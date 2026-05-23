@@ -1,0 +1,31 @@
+# Entorno virtual
+venv/
+.venv/
+env/
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Variables de entorno y secretos
+.env
+.env.*
+
+# Base de datos local (se recrea automáticamente)
+veterinaria.db
+*.db
+*.sqlite3
+
+# Distribución / build
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db
