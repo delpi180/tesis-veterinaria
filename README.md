@@ -142,6 +142,5 @@ No se requiere ninguna API Key de OpenAI para la funcionalidad principal del sis
 
 ---
 
-## Autora
-
-Diana — Tesis de grado, 2026
+## Autor
+Mendoza, 2026
