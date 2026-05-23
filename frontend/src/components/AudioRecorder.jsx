@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react'
 
+const BASE = import.meta.env.VITE_API_URL ?? ''
+
 const MicIcon = ({ className }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
@@ -81,7 +83,7 @@ export default function AudioRecorder({ onResult, onStatusChange }) {
     try {
       const form = new FormData()
       form.append('audio', blob, 'consulta.webm')
-      const res = await fetch('/api/transcribe', { method: 'POST', body: form })
+      const res = await fetch(`${BASE}/api/transcribe`, { method: 'POST', body: form })
       if (!res.ok) throw new Error(`Transcripción: ${res.status}`)
       ;({ transcripcion } = await res.json())
     } catch (e) {
@@ -94,7 +96,7 @@ export default function AudioRecorder({ onResult, onStatusChange }) {
 
     let soap
     try {
-      const res = await fetch('/api/process-soap', {
+      const res = await fetch(`${BASE}/api/process-soap`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ texto: transcripcion }),

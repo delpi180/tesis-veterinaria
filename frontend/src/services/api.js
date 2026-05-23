@@ -1,7 +1,9 @@
+const BASE = import.meta.env.VITE_API_URL ?? ''
+
 async function request(path, options = {}) {
   let res
   try {
-    res = await fetch(path, options)
+    res = await fetch(BASE + path, options)
   } catch {
     throw new Error('Sin conexión con el servidor. ¿Está el backend corriendo?')
   }
