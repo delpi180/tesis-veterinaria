@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
+import GlobalSearch from './components/GlobalSearch'
 import { ToastProvider } from './components/Toast'
 import Login from './pages/Login'
 import Inicio from './pages/Inicio'
@@ -27,6 +28,7 @@ function AppProtegida() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
+      <GlobalSearch />
       <Routes>
         <Route path="/"                       element={<Inicio />} />
         <Route path="/clientes"               element={<Clientes />} />

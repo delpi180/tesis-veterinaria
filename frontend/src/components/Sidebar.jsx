@@ -6,6 +6,7 @@ import {
   Menu, X,
 } from 'lucide-react'
 import { getNombre, getRol, cerrarSesion, esVeterinario } from '../services/api'
+import ThemeToggle from './ThemeToggle'
 
 const PawIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
@@ -122,7 +123,8 @@ export default function Sidebar() {
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-purple-800">
-          <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <div className="flex items-center gap-3 mt-3">
             <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white text-xs font-bold uppercase">
               {nombre.charAt(0)}
             </div>

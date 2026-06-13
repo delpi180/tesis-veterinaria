@@ -1,5 +1,88 @@
 @import "tailwindcss";
 
+:root {
+  --bg-primary: #f8fafc;       /* slate-50 */
+  --bg-card: #ffffff;
+  --bg-header: #ffffff;
+  --text-primary: #1e293b;     /* slate-800 */
+  --text-secondary: #64748b;   /* slate-500 */
+  --border-color: #e2e8f0;     /* slate-200 */
+  --hover-bg: #f1f5f9;         /* slate-100 */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06);
+  --input-bg: #ffffff;
+  --table-stripe: #f8fafc;
+  --purple-gradient-from: #7e22ce;
+  --purple-gradient-to: #7c3aed;
+  --transition-theme: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+.dark {
+  --bg-primary: #0f172a;       /* slate-900 */
+  --bg-card: #1e293b;          /* slate-800 */
+  --bg-header: #1e293b;
+  --text-primary: #f1f5f9;     /* slate-100 */
+  --text-secondary: #94a3b8;   /* slate-400 */
+  --border-color: #334155;     /* slate-700 */
+  --hover-bg: #334155;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
+  --input-bg: #334155;
+  --table-stripe: #1e293b;
+  --purple-gradient-from: #9333ea;
+  --purple-gradient-to: #8b5cf6;
+}
+
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; font-family: 'Inter', system-ui, sans-serif; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: var(--transition-theme);
+}
+
 #root { width: 100%; min-height: 100vh; display: flex; }
+
+/* Themed utility classes */
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-card);
+  transition: var(--transition-theme);
+}
+
+.themed-header {
+  background-color: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+  transition: var(--transition-theme);
+}
+
+.themed-input {
+  background-color: var(--input-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  transition: var(--transition-theme);
+}
+
+.themed-input:focus {
+  border-color: #a855f7;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15);
+}
+
+/* KPI card entrance animation */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fadeSlideUp 0.5s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-fade-up:nth-child(1) { animation-delay: 0.05s; }
+.animate-fade-up:nth-child(2) { animation-delay: 0.1s; }
+.animate-fade-up:nth-child(3) { animation-delay: 0.15s; }
+.animate-fade-up:nth-child(4) { animation-delay: 0.2s; }
