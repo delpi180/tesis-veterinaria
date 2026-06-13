@@ -51,6 +51,7 @@ class Paciente(Base):
     color               = Column(String(60))
     alergias            = Column(Text)          # alertas clínicas destacadas
     condiciones_cronicas = Column(Text)
+    foto_url            = Column(Text, nullable=True)  # Base64 data URI de la foto
 
     cliente  = relationship("Cliente", back_populates="pacientes")
     historias = relationship(

@@ -1,6 +1,8 @@
 from datetime import time
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import base64
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -144,3 +146,33 @@ def actualizar_historia(
     db.commit()
     db.refresh(historia)
     return historia
+
+
+# ── Foto de la mascota ───────────────────────────────────────────────────────
+
+@router.post("/{paciente_id}/foto")
+async def subir_foto(paciente_id: int, foto: UploadFile = File(...), db: Session = Depends(get_db)):
+    """Sube una foto de la mascota y la guarda como data URI (base64) en la BD."""
+    paciente = db.get(Paciente, paciente_id)
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    MAX_SIZE = 2 * 1024 * 1024  # 2 MB
+    contenido = await foto.read()
+    if len(contenido) > MAX_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La imagen excede el tamaño máximo de 2 MB ({len(contenido)} bytes).",
+        )
+
+    import os
+    ext = os.path.splitext(foto.filename or "foto.png")[-1].lstrip(".").lower()
+    if ext == "jpg":
+        ext = "jpeg"
+    b64 = base64.b64encode(contenido).decode("utf-8")
+    data_uri = f"data:image/{ext};base64,{b64}"
+
+    paciente.foto_url = data_uri
+    db.commit()
+    db.refresh(paciente)
+    return {"foto_url": paciente.foto_url}

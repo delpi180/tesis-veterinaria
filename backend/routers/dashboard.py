@@ -109,6 +109,44 @@ def resumen_dashboard(db: Session = Depends(get_db)):
     total_clientes = db.query(func.count(Cliente.id)).scalar()
     total_pacientes = db.query(func.count(Paciente.id)).scalar()
 
+    # ── Distribución por especie ──────────────────────────────────────────────
+    especies_rows = (
+        db.query(Paciente.especie, func.count(Paciente.id))
+        .group_by(Paciente.especie)
+        .all()
+    )
+    especies_distribucion = [
+        {"especie": especie or "Sin especificar", "cantidad": int(cant)}
+        for especie, cant in especies_rows
+    ]
+
+    # ── Ingresos de la semana (últimos 7 días, por día) ───────────────────────
+    ingresos_semana_data: dict[int, float] = {i: 0.0 for i in range(7)}
+    for i in range(7):
+        dia = lunes + timedelta(days=i)
+        dia_ini, dia_fin = _rango_local(dia)
+        total_dia = (
+            db.query(func.coalesce(func.sum(Venta.total), 0))
+            .filter(Venta.fecha >= dia_ini, Venta.fecha < dia_fin)
+            .scalar()
+        )
+        ingresos_semana_data[i] = float(total_dia)
+    ingresos_semana = [
+        {"dia": DIAS[i], "total": ingresos_semana_data[i]} for i in range(7)
+    ]
+
+    # ── Métodos de pago del mes ───────────────────────────────────────────────
+    metodos_rows = (
+        db.query(Venta.metodo_pago, func.count(Venta.id), func.coalesce(func.sum(Venta.total), 0))
+        .filter(Venta.fecha >= mes_ini)
+        .group_by(Venta.metodo_pago)
+        .all()
+    )
+    metodos_pago = [
+        {"metodo": metodo or "efectivo", "cantidad": int(cant), "total": float(total)}
+        for metodo, cant, total in metodos_rows
+    ]
+
     # ── Vacunas con próxima dosis (recordatorios) ─────────────────────────────
     historias_vacunas = (
         db.query(HistoriaClinica)
@@ -157,6 +195,9 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         "total_clientes": int(total_clientes),
         "total_pacientes": int(total_pacientes),
         "vacunas_proximas": vacunas,
+        "especies_distribucion": especies_distribucion,
+        "ingresos_semana": ingresos_semana,
+        "metodos_pago": metodos_pago,
     }
 
 
