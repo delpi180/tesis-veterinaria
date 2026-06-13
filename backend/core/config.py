@@ -34,6 +34,9 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Corrección para Render: SQLAlchemy 2.0 requiere postgresql+psycopg:// para psycopg v3
-if settings.database_url and settings.database_url.startswith("postgres://"):
-    settings.database_url = settings.database_url.replace("postgres://", "postgresql+psycopg://", 1)
+# Corrección para Render: Forzar el uso de psycopg3 (psycopg-binary)
+if settings.database_url:
+    if settings.database_url.startswith("postgres://"):
+        settings.database_url = settings.database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif settings.database_url.startswith("postgresql://"):
+        settings.database_url = settings.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
