@@ -33,3 +33,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Corrección para Render: SQLAlchemy 2.0 requiere postgresql:// en lugar de postgres://
+if settings.database_url and settings.database_url.startswith("postgres://"):
+    settings.database_url = settings.database_url.replace("postgres://", "postgresql://", 1)
