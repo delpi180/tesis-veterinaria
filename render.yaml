@@ -1,3 +1,8 @@
+databases:
+  - name: tesis-veterinaria-db
+    plan: free
+    postgresMajorVersion: 15
+
 services:
   - type: web
     name: tesis-veterinaria-backend
@@ -12,8 +17,3 @@ services:
         fromDatabase:
           name: tesis-veterinaria-db
           property: connectionString
-
-  - type: psql
-    name: tesis-veterinaria-db
-    plan: free
-    postgresMajorVersion: 15
