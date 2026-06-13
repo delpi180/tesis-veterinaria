@@ -1,0 +1,13 @@
+name: Keep Render Awake
+
+on:
+  schedule:
+    - cron: "*/14 * * * *" # Se ejecuta cada 14 minutos
+  workflow_dispatch: # Permite ejecutarlo manualmente
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Backend
+        run: curl -s https://tesis-veterinaria-backend.onrender.com/api/health
