@@ -15,6 +15,11 @@ router = APIRouter(prefix="/api/clientes", tags=["Clientes"])
 
 @router.post("/", response_model=ClienteOut, status_code=status.HTTP_201_CREATED)
 def crear_cliente(payload: ClienteCreate, db: Session = Depends(get_db)):
+    if payload.dni and db.query(Cliente).filter(Cliente.dni == payload.dni).first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya existe un cliente registrado con el DNI {payload.dni}",
+        )
     cliente = Cliente(**payload.model_dump())
     db.add(cliente)
     db.commit()

@@ -1,0 +1,25 @@
+# Dependencias Node
+node_modules/
+
+# Entornos virtuales Python
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Bases de datos locales
+*.db
+*.sqlite3
+
+# Variables de entorno
+.env
+.env.local
+
+# Archivos del sistema y de IA
+.DS_Store
+.claude/
+.gemini/
+
+# Builds
+dist/
+build/

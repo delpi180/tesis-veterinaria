@@ -1,70 +1,80 @@
 import os
-import shutil
-import tempfile
-import whisper
-import imageio_ffmpeg
+from deepgram import DeepgramClient
+from core.config import settings
 
 
-def _setup_ffmpeg():
-    """
-    imageio-ffmpeg empaqueta el binario como 'ffmpeg-win-x86_64-vX.Y.exe'.
-    Whisper llama ["ffmpeg", ...] y necesita 'ffmpeg.exe' en el PATH.
-    Esta función garantiza que exista 'ffmpeg.exe' en el directorio del binario
-    y lo agrega al PATH del proceso.
-    """
-    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-    ffmpeg_dir = os.path.dirname(ffmpeg_exe)
-
-    # Crear ffmpeg.exe si el binario tiene nombre largo con versión
-    ffmpeg_plain = os.path.join(ffmpeg_dir, "ffmpeg.exe")
-    if not os.path.exists(ffmpeg_plain):
-        shutil.copy2(ffmpeg_exe, ffmpeg_plain)
-        print(f"[FFMPEG] Copiado como ffmpeg.exe en {ffmpeg_dir}")
-
-    # Agregar al PATH si no está
-    path_env = os.environ.get("PATH", "")
-    if ffmpeg_dir not in path_env:
-        os.environ["PATH"] = ffmpeg_dir + os.pathsep + path_env
-
-    # Verificar que 'ffmpeg' es localizable
-    found = shutil.which("ffmpeg")
-    if found:
-        print(f"[FFMPEG] OK — {found}")
-    else:
-        print(f"[FFMPEG] ADVERTENCIA: 'ffmpeg' no encontrado en PATH tras configuración")
-
-
-_setup_ffmpeg()
-
-# Singleton: el modelo se carga una sola vez al primer uso
-_model = None
-
-
-def _get_model() -> whisper.Whisper:
-    global _model
-    if _model is None:
-        print("[WHISPER] Cargando modelo 'base'…")
-        _model = whisper.load_model("base")
-        print("[WHISPER] Modelo cargado OK")
-    return _model
+# Vocabulario veterinario para "keyterm boosting": ayuda a Deepgram a no
+# transcribir mal nombres de fármacos, vacunas y términos clínicos frecuentes.
+KEYTERMS_VET = [
+    # Vacunas
+    "Nobivac", "Vanguard", "Eurican", "Defensor", "Rabisin", "Bravecto",
+    "Quíntuple", "Séxtuple", "Antirrábica", "Triple felina", "Puppy",
+    # Fármacos
+    "Amoxicilina", "Metronidazol", "Meloxicam", "Carprofeno", "Enrofloxacina",
+    "Ivermectina", "Cefalexina", "Dexametasona", "Prednisona", "Tramadol",
+    "Maropitant", "Cerenia", "Omeprazol", "Ranitidina", "Furosemida",
+    "Doxiciclina", "Gabapentina", "Apoquel",
+    # Términos clínicos
+    "mucosas", "ictéricas", "cianóticas", "linfonódulos", "taquicardia",
+    "deshidratado", "hematuria", "anorexia", "condición corporal",
+]
 
 
 def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav") -> str:
-    model = _get_model()
-    suffix = os.path.splitext(filename)[-1] or ".wav"
+    """
+    Transcribe audio_bytes a texto usando Deepgram (pre-recorded REST).
+    Devuelve el transcript como string plano.
 
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(audio_bytes)
-        tmp_path = tmp.name
+    - El modelo y el idioma son configurables en .env (DEEPGRAM_MODEL,
+      DEEPGRAM_LANGUAGE). Por defecto nova-3 + multi (maneja español con
+      nombres de marca en inglés).
+    - Se aplica keyterm boosting con vocabulario veterinario. Si la combinación
+      modelo/idioma no soporta keyterm, reintenta automáticamente sin él.
+    """
+    if not settings.deepgram_api_key:
+        raise RuntimeError(
+            "DEEPGRAM_API_KEY no está configurada. "
+            "Agrégala al archivo .env del backend."
+        )
 
-    print(f"[TRANSCRIBE] Procesando {suffix} — {len(audio_bytes)} bytes")
+    ext = os.path.splitext(filename)[-1].lower() or ".wav"
+    client = DeepgramClient(api_key=settings.deepgram_api_key)
+
+    base_kwargs = dict(
+        request=audio_bytes,
+        model=settings.deepgram_model,
+        language=settings.deepgram_language,
+        smart_format=True,   # puntuación y números formateados
+    )
+
+    print(
+        f"[DEEPGRAM] Enviando {ext} ({len(audio_bytes):,} bytes) "
+        f"— modelo={settings.deepgram_model} lang={settings.deepgram_language}"
+    )
+
+    def _llamar(con_keyterms: bool):
+        kwargs = dict(base_kwargs)
+        if con_keyterms:
+            kwargs["keyterm"] = KEYTERMS_VET
+        return client.listen.v1.media.transcribe_file(**kwargs)
+
     try:
-        result = model.transcribe(tmp_path, language="es", fp16=False)
-        text = result["text"].strip()
-        print(f"[TRANSCRIBE] OK — '{text[:80]}{'…' if len(text) > 80 else ''}'")
-        return text
-    except Exception as e:
-        print(f"[TRANSCRIBE] ERROR: {e}")
-        raise
-    finally:
-        os.unlink(tmp_path)
+        try:
+            response = _llamar(con_keyterms=True)
+        except Exception as exc_kt:
+            # El parámetro keyterm puede no estar soportado por el modelo/idioma:
+            # reintentar sin él en vez de fallar la consulta.
+            print(f"[DEEPGRAM] keyterm no aplicado ({exc_kt}); reintentando sin keyterm.")
+            response = _llamar(con_keyterms=False)
+    except Exception as exc:
+        raise RuntimeError(f"Error al conectar con Deepgram: {exc}") from exc
+
+    try:
+        transcript = response.results.channels[0].alternatives[0].transcript
+    except (AttributeError, IndexError, KeyError) as exc:
+        raise RuntimeError(f"Respuesta inesperada de Deepgram: {exc}") from exc
+
+    print(
+        f"[DEEPGRAM] OK — '{transcript[:80]}{'…' if len(transcript) > 80 else ''}'"
+    )
+    return transcript

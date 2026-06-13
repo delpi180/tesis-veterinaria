@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Avances — VetIA / Tesis 2026</title>
+<style>
+  :root {
+    --purple: #7c3aed;
+    --purple-light: #ede9fe;
+    --purple-mid: #a78bfa;
+    --green: #059669;
+    --green-light: #d1fae5;
+    --orange: #d97706;
+    --orange-light: #fef3c7;
+    --red: #dc2626;
+    --red-light: #fee2e2;
+    --sky: #0284c7;
+    --sky-light: #e0f2fe;
+    --slate: #475569;
+    --slate-light: #f8fafc;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f1f5f9;
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 60%, #a855f7 100%);
+    color: white;
+    padding: 28px 32px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 20px rgba(124,58,237,.35);
+  }
+  header h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -.02em; }
+  header p  { font-size: .82rem; opacity: .8; margin-top: 3px; }
+
+  .header-row { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+
+  /* Global progress bar */
+  .global-bar-wrap { display: flex; align-items: center; gap: 10px; }
+  .global-bar {
+    width: 220px; height: 8px;
+    background: rgba(255,255,255,.25);
+    border-radius: 99px; overflow: hidden;
+  }
+  .global-bar-fill {
+    height: 100%; border-radius: 99px;
+    background: #a3e635;
+    transition: width .4s ease;
+  }
+  .global-pct { font-size: .85rem; font-weight: 700; color: #a3e635; min-width: 38px; text-align: right; }
+
+  /* ── LAYOUT ── */
+  main { max-width: 960px; margin: 0 auto; padding: 28px 20px 60px; }
+
+  /* ── SECTION HEADERS ── */
+  .section-title {
+    font-size: .7rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--text-muted);
+    margin: 28px 0 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* ── CARDS ── */
+  .card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    transition: box-shadow .15s;
+  }
+  .card:hover { box-shadow: 0 2px 12px rgba(0,0,0,.07); }
+
+  /* Task row */
+  .task-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .1s;
+  }
+  .task-row:last-child { border-bottom: none; }
+  .task-row:hover { background: var(--slate-light); }
+
+  .task-row input[type="checkbox"] {
+    width: 17px; height: 17px; border-radius: 4px;
+    accent-color: var(--purple);
+    cursor: pointer; flex-shrink: 0; margin-top: 2px;
+  }
+
+  .task-body { flex: 1; min-width: 0; }
+  .task-title {
+    font-size: .875rem; font-weight: 500; line-height: 1.35;
+    transition: color .15s;
+  }
+  .task-row.done .task-title { text-decoration: line-through; color: var(--text-muted); }
+  .task-meta { font-size: .75rem; color: var(--text-muted); margin-top: 2px; }
+
+  /* Badge */
+  .badge {
+    font-size: .65rem; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; border-radius: 99px;
+    padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
+  }
+  .badge-done    { background: var(--green-light);  color: var(--green); }
+  .badge-warn    { background: var(--orange-light); color: var(--orange); }
+  .badge-todo    { background: var(--red-light);    color: var(--red); }
+  .badge-info    { background: var(--sky-light);    color: var(--sky); }
+  .badge-purple  { background: var(--purple-light); color: var(--purple); }
+
+  /* ── NOTES SECTION ── */
+  .notes-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .notes-card h3 { font-size: .875rem; font-weight: 600; margin-bottom: 10px; color: var(--text); }
+  .notes-area {
+    width: 100%;
+    min-height: 120px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: .85rem;
+    font-family: inherit;
+    color: var(--text);
+    resize: vertical;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .notes-area:focus { border-color: var(--purple-mid); }
+  .notes-save {
+    margin-top: 8px;
+    background: var(--purple);
+    color: white;
+    border: none;
+    border-radius: 7px;
+    padding: 6px 16px;
+    font-size: .8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .notes-save:hover { background: #6d28d9; }
+  .notes-saved { color: var(--green); font-size: .78rem; margin-left: 8px; display: none; }
+
+  /* ── STAT CHIPS ── */
+  .stats-row {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px;
+  }
+  .stat-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: white; border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 16px;
+    flex: 1; min-width: 120px;
+  }
+  .stat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .stat-chip .num { font-size: 1.3rem; font-weight: 700; line-height: 1; }
+  .stat-chip .lbl { font-size: .72rem; color: var(--text-muted); }
+
+  /* ── BUG ITEM ── */
+  .bug-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .bug-item:last-child { border-bottom: none; }
+  .bug-icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .9rem; flex-shrink: 0; margin-top: 1px;
+  }
+  .bug-text { flex: 1; }
+  .bug-title { font-size: .875rem; font-weight: 500; }
+  .bug-desc  { font-size: .78rem; color: var(--text-muted); margin-top: 2px; }
+  .bug-file  { font-size: .7rem; background: #f1f5f9; color: var(--slate); border-radius: 4px; padding: 1px 6px; font-family: monospace; display: inline-block; margin-top: 4px; }
+
+  /* ── PRIORITY MATRIX ── */
+  .matrix { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .matrix-cell {
+    background: white; border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px;
+  }
+  .matrix-cell h4 { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+  .matrix-cell ul { list-style: none; }
+  .matrix-cell ul li { font-size: .8rem; padding: 3px 0; color: var(--text); display: flex; gap: 6px; }
+  .matrix-cell ul li::before { content: '›'; color: var(--text-muted); }
+
+  .cell-urgent-imp  { border-color: #fca5a5; } .cell-urgent-imp h4  { color: var(--red); }
+  .cell-nurgent-imp { border-color: #86efac; } .cell-nurgent-imp h4 { color: var(--green); }
+  .cell-urgent-nimp { border-color: #fcd34d; } .cell-urgent-nimp h4 { color: var(--orange); }
+  .cell-nurgent-nimp{ border-color: #bfdbfe; } .cell-nurgent-nimp h4{ color: var(--sky); }
+
+  @media (max-width: 600px) {
+    .matrix { grid-template-columns: 1fr; }
+    .global-bar { width: 140px; }
+    header { padding: 20px 16px; }
+    main { padding: 16px 12px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <div>
+      <h1>VetIA — Sistema Clínico Veterinario</h1>
+      <p>Tesis de Bachiller · Centro Médico Veterinario Los Pinos · 2026</p>
+    </div>
+    <div class="global-bar-wrap">
+      <div class="global-bar">
+        <div class="global-bar-fill" id="globalFill" style="width:0%"></div>
+      </div>
+      <span class="global-pct" id="globalPct">0%</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- STATS -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-chip">
+      <div class="stat-dot" style="background:#059669"></div>
+      <div><div class="num" id="cntDone">—</div><div class="lbl">Completados</div></div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-dot" style="background:#d97706"></div>
+      <div><div class="num" id="cntWarn">—</div><div class="lbl">En revisión</div></div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-dot" style="background:#dc2626"></div>
+      <div><div class="num" id="cntTodo">—</div><div class="lbl">Pendientes</div></div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-dot" style="background:#7c3aed"></div>
+      <div><div class="num" id="cntTotal">—</div><div class="lbl">Total ítems</div></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!--  MÓDULOS IMPLEMENTADOS                     -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="section-title">Backend — API & Datos</div>
+  <div class="card">
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Arquitectura FastAPI + SQLAlchemy 2 + SQLite</div>
+        <div class="task-meta">models.py · database.py · alembic</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Modelos relacionales completos (12 tablas)</div>
+        <div class="task-meta">Cliente → Paciente → HistoriaClinica · Cita · Evaluador · SUS · TAM · Producto · Venta · VentaItem</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Routers REST: clientes, pacientes, citas, historias, productos, ventas</div>
+        <div class="task-meta">CRUD completo con validación Pydantic</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Módulo de evaluación SUS + TAM con cálculo automático de puntajes</div>
+        <div class="task-meta">sus.py · tam.py · encuestas.py · evaluadores.py</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Servicio de transcripción de voz (Deepgram Nova-3)</div>
+        <div class="task-meta">services/transcription.py · endpoint POST /api/transcribe</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Extractor IA de historia clínica (GPT-4o-mini, JSON estructurado)</div>
+        <div class="task-meta">services/historia_extractor.py · system prompt con mapeo clínico completo · manejo de fechas relativas</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Deploy en Render (backend) + Vercel (frontend)</div>
+        <div class="task-meta">render.yaml · VITE_API_URL configurada para producción</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+  </div>
+
+  <div class="section-title">Frontend — Módulos de la aplicación</div>
+  <div class="card">
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Módulo Clientes — registro, búsqueda en tiempo real, DNI</div>
+        <div class="task-meta">pages/Clientes.jsx · pages/DetalleCliente.jsx</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Módulo Pacientes — registro por propietario, especie/raza/edad</div>
+        <div class="task-meta">DetalleCliente.jsx (sección mascotas)</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Módulo Historias Clínicas SOAP — ingreso manual, texto libre IA y grabación de voz</div>
+        <div class="task-meta">pages/HistoriasClinicas.jsx · components/AudioRecorder.jsx · components/SOAPPanel.jsx</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Exportación PDF de historia clínica completa</div>
+        <div class="task-meta">jsPDF + jspdf-autotable integrado en HistoriasClinicas.jsx</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Módulo Turnos — calendario de citas (vista mensual + próximos turnos)</div>
+        <div class="task-meta">pages/Turnos.jsx</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Módulo Inventario — control de stock con alertas de nivel bajo</div>
+        <div class="task-meta">pages/Inventario.jsx · campo stock_minimo en Producto</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Módulo Ventas — registro de ventas, KPIs financieros, gráficos Recharts</div>
+        <div class="task-meta">pages/Ventas.jsx</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+    <div class="task-row done" onclick="toggle(this)">
+      <input type="checkbox" checked />
+      <div class="task-body">
+        <div class="task-title">Módulo Mediciones — formularios SUS y TAM, resultados + visualización</div>
+        <div class="task-meta">pages/Mediciones.jsx · tabs: Encuestas / Resultados / Pipeline IA</div>
+      </div>
+      <span class="badge badge-done">Listo</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!--  PROBLEMAS CONOCIDOS                       -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="section-title">Bugs y problemas conocidos</div>
+  <div class="card">
+
+    <div class="bug-item">
+      <div class="bug-icon" style="background:#fee2e2">🔴</div>
+      <div class="bug-text">
+        <div class="bug-title">Ruta de API desactualizada en el frontend</div>
+        <div class="bug-desc">El frontend llama a <code>/api/process-soap</code> (nombre antiguo) pero el endpoint actual es <code>/api/procesar-historia</code>. Provoca error 404 al procesar con IA.</div>
+        <span class="bug-file">HistoriasClinicas.jsx → services/api.js</span>
+      </div>
+      <span class="badge badge-todo">Crítico</span>
+    </div>
+
+    <div class="bug-item">
+      <div class="bug-icon" style="background:#fef3c7">🟡</div>
+      <div class="bug-text">
+        <div class="bug-title">Dashboard Inicio con datos hardcodeados</div>
+        <div class="bug-desc">Los KPIs del panel principal (pacientes, ingresos, nuevos clientes) muestran valores fijos ('12', '45', 'S/ 850') en lugar de datos reales de la base de datos.</div>
+        <span class="bug-file">pages/Inicio.jsx</span>
+      </div>
+      <span class="badge badge-warn">Importante</span>
+    </div>
+
+    <div class="bug-item">
+      <div class="bug-icon" style="background:#fef3c7">🟡</div>
+      <div class="bug-text">
+        <div class="bug-title">CORS con allow_origins=["*"] en producción</div>
+        <div class="bug-desc">Permite solicitudes desde cualquier origen. Apropiado para desarrollo y demo de tesis, pero debería restringirse al dominio de Vercel en producción real.</div>
+        <span class="bug-file">backend/main.py</span>
+      </div>
+      <span class="badge badge-warn">Menor</span>
+    </div>
+
+    <div class="bug-item">
+      <div class="bug-icon" style="background:#e0f2fe">🔵</div>
+      <div class="bug-text">
+        <div class="bug-title">soap_processor.py (léxico) sin uso activo</div>
+        <div class="bug-desc">El clasificador NLP léxico fue reemplazado por GPT-4o-mini pero se conserva en services/ para comparativa de tesis. Verificar que esté documentado como baseline.</div>
+        <span class="bug-file">backend/services/soap_processor.py</span>
+      </div>
+      <span class="badge badge-info">Tesis</span>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!--  PENDIENTES / MEJORAS                      -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="section-title">Tareas pendientes y mejoras</div>
+  <div class="card">
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Corregir ruta /api/process-soap → /api/procesar-historia</div>
+        <div class="task-meta">Actualizar la llamada en services/api.js o HistoriasClinicas.jsx</div>
+      </div>
+      <span class="badge badge-todo">Bug fix</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Conectar KPIs del Dashboard a datos reales</div>
+        <div class="task-meta">Agregar endpoints: GET /api/stats/hoy y consumirlos en Inicio.jsx</div>
+      </div>
+      <span class="badge badge-warn">Mejora</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Implementar sistema de autenticación básico</div>
+        <div class="task-meta">Login con usuario/contraseña. JWT o sesión simple para proteger la app</div>
+      </div>
+      <span class="badge badge-todo">Pendiente</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Agregar tests de integración para endpoints críticos</div>
+        <div class="task-meta">pytest + TestClient de FastAPI: al menos transcribe, procesar-historia, clientes CRUD</div>
+      </div>
+      <span class="badge badge-todo">Pendiente</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Completar colección de respuestas SUS y TAM para el análisis estadístico</div>
+        <div class="task-meta">Mínimo recomendado: 10–15 evaluadores para resultados significativos</div>
+      </div>
+      <span class="badge badge-purple">Tesis</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Documentar comparativa NLP léxico vs GPT-4o-mini en la tesis</div>
+        <div class="task-meta">soap_processor.py vs historia_extractor.py — precisión, velocidad, costo</div>
+      </div>
+      <span class="badge badge-purple">Tesis</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Manejo de errores de red en el frontend (estados loading/error)</div>
+        <div class="task-meta">Mostrar feedback claro cuando la API falla o tarda — especialmente en grabación de voz</div>
+      </div>
+      <span class="badge badge-warn">UX</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Paginación en listados de clientes e historias</div>
+        <div class="task-meta">Evitar cargar todos los registros en memoria cuando la BD crezca</div>
+      </div>
+      <span class="badge badge-info">Escalabilidad</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Validación de tipo de archivo de audio en el frontend antes de enviar</div>
+        <div class="task-meta">AudioRecorder.jsx: confirmar que el blob generado tenga extensión aceptada por el backend</div>
+      </div>
+      <span class="badge badge-warn">Mejora</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Migrar SQLite → PostgreSQL para despliegue en Render (producción)</div>
+        <div class="task-meta">SQLite no es persistente entre deployments en Render free tier</div>
+      </div>
+      <span class="badge badge-warn">Deploy</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Agregar campo "sexo" y "esterilizado" al modelo Paciente</div>
+        <div class="task-meta">Datos frecuentes en historia clínica veterinaria que actualmente faltan</div>
+      </div>
+      <span class="badge badge-info">Modelo</span>
+    </div>
+
+    <div class="task-row" onclick="toggle(this)">
+      <input type="checkbox" />
+      <div class="task-body">
+        <div class="task-title">Redactar sección de limitaciones y trabajo futuro en la tesis</div>
+        <div class="task-meta">Whisper local vs Deepgram, SQLite vs PostgreSQL, sin autenticación, costo de API</div>
+      </div>
+      <span class="badge badge-purple">Tesis</span>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!--  MATRIZ DE PRIORIDAD                       -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="section-title">Matriz de prioridad</div>
+  <div class="matrix">
+    <div class="matrix-cell cell-urgent-imp">
+      <h4>🔴 Urgente + Importante</h4>
+      <ul>
+        <li>Fix ruta /api/process-soap</li>
+        <li>Conectar KPIs a datos reales</li>
+        <li>Recolectar datos SUS/TAM</li>
+      </ul>
+    </div>
+    <div class="matrix-cell cell-nurgent-imp">
+      <h4>🟢 Importante (puede planificarse)</h4>
+      <ul>
+        <li>Autenticación básica</li>
+        <li>Documentar comparativa NLP</li>
+        <li>Migrar a PostgreSQL</li>
+        <li>Tests de integración</li>
+      </ul>
+    </div>
+    <div class="matrix-cell cell-urgent-nimp">
+      <h4>🟡 Urgente pero menor</h4>
+      <ul>
+        <li>Validación audio en frontend</li>
+        <li>Manejo de errores de red</li>
+        <li>Paginación en listados</li>
+      </ul>
+    </div>
+    <div class="matrix-cell cell-nurgent-nimp">
+      <h4>🔵 Backlog / Nice-to-have</h4>
+      <ul>
+        <li>Campo sexo/esterilizado en Paciente</li>
+        <li>Restringir CORS a dominio Vercel</li>
+        <li>Limpiar soap_processor.py</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!--  NOTAS                                     -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="section-title">Notas y observaciones</div>
+  <div class="notes-card">
+    <h3>Notas personales</h3>
+    <textarea class="notes-area" id="notesArea" placeholder="Escribe aquí tus observaciones, ideas o recordatorios..."></textarea>
+    <div style="display:flex;align-items:center;">
+      <button class="notes-save" onclick="saveNotes()">Guardar</button>
+      <span class="notes-saved" id="notesSaved">✓ Guardado</span>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // ── Persistencia en localStorage ──────────────────────────────
+  const STORAGE_KEY = 'vetia-avances-v1';
+
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch { return {}; }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  // ── Toggle de tareas ──────────────────────────────────────────
+  function toggle(row) {
+    const cb = row.querySelector('input[type="checkbox"]');
+    cb.checked = !cb.checked;
+    row.classList.toggle('done', cb.checked);
+    persistAll();
+    updateStats();
+  }
+
+  // ── Stats ─────────────────────────────────────────────────────
+  function updateStats() {
+    const rows  = document.querySelectorAll('.task-row');
+    const total = rows.length;
+    let done = 0, warn = 0, todo = 0;
+
+    rows.forEach(r => {
+      const cb = r.querySelector('input[type="checkbox"]');
+      const badge = r.querySelector('.badge');
+      if (cb && cb.checked) {
+        done++;
+      } else if (badge) {
+        if (badge.classList.contains('badge-warn')) warn++;
+        else todo++;
+      }
+    });
+
+    document.getElementById('cntDone').textContent  = done;
+    document.getElementById('cntWarn').textContent  = warn;
+    document.getElementById('cntTodo').textContent  = todo;
+    document.getElementById('cntTotal').textContent = total;
+
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    document.getElementById('globalFill').style.width = pct + '%';
+    document.getElementById('globalPct').textContent  = pct + '%';
+  }
+
+  // ── Persist checkbox state ────────────────────────────────────
+  function persistAll() {
+    const state = loadState();
+    const rows  = document.querySelectorAll('.task-row');
+    rows.forEach((row, i) => {
+      const cb = row.querySelector('input[type="checkbox"]');
+      if (cb) state['task_' + i] = cb.checked;
+    });
+    saveState(state);
+  }
+
+  function restoreAll() {
+    const state = loadState();
+    const rows  = document.querySelectorAll('.task-row');
+    rows.forEach((row, i) => {
+      const cb = row.querySelector('input[type="checkbox"]');
+      if (cb && state['task_' + i] !== undefined) {
+        cb.checked = state['task_' + i];
+        row.classList.toggle('done', cb.checked);
+      }
+    });
+  }
+
+  // ── Notes ─────────────────────────────────────────────────────
+  function saveNotes() {
+    const state = loadState();
+    state.notes = document.getElementById('notesArea').value;
+    saveState(state);
+    const el = document.getElementById('notesSaved');
+    el.style.display = 'inline';
+    setTimeout(() => { el.style.display = 'none'; }, 2000);
+  }
+
+  function restoreNotes() {
+    const state = loadState();
+    if (state.notes) document.getElementById('notesArea').value = state.notes;
+  }
+
+  // ── Init ──────────────────────────────────────────────────────
+  restoreAll();
+  restoreNotes();
+  updateStats();
+</script>
+</body>
+</html>

@@ -1,8 +1,11 @@
-import { NavLink } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Calendar, ClipboardList,
-  Package, BarChart2,
+  Package, Stethoscope, BarChart2, Activity, LogOut, Wallet, UserCog,
+  Menu, X,
 } from 'lucide-react'
+import { getNombre, getRol, cerrarSesion, esVeterinario } from '../services/api'
 
 const PawIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
@@ -10,23 +13,30 @@ const PawIcon = () => (
   </svg>
 )
 
+// `vet` => visible solo para veterinario
 const SECCION_CLINICA = [
-  { label: 'Inicio',            to: '/',           Icon: LayoutDashboard },
-  { label: 'Clientes',          to: '/clientes',   Icon: Users            },
-  { label: 'Turnos',            to: '/turnos',     Icon: Calendar         },
-  { label: 'Historias Clínicas', to: '/consultas', Icon: ClipboardList    },
+  { label: 'Inicio',             to: '/',          Icon: LayoutDashboard },
+  { label: 'Clientes',           to: '/clientes',  Icon: Users },
+  { label: 'Turnos',             to: '/turnos',    Icon: Calendar },
+  { label: 'Historias Clínicas', to: '/consultas', Icon: ClipboardList, vet: true },
 ]
-
 const SECCION_ADMIN = [
-  { label: 'Inventario',        to: '/inventario', Icon: Package   },
-  { label: 'Ventas y Reportes', to: '/ventas',     Icon: BarChart2 },
+  { label: 'Inventario',        to: '/inventario', Icon: Package },
+  { label: 'Servicios',         to: '/servicios',  Icon: Stethoscope },
+  { label: 'Ventas',            to: '/ventas',     Icon: BarChart2 },
+  { label: 'Caja',              to: '/caja',       Icon: Wallet },
+  { label: 'Usuarios',          to: '/usuarios',   Icon: UserCog, vet: true },
+]
+const SECCION_TESIS = [
+  { label: 'Mediciones', to: '/mediciones', Icon: Activity },
 ]
 
-function NavItem({ label, to, Icon }) {
+function NavItem({ label, to, Icon, onClick }) {
   return (
     <NavLink
       to={to}
       end={to === '/'}
+      onClick={onClick}
       className={({ isActive }) => [
         'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
         isActive
@@ -46,46 +56,87 @@ function NavItem({ label, to, Icon }) {
 }
 
 export default function Sidebar() {
+  const navigate = useNavigate()
+  const [abierto, setAbierto] = useState(false)
+  const nombre = getNombre() || 'Veterinario'
+  const rol = getRol() || 'veterinario'
+  const visible = (items) => items.filter(i => !i.vet || esVeterinario())
+
+  const handleLogout = () => {
+    cerrarSesion()
+    navigate('/login', { replace: true })
+  }
+  const cerrar = () => setAbierto(false)
+
+  const Seccion = ({ titulo, items }) => {
+    const vis = visible(items)
+    if (vis.length === 0) return null
+    return (
+      <>
+        <p className="text-purple-400 text-xs font-semibold uppercase tracking-widest px-3 mt-5 mb-2 first:mt-0">{titulo}</p>
+        {vis.map(item => <NavItem key={item.to} {...item} onClick={cerrar} />)}
+      </>
+    )
+  }
+
   return (
-    <aside className="w-64 min-h-screen bg-purple-950 flex flex-col shrink-0">
-      {/* Logo */}
-      <div className="px-6 py-6 flex items-center gap-3 border-b border-purple-800">
-        <div className="bg-purple-700 rounded-xl p-2 text-white">
-          <PawIcon />
-        </div>
-        <div>
-          <p className="text-white font-bold text-sm leading-tight">Veterinaria</p>
-          <p className="text-purple-300 text-xs font-medium">Los Pinos</p>
-        </div>
+    <>
+      {/* Barra superior móvil */}
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-purple-950 text-white px-4 py-3 flex items-center gap-3">
+        <button onClick={() => setAbierto(true)} className="p-1.5 rounded-lg hover:bg-purple-800">
+          <Menu className="w-5 h-5" />
+        </button>
+        <span className="font-bold text-sm">Veterinaria Los Pinos</span>
       </div>
+      <div className="md:hidden h-12" />
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-5 flex flex-col gap-1 overflow-y-auto">
+      {/* Overlay móvil */}
+      {abierto && <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={cerrar} />}
 
-        <p className="text-purple-400 text-xs font-semibold uppercase tracking-widest px-3 mb-2">
-          Clínica
-        </p>
-        {SECCION_CLINICA.map(item => <NavItem key={item.to} {...item} />)}
-
-        <p className="text-purple-400 text-xs font-semibold uppercase tracking-widest px-3 mt-5 mb-2">
-          Administración
-        </p>
-        {SECCION_ADMIN.map(item => <NavItem key={item.to} {...item} />)}
-
-      </nav>
-
-      {/* Footer */}
-      <div className="px-4 py-4 border-t border-purple-800">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white text-xs font-bold">
-            V
+      {/* Sidebar */}
+      <aside className={[
+        'w-64 bg-purple-950 flex flex-col shrink-0 z-50',
+        'fixed inset-y-0 left-0 transform transition-transform md:transform-none md:static md:min-h-screen',
+        abierto ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      ].join(' ')}>
+        {/* Logo */}
+        <div className="px-6 py-6 flex items-center gap-3 border-b border-purple-800">
+          <div className="bg-purple-700 rounded-xl p-2 text-white">
+            <PawIcon />
           </div>
-          <div>
-            <p className="text-white text-xs font-medium">Veterinario</p>
-            <p className="text-purple-400 text-xs">Los Pinos</p>
+          <div className="flex-1">
+            <p className="text-white font-bold text-sm leading-tight">Veterinaria</p>
+            <p className="text-purple-300 text-xs font-medium">Los Pinos</p>
+          </div>
+          <button onClick={cerrar} className="md:hidden p-1 text-purple-300 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-5 flex flex-col gap-1 overflow-y-auto">
+          <Seccion titulo="Clínica" items={SECCION_CLINICA} />
+          <Seccion titulo="Administración" items={SECCION_ADMIN} />
+          <Seccion titulo="Tesis" items={SECCION_TESIS} />
+        </nav>
+
+        {/* Footer */}
+        <div className="px-4 py-4 border-t border-purple-800">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white text-xs font-bold uppercase">
+              {nombre.charAt(0)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-xs font-medium capitalize truncate">{nombre}</p>
+              <p className="text-purple-400 text-xs capitalize">{rol}</p>
+            </div>
+            <button onClick={handleLogout} title="Cerrar sesión"
+              className="p-2 rounded-lg text-purple-300 hover:text-white hover:bg-purple-800 transition">
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   )
 }

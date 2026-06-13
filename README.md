@@ -1,146 +1,129 @@
 # Implementación de un sistema automatizado para optimizar el seguimiento del historial clínico en el Centro médico veterinario los Pinos - 2026
 
-Sistema web de gestión clínica veterinaria con módulo de asistencia por IA para la estructuración automática de historias clínicas en formato SOAP mediante reconocimiento de voz (Whisper).
+Sistema integral web de gestión clínica veterinaria diseñado como proyecto de tesis. Cuenta con un módulo avanzado de asistencia por IA para la estructuración automática de historias clínicas en formato SOAP mediante transcripción de voz y procesamiento de lenguaje natural, además de módulos de evaluación académica (SUS, TAM y métricas de exactitud de IA).
 
 ---
 
-## Tecnologías utilizadas
+## 🚀 Arquitectura y Tecnologías Utilizadas
 
-| Capa | Tecnología |
-|------|------------|
-| Frontend | React 19 + Vite 8 + Tailwind CSS v4 |
-| Backend | FastAPI + SQLAlchemy 2 + SQLite |
-| IA / Voz | OpenAI Whisper (local, modelo `base`) |
-| PDF | jsPDF + jspdf-autotable |
-| Gráficos | Recharts |
+La plataforma está diseñada con una arquitectura Cliente-Servidor moderna, separando completamente el frontend del backend y utilizando servicios en la nube para la inteligencia artificial.
+
+### Frontend (SPA)
+*   **Framework:** React 19 + Vite 8
+*   **Estilos:** Tailwind CSS v4
+*   **Iconos:** Lucide React
+*   **Gráficos e Informes:** Recharts (Data Viz) y jsPDF (Exportación de Historias)
+*   **Enrutamiento:** React Router DOM v7
+
+### Backend (API REST)
+*   **Framework:** FastAPI (Python 3.10+)
+*   **ORM y Base de Datos:** SQLAlchemy 2.0 + Alembic (Migraciones) + PostgreSQL (psycopg 3)
+*   **Autenticación:** JWT (JSON Web Tokens) con Pydantic Settings
+*   **Testing:** Pytest
+
+### Integraciones de Inteligencia Artificial (IA)
+A diferencia de versiones anteriores, el sistema ahora utiliza servicios de IA especializados en la nube para maximizar la velocidad y precisión:
+*   **Transcripción de Voz:** Deepgram SDK (Modelo `Nova-3`)
+*   **Estructuración Clínica (NLP a SOAP):** OpenAI API (Modelo `GPT-4o-mini`)
 
 ---
 
-## Estructura del proyecto
+## 📦 Módulos del Sistema
 
-```
+El proyecto abarca la gestión integral de la veterinaria y la validación de la tesis:
+
+### Gestión Veterinaria
+*   **Autenticación y Usuarios:** Roles de sistema (Veterinario, Recepcionista).
+*   **Clientes y Pacientes:** Registro de propietarios y mascotas (especie, raza, edad, etc.).
+*   **Historias Clínicas y SOAP IA:** Ingreso manual o por voz. La IA (Deepgram + GPT) transcribe la consulta y extrae automáticamente los signos vitales, diagnósticos y tratamientos.
+*   **Citas (Turnos):** Agenda y calendario de atención.
+*   **Inventario (Productos y Servicios):** Control de stock de medicamentos y catálogo de servicios.
+*   **Ventas y Facturación:** Registro de transacciones.
+*   **Dashboard:** KPIs, gráficos estadísticos y resumen general de la clínica.
+
+### Módulos de Evaluación (Tesis)
+*   **Comparativa de Exactitud IA vs Léxico:** Endpoints diseñados para comparar la extracción de datos de GPT-4o-mini contra un algoritmo léxico clásico y un *Gold Standard*, midiendo Precisión, Recall y F1-Score.
+*   **Encuestas de Usabilidad:** Formularios y recolección de datos utilizando la Escala de Usabilidad del Sistema (SUS).
+*   **Modelo de Aceptación Tecnológica (TAM):** Recolección de métricas sobre la percepción de utilidad y facilidad de uso por parte de los evaluadores.
+
+---
+
+## 📂 Estructura del Proyecto
+
+```text
 tesis-veterinaria/
-├── backend/          # API REST con FastAPI
-│   ├── main.py
-│   ├── models.py
-│   ├── schemas.py
-│   ├── database.py
-│   ├── routers/
-│   │   ├── clientes.py
-│   │   └── pacientes.py
-│   └── services/
-│       ├── transcription.py   # Whisper local
-│       └── soap_processor.py  # Clasificador NLP SOAP
-└── frontend/         # SPA con React + Vite
-    └── src/
-        ├── pages/
-        ├── components/
-        ├── hooks/
-        └── services/
+├── backend/                  # API REST (FastAPI)
+│   ├── main.py               # Punto de entrada de la aplicación
+│   ├── models.py             # Definición de tablas (SQLAlchemy)
+│   ├── schemas.py            # Esquemas de validación (Pydantic)
+│   ├── database.py           # Conexión a la BD
+│   ├── alembic/              # Migraciones de base de datos
+│   ├── routers/              # Controladores (clientes, pacientes, citas, etc.)
+│   ├── services/             # Lógica de negocio e integraciones
+│   │   ├── transcription.py  # Integración Deepgram Nova-3
+│   │   ├── historia_extractor.py # Integración OpenAI GPT-4o-mini
+│   │   └── soap_processor.py # Procesador léxico comparativo
+│   └── tests/                # Pruebas unitarias
+│
+├── frontend/                 # Interfaz de Usuario (React + Vite)
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js        # Configuración de Vite (Proxy hacia el backend)
+│   └── src/
+│       ├── App.jsx           # Enrutador principal
+│       ├── components/       # Componentes reutilizables de UI
+│       ├── pages/            # Vistas principales de los módulos
+│       ├── hooks/            # Custom Hooks de React
+│       ├── services/         # Llamadas a la API (Fetch/Axios)
+│       └── utils/            # Funciones auxiliares
+│
+└── render.yaml               # Archivo de configuración para despliegue en Render
 ```
 
 ---
 
-## Instrucciones para levantar el proyecto
+## ⚙️ Instrucciones para levantar el proyecto en local
 
-### Requisitos previos
+### 1. Variables de Entorno (Backend)
+Dentro de la carpeta `backend/`, copia el archivo `.env.example` y renómbralo a `.env`. Configura las credenciales necesarias:
+*   URL de conexión a la Base de Datos.
+*   Tokens de JWT (Secret Key).
+*   `DEEPGRAM_API_KEY`
+*   `OPENAI_API_KEY`
 
-- Python 3.10 o superior
-- Node.js 18 o superior
-- npm 9 o superior
-
----
-
-### 1. Clonar el repositorio
-
-```bash
-git clone <URL-del-repositorio>
-cd tesis-veterinaria
-```
-
----
-
-### 2. Configurar y levantar el Backend
+### 2. Levantar el Backend (FastAPI)
+Abre una terminal y ejecuta:
 
 ```bash
-# Entrar a la carpeta del backend
 cd backend
-
-# Crear el entorno virtual
 python -m venv venv
 
-# Activar el entorno virtual
-# En Windows:
+# Activar entorno virtual
+# Windows:
 .\venv\Scripts\activate
-# En macOS/Linux:
+# Linux/Mac:
 source venv/bin/activate
 
-# Instalar dependencias
 pip install -r requirements.txt
 
-# Levantar el servidor (puerto 8000)
+# Ejecutar el servidor (Puerto 8000)
 uvicorn main:app --reload
 ```
+La documentación interactiva de la API estará en: **http://localhost:8000/docs**
 
-La base de datos `veterinaria.db` se crea automáticamente al primer inicio.
-
-El servidor quedará disponible en: **http://localhost:8000**
-Documentación interactiva (Swagger): **http://localhost:8000/docs**
-
----
-
-### 3. Configurar y levantar el Frontend
-
-Abrir una **nueva terminal** (mantener el backend corriendo):
+### 3. Levantar el Frontend (React)
+Abre una nueva terminal y ejecuta:
 
 ```bash
-# Desde la raíz del proyecto
 cd frontend
-
-# Instalar dependencias de Node
 npm install
 
-# Levantar el servidor de desarrollo (puerto 5173)
+# Ejecutar el entorno de desarrollo (Puerto 5173)
 npm run dev
 ```
+La aplicación web estará disponible en: **http://localhost:5173**
 
-La aplicación quedará disponible en: **http://localhost:5173**
-
-> El proxy de Vite redirige automáticamente `/api/*` al backend en el puerto 8000. No se requiere configuración adicional de CORS.
-
----
-
-### 4. Probar el sistema
-
-1. Abrir el navegador en `http://localhost:5173`
-2. Ir a **Clientes** → crear un propietario con DNI
-3. En el detalle del cliente → **Agregar** una mascota
-4. Hacer clic en **Atender** para abrir la pantalla de consulta
-5. Probar las tres modalidades de ingreso: manual, texto libre con IA, o grabación de voz
+*(Nota: Vite está configurado para hacer proxy de `/api` directamente al puerto 8000 del backend, por lo que no es necesario configurar CORS en entorno de desarrollo local).*
 
 ---
-
-## Nota importante — Módulo de voz (Whisper)
-
-El módulo de transcripción utiliza **OpenAI Whisper en modo local** (sin API key). El modelo `base` (~140 MB) se descarga automáticamente de los servidores de Hugging Face la primera vez que se usa la función de grabación de voz. Esto puede tardar unos minutos dependiendo de la conexión a internet.
-
-No se requiere ninguna API Key de OpenAI para la funcionalidad principal del sistema.
-
----
-
-## Módulos del sistema
-
-| Módulo | Descripción |
-|--------|-------------|
-| **Clientes** | Registro de propietarios con DNI, búsqueda en tiempo real |
-| **Mascotas** | Registro por propietario con especie, raza y edad |
-| **Historias Clínicas** | Consultas SOAP con voz + IA o ingreso manual |
-| **Turnos** | Calendario de citas (vista mensual + próximos turnos) |
-| **Inventario** | Control de stock con alertas de nivel bajo |
-| **Ventas y Reportes** | KPIs financieros y gráficos de consultas |
-| **Exportación PDF** | Historia clínica completa del paciente |
-
----
-
-## Autor
-Mendoza, 2026
+**Autor:** Mendoza, 2026

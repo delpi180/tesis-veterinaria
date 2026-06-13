@@ -40,8 +40,14 @@ function ClienteForm({ onSuccess, onCancel, visible }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.dni.trim())    { setError('El DNI es obligatorio.');    return }
+    const dni = form.dni.trim()
+    const tel = form.telefono.replace(/\D/g, '')
+    if (!dni)                { setError('El DNI es obligatorio.');    return }
+    if (!/^\d{8}$/.test(dni)) { setError('El DNI debe tener exactamente 8 dígitos.'); return }
     if (!form.nombre.trim()) { setError('El nombre es obligatorio.'); return }
+    if (form.telefono.trim() && (tel.length < 6 || tel.length > 12)) {
+      setError('El teléfono debe tener entre 6 y 12 dígitos.'); return
+    }
     setSaving(true); setError(null)
     try {
       const nuevo = await api.post('/api/clientes/', form)

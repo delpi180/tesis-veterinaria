@@ -1,719 +1,1053 @@
-import { useState, useEffect } from 'react'
-import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { useAudioRecorder } from '../hooks/useAudioRecorder'
-import { api } from '../services/api'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import { useState, useEffect, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  ChevronDown, Plus, Trash2, Download, Save, Check,
+  ArrowLeft, Mic, StopCircle, AlertTriangle, Loader2, FileText,
+} from "lucide-react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import { api, authHeaders } from "../services/api";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
-// ── Iconos ────────────────────────────────────────────────────────────────
-const MicIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-  </svg>
-)
-const StopIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-    <rect x="6" y="6" width="12" height="12" rx="2" />
-  </svg>
-)
-const SparklesIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l.75 2.25L8 6l-2.25.75L5 9l-.75-2.25L2 6l2.25-.75L5 3zm10 10l1.5 4.5 4.5 1.5-4.5 1.5L15 24l-1.5-4.5L9 18l4.5-1.5L15 13zm-5-8l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3z" />
-  </svg>
-)
-const SaveIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-  </svg>
-)
-const CheckIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-  </svg>
-)
-const BackIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-  </svg>
-)
-const Spinner = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" className={`animate-spin ${className}`}>
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-  </svg>
-)
-const ClipboardIcon = ({ className = 'w-8 h-8' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-  </svg>
-)
-const ChevronDownIcon = ({ open }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
-    className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-  </svg>
-)
-const DownloadIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-  </svg>
-)
+// ── Catálogos ────────────────────────────────────────────────────────────────
 
-// ── Campos SOAP estructurados ─────────────────────────────────────────────
-const FIELDS = [
-  {
-    key: 'motivoAnamnesis', label: 'Motivo y Anamnesis', badge: 'S — Subjetivo',
-    placeholder: 'Síntomas reportados por el propietario, historia clínica, comportamiento observado…',
-    border: 'border-l-sky-500', badgeColor: 'bg-sky-100 text-sky-700', ring: 'focus:ring-sky-300', rows: 4,
-  },
-  {
-    key: 'examenFisico', label: 'Examen Físico', badge: 'O — Objetivo',
-    placeholder: 'Signos vitales, temperatura, peso, frecuencia cardíaca, hallazgos del examen clínico…',
-    border: 'border-l-emerald-500', badgeColor: 'bg-emerald-100 text-emerald-700', ring: 'focus:ring-emerald-300', rows: 4,
-  },
-  {
-    key: 'diagnostico', label: 'Diagnóstico', badge: 'A — Análisis',
-    placeholder: 'Diagnóstico presuntivo, diagnósticos diferenciales…',
-    border: 'border-l-amber-500', badgeColor: 'bg-amber-100 text-amber-700', ring: 'focus:ring-amber-300', rows: 3,
-  },
-  {
-    key: 'tratamiento', label: 'Tratamiento', badge: 'P — Plan',
-    placeholder: 'Medicamentos, dosis, procedimientos, indicaciones al propietario, próximo control…',
-    border: 'border-l-violet-500', badgeColor: 'bg-violet-100 text-violet-700', ring: 'focus:ring-violet-300', rows: 4,
-  },
-]
+const SISTEMAS_EOP = [
+  "tegumentario", "cardiovascular", "respiratorio", "digestivo",
+  "urinario", "reproductor", "nervioso", "musculoesqueletico",
+  "linfatico", "sentidos", "endocrino",
+];
+const SISTEMA_LABELS = {
+  tegumentario: "Tegumentario",      cardiovascular: "Cardiovascular",
+  respiratorio: "Respiratorio",      digestivo: "Digestivo",
+  urinario: "Urinario",              reproductor: "Reproductor",
+  nervioso: "Nervioso",              musculoesqueletico: "Músculo-esquelético",
+  linfatico: "Linfático",            sentidos: "Sentidos especiales",
+  endocrino: "Endocrino",
+};
 
-const AI_BADGE = {
-  recording:    { text: 'Grabando',       cls: 'bg-red-100 text-red-700 border-red-200'            },
-  transcribing: { text: 'Transcribiendo', cls: 'bg-violet-100 text-violet-700 border-violet-200'   },
-  organizing:   { text: 'Organizando',    cls: 'bg-violet-100 text-violet-700 border-violet-200'   },
-  done:         { text: 'IA aplicada',    cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+const OPT = {
+  tipo_consulta: [
+    { v: "primera_vez", l: "Primera vez" }, { v: "control", l: "Control" },
+    { v: "urgencia",    l: "Urgencia" },    { v: "vacunacion", l: "Vacunación" },
+  ],
+  mucosas: [
+    { v: "rosadas",    l: "Rosadas" },    { v: "palidas",    l: "Pálidas" },
+    { v: "congestivas",l: "Congestivas" },{ v: "ictericas",  l: "Ictéricas" },
+    { v: "cianoticas", l: "Cianóticas" },
+  ],
+  tllc: [
+    { v: "normal",    l: "Normal (<2 seg)" },
+    { v: "aumentado", l: "Aumentado (>2 seg)" },
+  ],
+  estado_sensorio: [
+    { v: "alerta",     l: "Alerta" },    { v: "deprimido",  l: "Deprimido" },
+    { v: "estuporoso", l: "Estuporoso" },{ v: "comatoso",   l: "Comatoso" },
+  ],
+  hidratacion: [
+    { v: "normal",     l: "Normal" },
+    { v: "leve_5",     l: "Deshidratación leve (5%)" },
+    { v: "moderada_7", l: "Deshidratación moderada (7%)" },
+    { v: "grave_10",   l: "Deshidratación grave (10%)" },
+    { v: "shock_12",   l: "Shock hipovolémico (>12%)" },
+  ],
+  pulso: [
+    { v: "fuerte",    l: "Fuerte" },   { v: "debil",     l: "Débil" },
+    { v: "filiforme", l: "Filiforme" },{ v: "ausente",   l: "Ausente" },
+  ],
+  pronostico: [
+    { v: "favorable",   l: "Favorable" },  { v: "reservado",    l: "Reservado" },
+    { v: "desfavorable",l: "Desfavorable" },{ v: "grave",       l: "Grave" },
+  ],
+  sistema_estado: [
+    { v: "normal",     l: "Normal" },
+    { v: "alterado",   l: "Alterado" },
+    { v: "no_evaluado",l: "No evaluado" },
+  ],
+};
+
+const getLabel = (field, value) => {
+  if (!value) return value;
+  return OPT[field]?.find(o => o.v === value)?.l ?? value;
+};
+
+// Campo → sección del acordeón (para auto-abrir con inferidos)
+const FIELD_TO_SECTION = {
+  motivo_consulta: "s1", tiempo_evolucion: "s1", derivado_por: "s1",
+  detalle: "s1", alimentacion_tipo: "s1", alimentacion_cantidad_gr: "s1",
+  antecedentes: "s1", tipo_consulta: "s1",
+  temperatura_c: "s2", peso_kg: "s2", frecuencia_cardiaca: "s2",
+  frecuencia_respiratoria: "s2", condicion_corporal: "s2",
+  mucosas: "s2", tllc: "s2", estado_sensorio: "s2", hidratacion: "s2",
+  pulso: "s2", linfonodulos: "s2",
+  diagnostico_presuntivo: "s4", diagnosticos_diferenciales: "s4",
+  diagnostico_definitivo: "s4",
+  examenes_solicitados: "s5", indicaciones: "s5", pronostico: "s5",
+};
+
+// ── Estado inicial ────────────────────────────────────────────────────────────
+
+const eopVacio = () =>
+  Object.fromEntries(SISTEMAS_EOP.map(s => [s, { estado: "", detalle: "" }]));
+
+const TX_EMPTY = { medicamento: "", dosis: "", via: "", frecuencia: "", duracion: "" };
+const VX_EMPTY = { vacuna: "", lote: "", proxima_dosis: "" };
+
+const FORM_VACIO = {
+  motivo_consulta: "", tiempo_evolucion: "", derivado_por: "",
+  detalle: "", alimentacion_tipo: "", alimentacion_cantidad_gr: "",
+  antecedentes: "", tipo_consulta: "",
+  temperatura_c: "", peso_kg: "", frecuencia_cardiaca: "",
+  frecuencia_respiratoria: "", condicion_corporal: "",
+  mucosas: "", tllc: "", estado_sensorio: "", hidratacion: "",
+  pulso: "", linfonodulos: "",
+  examen_particular: eopVacio(),
+  diagnostico_presuntivo: "", diagnosticos_diferenciales: "",
+  diagnostico_definitivo: "",
+  examenes_solicitados: "",
+  tratamiento_items: [],
+  vacunas_items: [],
+  indicaciones: "", pronostico: "", proxima_cita: "",
+};
+
+const NUM_FIELDS = [
+  "temperatura_c", "peso_kg", "frecuencia_cardiaca",
+  "frecuencia_respiratoria", "condicion_corporal", "alimentacion_cantidad_gr",
+];
+
+// ── Payload / hidratación de formulario ──────────────────────────────────────
+
+function buildPayload(form) {
+  const out = {};
+  for (const [k, v] of Object.entries(form)) {
+    if (["examen_particular", "tratamiento_items", "vacunas_items"].includes(k)) continue;
+    if (v === "" || v === null || v === undefined) {
+      out[k] = null;
+    } else if (NUM_FIELDS.includes(k)) {
+      const n = Number(v);
+      out[k] = isNaN(n) ? null : n;
+    } else if (k === "proxima_cita") {
+      out[k] = v ? v + ":00" : null;
+    } else {
+      out[k] = v;
+    }
+  }
+  const ep = {};
+  for (const [s, val] of Object.entries(form.examen_particular)) {
+    if (val.estado || val.detalle?.trim())
+      ep[s] = { estado: val.estado || null, detalle: val.detalle?.trim() || null };
+  }
+  out.examen_particular = Object.keys(ep).length > 0 ? ep : null;
+  const tx = (form.tratamiento_items || []).filter(i => i.medicamento?.trim());
+  out.tratamiento_items = tx.length > 0
+    ? tx.map(i => ({ medicamento: i.medicamento||null, dosis: i.dosis||null,
+        via: i.via||null, frecuencia: i.frecuencia||null, duracion: i.duracion||null }))
+    : null;
+  const vx = (form.vacunas_items || []).filter(i => i.vacuna?.trim());
+  out.vacunas_items = vx.length > 0
+    ? vx.map(i => ({ vacuna: i.vacuna||null, lote: i.lote||null, proxima_dosis: i.proxima_dosis||null }))
+    : null;
+  return out;
 }
 
-const SOAP_DISPLAY = [
-  { key: 'anamnesis',     label: 'Anamnesis',    badge: 'S', dotCls: 'bg-sky-500',     pillCls: 'bg-sky-50 text-sky-700 border-sky-200'         },
-  { key: 'examen_fisico', label: 'Examen Físico', badge: 'O', dotCls: 'bg-emerald-500', pillCls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { key: 'diagnostico',   label: 'Diagnóstico',  badge: 'A', dotCls: 'bg-amber-500',   pillCls: 'bg-amber-50 text-amber-700 border-amber-200'     },
-  { key: 'tratamiento',   label: 'Tratamiento',  badge: 'P', dotCls: 'bg-violet-500',  pillCls: 'bg-violet-50 text-violet-700 border-violet-200'   },
-]
+function formFromHistoria(h) {
+  const f = { ...FORM_VACIO };
+  for (const k of Object.keys(FORM_VACIO)) {
+    if (["examen_particular", "tratamiento_items", "vacunas_items"].includes(k)) continue;
+    const v = h[k];
+    if (v !== null && v !== undefined)
+      f[k] = k === "proxima_cita" ? (v ? v.slice(0, 16) : "") : String(v);
+  }
+  const ep = eopVacio();
+  if (h.examen_particular && typeof h.examen_particular === "object") {
+    for (const s of SISTEMAS_EOP) {
+      const val = h.examen_particular[s];
+      if (!val) continue;
+      ep[s] = typeof val === "string"
+        ? { estado: "", detalle: val }
+        : { estado: val.estado || "", detalle: val.detalle || "" };
+    }
+  }
+  f.examen_particular = ep;
+  f.tratamiento_items = Array.isArray(h.tratamiento_items)
+    ? h.tratamiento_items.map(i => ({
+        medicamento: i.medicamento||"", dosis: i.dosis||"",
+        via: i.via||"", frecuencia: i.frecuencia||"", duracion: i.duracion||"" }))
+    : [];
+  f.vacunas_items = Array.isArray(h.vacunas_items)
+    ? h.vacunas_items.map(i => ({ vacuna: i.vacuna||"", lote: i.lote||"", proxima_dosis: i.proxima_dosis||"" }))
+    : [];
+  return f;
+}
 
-// ── Tarjeta de historia clínica ──────────────────────────────────────────
-function HistoriaCard({ historia, index }) {
-  const [open, setOpen] = useState(index === 1)
+// ── Estilos con resaltado ─────────────────────────────────────────────────────
 
-  const fecha = new Date(historia.fecha)
-  const fechaStr = fecha.toLocaleDateString('es-MX', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  })
-  const horaStr = fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+const lCls = "block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1";
 
-  const hasContent = SOAP_DISPLAY.some(s => historia[s.key])
+const hlInput = (hl) => {
+  const base = "w-full rounded-md px-2.5 py-1.5 text-sm text-slate-800 focus:outline-none focus:ring-1";
+  if (hl === "alerta")   return `${base} border-2 border-rose-400 bg-rose-50 focus:ring-rose-200 focus:border-rose-500`;
+  if (hl === "ok")       return `${base} border border-emerald-300 bg-emerald-50 focus:ring-emerald-200 focus:border-emerald-400`;
+  if (hl === "inferido") return `${base} border border-amber-400 bg-amber-50 focus:ring-amber-200 focus:border-amber-500`;
+  return `${base} border border-slate-200 bg-white focus:ring-purple-300 focus:border-purple-300`;
+};
+
+function HlLabel({ hl }) {
+  if (hl === "alerta")
+    return (
+      <span className="flex items-center gap-0.5 text-rose-600 shrink-0">
+        <AlertTriangle size={10} />
+        <span style={{ fontSize: "9px" }} className="font-bold">Fuera de rango — revisa</span>
+      </span>
+    );
+  if (hl === "ok")
+    return <Check size={10} className="text-emerald-500 shrink-0" />;
+  if (hl === "inferido")
+    return (
+      <span className="flex items-center gap-0.5 text-amber-600 shrink-0">
+        <AlertTriangle size={10} />
+        <span style={{ fontSize: "9px" }} className="font-medium">Inferido — confirma</span>
+      </span>
+    );
+  return null;
+}
+
+function Field({ label, children, cls = "", hl }) {
+  return (
+    <div className={cls}>
+      <div className="flex items-center gap-1 mb-1">
+        <label className={lCls}>{label}</label>
+        <HlLabel hl={hl} />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+const TIn = ({ value, onChange, placeholder = "", hl }) =>
+  <input type="text" value={value} onChange={onChange} placeholder={placeholder} className={hlInput(hl)} />;
+const NIn = ({ value, onChange, placeholder = "", hl }) =>
+  <input type="number" step="any" value={value} onChange={onChange} placeholder={placeholder} className={hlInput(hl)} />;
+const TAr = ({ value, onChange, rows = 3, placeholder = "", hl }) =>
+  <textarea value={value} onChange={onChange} rows={rows} placeholder={placeholder} className={`${hlInput(hl)} resize-y`} />;
+function Sel({ value, onChange, options, hl }) {
+  return (
+    <select value={value} onChange={onChange} className={hlInput(hl)}>
+      <option value="">—</option>
+      {options.map(({ v, l }) => <option key={v} value={v}>{l}</option>)}
+    </select>
+  );
+}
+
+// ── AccordionSection ─────────────────────────────────────────────────────────
+
+function AccordionSection({ num, title, isOpen, onToggle, children }) {
+  return (
+    <div className="border border-slate-200 rounded-md overflow-hidden">
+      <button type="button" onClick={onToggle}
+        className="w-full flex items-center gap-3 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-left transition-colors">
+        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-700 text-white text-xs font-bold flex items-center justify-center">
+          {num}
+        </span>
+        <span className="text-sm font-semibold text-slate-700 flex-1">{title}</span>
+        <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+      {isOpen && <div className="px-4 py-4 space-y-3 bg-white border-t border-slate-100">{children}</div>}
+    </div>
+  );
+}
+
+// ── Listas editables ─────────────────────────────────────────────────────────
+
+function TratamientoList({ items, onChange }) {
+  const add    = () => onChange([...items, { ...TX_EMPTY }]);
+  const remove = i  => onChange(items.filter((_, idx) => idx !== i));
+  const update = (i, f, v) => { const n = [...items]; n[i] = { ...n[i], [f]: v }; onChange(n); };
+  return (
+    <div className="space-y-2">
+      {items.map((item, i) => (
+        <div key={i} className="p-2.5 bg-slate-50 border border-slate-200 rounded-md">
+          <div className="grid grid-cols-5 gap-2">
+            <Field label="Medicamento" cls="col-span-2">
+              <TIn value={item.medicamento} onChange={e => update(i,"medicamento",e.target.value)} placeholder="Metronidazol" />
+            </Field>
+            <Field label="Dosis">
+              <TIn value={item.dosis} onChange={e => update(i,"dosis",e.target.value)} placeholder="15 mg/kg" />
+            </Field>
+            <Field label="Vía">
+              <TIn value={item.via} onChange={e => update(i,"via",e.target.value)} placeholder="Oral" />
+            </Field>
+            <div className="flex items-end gap-1.5">
+              <Field label="Frecuencia" cls="flex-1">
+                <TIn value={item.frecuencia} onChange={e => update(i,"frecuencia",e.target.value)} placeholder="c/12h" />
+              </Field>
+              <button type="button" onClick={() => remove(i)}
+                className="mb-0.5 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 w-1/5">
+            <Field label="Duración">
+              <TIn value={item.duracion} onChange={e => update(i,"duracion",e.target.value)} placeholder="5 días" />
+            </Field>
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={add}
+        className="flex items-center gap-1.5 text-xs font-medium text-purple-700 hover:text-purple-900 border border-dashed border-purple-300 rounded-md px-3 py-1.5 hover:bg-purple-50 transition-colors">
+        <Plus size={13} /> Agregar medicamento
+      </button>
+    </div>
+  );
+}
+
+function VacunaList({ items, onChange }) {
+  const add    = () => onChange([...items, { ...VX_EMPTY }]);
+  const remove = i  => onChange(items.filter((_, idx) => idx !== i));
+  const update = (i, f, v) => { const n = [...items]; n[i] = { ...n[i], [f]: v }; onChange(n); };
+  return (
+    <div className="space-y-2">
+      {items.map((item, i) => (
+        <div key={i} className="grid grid-cols-3 gap-2 items-end p-2.5 bg-slate-50 border border-slate-200 rounded-md">
+          <Field label="Vacuna">
+            <TIn value={item.vacuna} onChange={e => update(i,"vacuna",e.target.value)} placeholder="Antirrábica" />
+          </Field>
+          <Field label="Lote">
+            <TIn value={item.lote} onChange={e => update(i,"lote",e.target.value)} placeholder="AB12345" />
+          </Field>
+          <div className="flex items-end gap-1.5">
+            <Field label="Próxima dosis" cls="flex-1">
+              <TIn value={item.proxima_dosis} onChange={e => update(i,"proxima_dosis",e.target.value)} placeholder="En 1 año" />
+            </Field>
+            <button type="button" onClick={() => remove(i)}
+              className="mb-0.5 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={add}
+        className="flex items-center gap-1.5 text-xs font-medium text-purple-700 hover:text-purple-900 border border-dashed border-purple-300 rounded-md px-3 py-1.5 hover:bg-purple-50 transition-colors">
+        <Plus size={13} /> Agregar vacuna
+      </button>
+    </div>
+  );
+}
+
+// ── HistoriaCard ─────────────────────────────────────────────────────────────
+
+function DRow({ label, value }) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <div className="flex gap-1.5 text-sm">
+      <span className="text-xs uppercase tracking-wide text-slate-400 whitespace-nowrap pt-px">{label}</span>
+      <span className="text-slate-700">{value}</span>
+    </div>
+  );
+}
+function DSec({ title, show, children }) {
+  if (!show) return null;
+  return (
+    <div className="pt-2 first:pt-0">
+      <p className="text-xs font-semibold uppercase tracking-wide text-purple-700 mb-1">{title}</p>
+      <div className="space-y-0.5 pl-1">{children}</div>
+    </div>
+  );
+}
+
+function HistoriaCard({ h, onEdit }) {
+  const fecha = new Date(h.fecha || h.creado_en).toLocaleString("es-PE", {
+    day: "2-digit", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+  const txItems = Array.isArray(h.tratamiento_items) ? h.tratamiento_items : [];
+  const vxItems = Array.isArray(h.vacunas_items)     ? h.vacunas_items     : [];
+  const epEntries = SISTEMAS_EOP.map(s => {
+    const val = (h.examen_particular || {})[s];
+    if (!val) return null;
+    const texto = typeof val === "string"
+      ? val
+      : [val.estado ? getLabel("sistema_estado", val.estado) : null, val.detalle].filter(Boolean).join(" — ");
+    return texto ? { label: SISTEMA_LABELS[s], texto } : null;
+  }).filter(Boolean);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      {/* Cabecera de la tarjeta */}
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className="w-full px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-3 hover:bg-slate-100 transition text-left"
-      >
-        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-purple-100 text-purple-700 text-xs font-bold shrink-0">
-          {index}
-        </span>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-700 capitalize truncate">{fechaStr}</p>
-          <p className="text-xs text-slate-400">{horaStr}</p>
-        </div>
-        <ChevronDownIcon open={open} />
-      </button>
-
-      {/* Contenido SOAP */}
-      {open && (
-        <div className="px-5 py-4">
-          {!hasContent ? (
-            <p className="text-xs text-slate-400 text-center py-2">Sin contenido registrado.</p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {SOAP_DISPLAY.map(({ key, label, badge, dotCls, pillCls }) =>
-                historia[key] ? (
-                  <div key={key} className={`border rounded-xl px-3.5 py-3 ${pillCls}`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${dotCls}`} />
-                      <span className="text-xs font-bold">{badge}</span>
-                      <span className="text-xs font-semibold">{label}</span>
-                    </div>
-                    <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">{historia[key]}</p>
-                  </div>
-                ) : null
-              )}
-            </div>
+    <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
+      <div className="flex items-center justify-between px-4 py-2 bg-purple-700 text-white">
+        <span className="text-sm font-semibold">{fecha}</span>
+        <div className="flex items-center gap-2">
+          {h.tipo_consulta && (
+            <span className="text-xs bg-white/20 px-2 py-0.5 rounded">
+              {getLabel("tipo_consulta", h.tipo_consulta)}
+            </span>
           )}
+          <button onClick={() => onEdit(h)}
+            className="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5 transition-colors">
+            Editar
+          </button>
         </div>
-      )}
+      </div>
+      <div className="px-4 py-3 divide-y divide-slate-100 space-y-2">
+        <DSec title="Anamnesis" show={h.motivo_consulta || h.tiempo_evolucion || h.detalle || h.antecedentes}>
+          <DRow label="Motivo"       value={h.motivo_consulta} />
+          <DRow label="Evolución"    value={h.tiempo_evolucion} />
+          <DRow label="Detalle"      value={h.detalle} />
+          <DRow label="Antecedentes" value={h.antecedentes} />
+        </DSec>
+        <DSec title="EOG — Constantes" show={h.peso_kg || h.temperatura_c || h.frecuencia_cardiaca || h.mucosas || h.hidratacion}>
+          <div className="flex flex-wrap gap-x-5 gap-y-0.5">
+            {h.peso_kg             && <DRow label="Peso"  value={`${h.peso_kg} kg`} />}
+            {h.temperatura_c       && <DRow label="T°"    value={`${h.temperatura_c} °C`} />}
+            {h.frecuencia_cardiaca && <DRow label="FC"    value={`${h.frecuencia_cardiaca} lpm`} />}
+            {h.frecuencia_respiratoria && <DRow label="FR" value={`${h.frecuencia_respiratoria} rpm`} />}
+            {h.condicion_corporal  && <DRow label="CC"    value={`${h.condicion_corporal}/9`} />}
+          </div>
+          <DRow label="Mucosas"  value={getLabel("mucosas",         h.mucosas)} />
+          <DRow label="TLLC"     value={getLabel("tllc",            h.tllc)} />
+          <DRow label="Sensorio" value={getLabel("estado_sensorio", h.estado_sensorio)} />
+          <DRow label="Hidrat."  value={getLabel("hidratacion",     h.hidratacion)} />
+          <DRow label="Pulso"    value={getLabel("pulso",           h.pulso)} />
+          <DRow label="Linfon."  value={h.linfonodulos} />
+        </DSec>
+        <DSec title="EOP — Sistemas" show={epEntries.length > 0}>
+          {epEntries.map(({ label, texto }) => <DRow key={label} label={label} value={texto} />)}
+        </DSec>
+        <DSec title="Diagnóstico" show={h.diagnostico_presuntivo || h.diagnosticos_diferenciales || h.diagnostico_definitivo}>
+          <DRow label="Presuntivo"    value={h.diagnostico_presuntivo} />
+          <DRow label="Diferenciales" value={h.diagnosticos_diferenciales} />
+          <DRow label="Definitivo"    value={h.diagnostico_definitivo} />
+        </DSec>
+        <DSec title="Plan" show={txItems.length > 0 || vxItems.length > 0 || h.examenes_solicitados || h.indicaciones}>
+          <DRow label="Exámenes" value={h.examenes_solicitados} />
+          {txItems.map((t, i) => (
+            <DRow key={i} label={`Tto ${i+1}`}
+              value={[t.medicamento,t.dosis,t.via,t.frecuencia,t.duracion].filter(Boolean).join(" · ")} />
+          ))}
+          {vxItems.map((v, i) => (
+            <DRow key={i} label={`Vac ${i+1}`}
+              value={[v.vacuna,v.lote,v.proxima_dosis?`próx. ${v.proxima_dosis}`:null].filter(Boolean).join(" · ")} />
+          ))}
+          <DRow label="Indicaciones" value={h.indicaciones} />
+          <DRow label="Pronóstico"   value={getLabel("pronostico", h.pronostico)} />
+          <DRow label="Próx. cita"   value={h.proxima_cita ? new Date(h.proxima_cita).toLocaleDateString("es-PE") : null} />
+        </DSec>
+      </div>
     </div>
-  )
+  );
 }
 
-// ── Componente principal ──────────────────────────────────────────────────
+// ── PDF ──────────────────────────────────────────────────────────────────────
+
+function generarPDF(paciente, historias) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  doc.setFillColor(88, 28, 135);
+  doc.rect(0, 0, 297, 18, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont(undefined, "bold");
+  doc.text("Veterinaria Los Pinos — Historia Clínica", 12, 12);
+  autoTable(doc, {
+    startY: 22,
+    head: [["Paciente", "Especie / Raza", "Propietario"]],
+    body: [[
+      paciente.nombre ?? "",
+      `${paciente.especie ?? ""} / ${paciente.raza ?? ""}`,
+      paciente.cliente ? paciente.cliente.nombre : "",
+    ]],
+    headStyles: { fillColor: [88, 28, 135], fontSize: 8 },
+    styles: { fontSize: 8 }, margin: { left: 12, right: 12 },
+  });
+  const filas = historias.map((h, i) => {
+    const constantes = [
+      h.peso_kg       ? `Peso: ${h.peso_kg} kg`        : null,
+      h.temperatura_c ? `T°: ${h.temperatura_c} °C`    : null,
+      h.frecuencia_cardiaca ? `FC: ${h.frecuencia_cardiaca} lpm` : null,
+      h.mucosas       ? `Muc: ${getLabel("mucosas", h.mucosas)}` : null,
+      h.hidratacion   ? `Hid: ${getLabel("hidratacion", h.hidratacion)}` : null,
+    ].filter(Boolean).join("\n");
+    const tto = (h.tratamiento_items || []).filter(t => t.medicamento)
+      .map(t => `• ${[t.medicamento,t.dosis,t.via,t.frecuencia].filter(Boolean).join(" ")}`)
+      .join("\n");
+    return [
+      i + 1,
+      new Date(h.fecha || h.creado_en).toLocaleDateString("es-PE"),
+      [h.motivo_consulta, getLabel("tipo_consulta", h.tipo_consulta)].filter(Boolean).join("\n"),
+      constantes,
+      h.diagnostico_presuntivo ?? "",
+      tto || (h.indicaciones ?? ""),
+    ];
+  });
+  autoTable(doc, {
+    startY: doc.lastAutoTable.finalY + 5,
+    head: [["#", "Fecha", "Motivo / Tipo", "Constantes EOG", "Dx Presuntivo", "Tratamiento"]],
+    body: filas,
+    headStyles: { fillColor: [88, 28, 135], fontSize: 8 },
+    columnStyles: {
+      0: { cellWidth: 8 }, 1: { cellWidth: 20 }, 2: { cellWidth: 45 },
+      3: { cellWidth: 45 }, 4: { cellWidth: 55 }, 5: { cellWidth: 85 },
+    },
+    margin: { left: 12, right: 12 },
+    styles: { fontSize: 7.5, cellPadding: 2 },
+  });
+  doc.save(`HC_${paciente.nombre ?? "paciente"}.pdf`);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const fmtSec = s =>
+  `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+
+// ── Componente principal ──────────────────────────────────────────────────────
+
 export default function HistoriasClinicas() {
-  const { pacienteId }    = useParams()
-  const location          = useLocation()
-  const navigate          = useNavigate()
-  const recorder          = useAudioRecorder()
+  const { pacienteId: id } = useParams();
+  const navigate = useNavigate();
 
-  const [paciente, setPaciente] = useState(location.state?.paciente ?? null)
-  const [cliente,  setCliente]  = useState(location.state?.cliente  ?? null)
+  // ── Datos
+  const [paciente,  setPaciente]  = useState(null);
+  const [historias, setHistorias] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState(null);
 
-  // Zona híbrida
-  const [freeText,  setFreeText]  = useState('')
-  const [aiStatus,  setAiStatus]  = useState('idle')
-  const [aiError,   setAiError]   = useState(null)
-  const [aiApplied, setAiApplied] = useState(false)
+  // ── Formulario
+  const [form,       setForm]       = useState(FORM_VACIO);
+  const [editandoId, setEditandoId] = useState(null);
+  const [guardando,  setGuardando]  = useState(false);
+  const [guardadoOk, setGuardadoOk] = useState(false);
+  const [errForm,    setErrForm]    = useState(null);
+  const [open, setOpen] = useState({ s1: true, s2: true, s3: false, s4: false, s5: false });
 
-  // Campos estructurados
-  const [fields, setFields] = useState({
-    motivoAnamnesis: '', examenFisico: '', diagnostico: '', tratamiento: '',
-  })
+  // ── IA / voz
+  const [aiState,       setAiState]       = useState(null); // null|"recording"|"transcribing"|"processing"|"done"|"error"
+  const [transcripcionIA, setTranscripcionIA] = useState("");
+  const [datosIA,       setDatosIA]       = useState(null);
+  const [inferenciasBrut, setInferenciasBrut] = useState({});
+  const [highlights,    setHighlights]    = useState({});
+  const [aiError,       setAiError]       = useState(null);
+  const [modoTexto,     setModoTexto]     = useState(false);
+  const [textoManual,   setTextoManual]   = useState("");
 
-  const [saving,  setSaving]  = useState(false)
-  const [saved,   setSaved]   = useState(false)
-  const [saveErr, setSaveErr] = useState(null)
+  const { isRecording, seconds, micError, start, stop } = useAudioRecorder();
 
-  // Historial
-  const [historias,        setHistorias]        = useState([])
-  const [loadingHistorias, setLoadingHistorias] = useState(false)
+  // ── Métrica de tiempo: cuándo empezó el registro y si se usó IA
+  const inicioRegistro = useRef(Date.now());
+  const usoIA = useRef(false);
 
-  const isProcessing = ['transcribing', 'organizing'].includes(aiStatus)
-
-  // Carga del paciente si llegamos sin state
+  // Propaga errores de micrófono al estado de IA
   useEffect(() => {
-    if (pacienteId && !paciente) {
-      api.get(`/api/pacientes/${pacienteId}`)
-        .then(p => setPaciente(p))
-        .catch(() => {})
-    }
-  }, [pacienteId])
+    if (micError) { setAiError(micError); setAiState("error"); }
+  }, [micError]);
 
-  // Carga del historial al entrar
+  // ── Carga inicial
   useEffect(() => {
-    if (!pacienteId) return
-    setLoadingHistorias(true)
-    api.get(`/api/pacientes/${pacienteId}/historias/`)
-      .then(data => setHistorias(Array.isArray(data) ? data : []))
-      .catch(() => setHistorias([]))
-      .finally(() => setLoadingHistorias(false))
-  }, [pacienteId])
+    setLoading(true);
+    Promise.all([
+      api.get(`/api/pacientes/${id}`),
+      api.get(`/api/pacientes/${id}/historias/`),
+    ])
+      .then(([pac, hists]) => { setPaciente(pac); setHistorias(Array.isArray(hists) ? hists : []); })
+      .catch(() => setError("No se pudo cargar el paciente."))
+      .finally(() => setLoading(false));
+  }, [id]);
 
-  const fmt = (s) =>
-    `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+  // ── Setters que limpian su resaltado al editar
+  const setF = f => e => {
+    setForm(p => ({ ...p, [f]: e.target.value }));
+    if (highlights[f]) setHighlights(p => { const n = { ...p }; delete n[f]; return n; });
+  };
+  const setEop = (s, c) => e =>
+    setForm(p => ({
+      ...p,
+      examen_particular: { ...p.examen_particular, [s]: { ...p.examen_particular[s], [c]: e.target.value } },
+    }));
 
-  const today = new Date().toLocaleDateString('es-MX', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  })
+  const toggle = k => setOpen(p => ({ ...p, [k]: !p[k] }));
 
-  // ── Voz → transcripción → SOAP (flujo automático) ───────────────────────
-  const handleVoiceToggle = async () => {
-    if (recorder.isRecording) {
-      setAiError(null)
-      setAiStatus('transcribing')
-      const blob = await recorder.stop()
-      if (!blob) { setAiStatus('error'); setAiError('No se obtuvo audio.'); return }
+  // ── Resetear formulario + estado IA
+  const resetForm = () => {
+    setForm(FORM_VACIO);
+    setEditandoId(null);
+    setErrForm(null);
+    setHighlights({});
+    setTranscripcionIA("");
+    setDatosIA(null);
+    setInferenciasBrut({});
+    setAiState(null);
+    setAiError(null);
+    setOpen({ s1: true, s2: true, s3: false, s4: false, s5: false });
+    // Reinicia la medición de tiempo para el siguiente registro
+    inicioRegistro.current = Date.now();
+    usoIA.current = false;
+  };
+
+  const handleEdit = h => {
+    setForm(formFromHistoria(h));
+    setEditandoId(h.id);
+    setHighlights({});
+    setAiState(null);
+    setOpen({ s1: true, s2: true, s3: true, s4: true, s5: true });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // ── Volcar datos de IA al formulario
+  const applyIA = (datos, inferencias, alertasRango = {}) => {
+    usoIA.current = true;   // este registro se asistió con IA (voz o texto)
+    setForm(prev => {
+      const next = { ...prev };
+      const SKIP = ["examen_particular", "tratamiento_items", "vacunas_items"];
+      for (const k of Object.keys(FORM_VACIO)) {
+        if (SKIP.includes(k)) continue;
+        const val = datos[k];
+        if (val === null || val === undefined) continue;
+        if (k === "proxima_cita") {
+          // datetime-local necesita YYYY-MM-DDTHH:MM; GPT devuelve YYYY-MM-DD (sin hora)
+          const v = String(val);
+          next[k] = v.length === 10 ? v + "T00:00" : v.slice(0, 16);
+        } else {
+          next[k] = String(val);
+        }
+      }
+      // EOP
+      const ep = eopVacio();
+      if (datos.examen_particular && typeof datos.examen_particular === "object") {
+        for (const s of SISTEMAS_EOP) {
+          const val = datos.examen_particular[s];
+          if (!val) continue;
+          ep[s] = typeof val === "string"
+            ? { estado: "", detalle: val }
+            : { estado: val.estado || "", detalle: val.detalle || "" };
+        }
+      }
+      next.examen_particular = ep;
+      // Listas — reemplaza (no acumula)
+      if (Array.isArray(datos.tratamiento_items) && datos.tratamiento_items.length > 0)
+        next.tratamiento_items = datos.tratamiento_items.map(i => ({
+          medicamento: i.medicamento||"", dosis: i.dosis||"",
+          via: i.via||"", frecuencia: i.frecuencia||"", duracion: i.duracion||"",
+        }));
+      if (Array.isArray(datos.vacunas_items) && datos.vacunas_items.length > 0)
+        next.vacunas_items = datos.vacunas_items.map(i => ({
+          vacuna: i.vacuna||"", lote: i.lote||"", proxima_dosis: i.proxima_dosis||"",
+        }));
+      return next;
+    });
+
+    // Resaltados: "explicito" → "ok", "inferido" → "inferido"
+    const hl = {};
+    for (const [campo, tipo] of Object.entries(inferencias))
+      hl[campo] = tipo === "inferido" ? "inferido" : "ok";
+    // Las alertas de rango fisiológico tienen prioridad (rojo)
+    for (const campo of Object.keys(alertasRango || {}))
+      hl[campo] = "alerta";
+    setHighlights(hl);
+
+    // Auto-abrir secciones con inferidos o con alertas de rango
+    const sectionsToOpen = new Set();
+    for (const [campo, tipo] of Object.entries(hl))
+      if ((tipo === "inferido" || tipo === "alerta") && FIELD_TO_SECTION[campo])
+        sectionsToOpen.add(FIELD_TO_SECTION[campo]);
+    if (sectionsToOpen.size > 0)
+      setOpen(prev => {
+        const next = { ...prev };
+        sectionsToOpen.forEach(s => { next[s] = true; });
+        return next;
+      });
+  };
+
+  // ── Flujo de grabación
+  const handleGrabar = async () => {
+    if (isRecording) {
+      // Detener y procesar
+      setAiState("transcribing");
+      setAiError(null);
       try {
-        // Paso 1: Whisper transcribe el audio
-        const formData = new FormData()
-        formData.append('audio', blob, 'consulta.webm')
-        const res = await fetch('/api/transcribe', { method: 'POST', body: formData })
-        if (!res.ok) throw new Error(`Error en transcripción: HTTP ${res.status}`)
-        const { transcripcion } = await res.json()
-        setFreeText(transcripcion)
+        const blob = await stop();
+        if (!blob) throw new Error("No se capturó audio.");
 
-        // Paso 2: el texto va directo al procesador SOAP sin intervención del usuario
-        setAiStatus('organizing')
-        const soap = await api.post('/api/process-soap', { texto: transcripcion })
-        const soapAnamnesis  = soap.subjetivo?.oraciones?.join('\n') ?? ''
-        const soapExamen     = soap.objetivo?.oraciones?.join('\n')  ?? ''
-        const soapDiag       = soap.analisis?.oraciones?.join('\n')  ?? ''
-        const soapTrat       = soap.plan?.oraciones?.join('\n')      ?? ''
-        const allEmpty = !soapAnamnesis && !soapExamen && !soapDiag && !soapTrat
-        setFields({
-          motivoAnamnesis: allEmpty ? transcripcion : soapAnamnesis,
-          examenFisico:    soapExamen,
-          diagnostico:     soapDiag,
-          tratamiento:     soapTrat,
-        })
-        setAiApplied(true)
-        setAiStatus('done')
-        setTimeout(() => setAiStatus('idle'), 2500)
+        // 1. Transcribir con Deepgram
+        const fd = new FormData();
+        fd.append("audio", blob, "consulta.webm");
+        const r1 = await fetch(`${BASE_URL}/api/transcribe`, { method: "POST", body: fd, headers: authHeaders() });
+        if (!r1.ok) {
+          const b = await r1.json().catch(() => ({}));
+          throw new Error(b?.detail ?? `Error al transcribir (HTTP ${r1.status})`);
+        }
+        const { transcripcion } = await r1.json();
+        setTranscripcionIA(transcripcion);
+
+        // 2. Extraer con GPT
+        setAiState("processing");
+        const { datos, inferencias, alertas_rango } = await api.post("/api/procesar-historia", { texto: transcripcion });
+        setDatosIA(datos);
+        setInferenciasBrut(inferencias);
+        applyIA(datos, inferencias, alertas_rango);
+        setAiState("done");
       } catch (e) {
-        setAiError(`Error al procesar: ${e.message}`)
-        setAiStatus('error')
+        setAiError(e.message);
+        setAiState("error");
       }
     } else {
-      setAiError(null)
-      await recorder.start()
-      setAiStatus('recording')
+      // Iniciar grabación
+      setAiState("recording");
+      setAiError(null);
+      setTranscripcionIA("");
+      setDatosIA(null);
+      await start();
     }
-  }
+  };
 
-  // ── Estructurar con IA ───────────────────────────────────────────────────
-  const handleOrganize = async () => {
-    if (!freeText.trim()) return
-    setAiStatus('organizing'); setAiError(null)
+  // ── Procesado desde texto libre
+  const handleProcesarTexto = async () => {
+    if (!textoManual.trim()) return;
+    setAiState("processing");
+    setAiError(null);
     try {
-      const soap = await api.post('/api/process-soap', { texto: freeText })
-      const sAnamnesis = soap.subjetivo?.oraciones?.join('\n') ?? ''
-      const sExamen    = soap.objetivo?.oraciones?.join('\n')  ?? ''
-      const sDiag      = soap.analisis?.oraciones?.join('\n')  ?? ''
-      const sTrat      = soap.plan?.oraciones?.join('\n')      ?? ''
-      const allEmpty2  = !sAnamnesis && !sExamen && !sDiag && !sTrat
-      setFields({
-        motivoAnamnesis: allEmpty2 ? freeText : sAnamnesis,
-        examenFisico:    sExamen,
-        diagnostico:     sDiag,
-        tratamiento:     sTrat,
-      })
-      setAiApplied(true)
-      setAiStatus('done')
-      setTimeout(() => setAiStatus('idle'), 2500)
+      const { datos, inferencias, transcripcion, alertas_rango } = await api.post("/api/procesar-historia", { texto: textoManual });
+      setTranscripcionIA(transcripcion);
+      setDatosIA(datos);
+      setInferenciasBrut(inferencias);
+      applyIA(datos, inferencias, alertas_rango);
+      setAiState("done");
     } catch (e) {
-      setAiError(`Error al organizar: ${e.message}`); setAiStatus('error')
+      setAiError(e.message);
+      setAiState("error");
     }
-  }
+  };
 
-  // ── Guardar en BD ─────────────────────────────────────────────────────────
+  // ── Guardar
   const handleSave = async () => {
-    if (!pacienteId) {
-      setSaveErr('Sin paciente vinculado. Abre esta pantalla desde el perfil de una mascota.')
-      return
-    }
-    setSaving(true); setSaveErr(null); setSaved(false)
-    const payload = {
-      anamnesis:     fields.motivoAnamnesis || null,
-      examen_fisico: fields.examenFisico    || null,
-      diagnostico:   fields.diagnostico     || null,
-      tratamiento:   fields.tratamiento     || null,
-    }
+    setGuardando(true); setErrForm(null);
     try {
-      const nueva = await api.post(`/api/pacientes/${pacienteId}/historias/`, payload)
-      setHistorias(prev => [nueva, ...prev])
-      setFields({ motivoAnamnesis: '', examenFisico: '', diagnostico: '', tratamiento: '' })
-      setFreeText('')
-      setAiApplied(false)
-      setSaved(true)
-      setTimeout(() => {
-        if (cliente?.id) navigate(`/clientes/${cliente.id}`)
-        else if (window.history.length > 1) navigate(-1)
-        else navigate('/clientes')
-      }, 1400)
+      const payload = buildPayload(form);
+      // Auditoría IA
+      if (transcripcionIA) payload.transcripcion = transcripcionIA;
+      if (datosIA)         payload.datos_ia = { ...datosIA, inferencias: inferenciasBrut };
+
+      if (editandoId) {
+        const r = await api.put(`/api/pacientes/${id}/historias/${editandoId}`, payload);
+        setHistorias(p => p.map(h => h.id === editandoId ? r : h));
+      } else {
+        // Métrica de tiempo: solo en registros nuevos
+        payload.segundos_registro = Math.max(1, Math.round((Date.now() - inicioRegistro.current) / 1000));
+        payload.metodo_registro = usoIA.current ? "ia" : "manual";
+        const r = await api.post(`/api/pacientes/${id}/historias/`, payload);
+        setHistorias(p => [r, ...p]);
+      }
+      setGuardadoOk(true);
+      setTimeout(() => setGuardadoOk(false), 2500);
+      resetForm();
     } catch (e) {
-      setSaveErr(`No se pudo guardar: ${e.message}`)
+      setErrForm(e?.message ?? "Error al guardar.");
     } finally {
-      setSaving(false)
+      setGuardando(false);
     }
-  }
+  };
 
-  // ── Generar PDF ───────────────────────────────────────────────────────────
-  const handleDownloadPDF = () => {
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const margen = 14
-    const ancho  = 182  // 210 - 2*14
+  // ── Contador de inferidos pendientes
+  const numInferidos = Object.values(highlights).filter(v => v === "inferido").length;
 
-    // ── Encabezado ─────────────────────────────────────────────────────────
-    doc.setFillColor(88, 28, 135)          // purple-900
-    doc.rect(0, 0, 210, 28, 'F')
-
-    doc.setTextColor(255, 255, 255)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(15)
-    doc.text('CENTRO MÉDICO VETERINARIO LOS PINOS', 105, 11, { align: 'center' })
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.text('Tel: (555) 123-4567  |  Av. Principal #123, Col. Centro  |  contacto@veterinarialospinos.com', 105, 18, { align: 'center' })
-    doc.text('Lun–Vie 8:00–18:00  |  Sáb 9:00–14:00', 105, 23, { align: 'center' })
-
-    // Línea decorativa bajo encabezado
-    doc.setDrawColor(167, 139, 250)        // violet-400
-    doc.setLineWidth(0.8)
-    doc.line(margen, 29, 210 - margen, 29)
-
-    // ── Título del documento ────────────────────────────────────────────────
-    doc.setTextColor(30, 30, 30)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
-    doc.text('HISTORIA CLÍNICA DEL PACIENTE', margen, 37)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(120, 120, 120)
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 210 - margen, 37, { align: 'right' })
-
-    // ── Tabla de datos del paciente ─────────────────────────────────────────
-    doc.setTextColor(30, 30, 30)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.text('Datos del Paciente', margen, 45)
-
-    autoTable(doc, {
-      startY: 48,
-      margin: { left: margen, right: margen },
-      body: [
-        ['Paciente',   paciente?.nombre   ?? '—',
-         'Propietario', cliente?.nombre   ?? '—'],
-        ['Especie',    paciente?.especie  ?? '—',
-         'Raza',       paciente?.raza     ?? '—'],
-        ['Edad',       paciente?.edad != null ? `${paciente.edad} años` : '—',
-         'Fecha reporte', new Date().toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })],
-      ],
-      theme: 'plain',
-      styles: { fontSize: 9, cellPadding: { top: 3, bottom: 3, left: 4, right: 4 } },
-      columnStyles: {
-        0: { fillColor: [237, 233, 254], fontStyle: 'bold', cellWidth: 38 },  // violet-100
-        1: { cellWidth: 52 },
-        2: { fillColor: [237, 233, 254], fontStyle: 'bold', cellWidth: 38 },
-        3: { cellWidth: 52 },
-      },
-      tableLineColor: [200, 190, 220],
-      tableLineWidth: 0.3,
-    })
-
-    // ── Sección de consultas ────────────────────────────────────────────────
-    const y1 = doc.lastAutoTable.finalY + 9
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(30, 30, 30)
-    doc.text('Consultas', margen, y1)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(120, 120, 120)
-    doc.text(`Total: ${historias.length} ${historias.length === 1 ? 'consulta registrada' : 'consultas registradas'}`, 210 - margen, y1, { align: 'right' })
-
-    if (historias.length === 0) {
-      doc.setFontSize(9)
-      doc.setTextColor(150, 150, 150)
-      doc.setFont('helvetica', 'italic')
-      doc.text('No hay consultas registradas para este paciente.', margen, y1 + 8)
-    } else {
-      autoTable(doc, {
-        startY: y1 + 3,
-        margin: { left: margen, right: margen },
-        head: [['#', 'Fecha', 'S — Anamnesis', 'O — Examen Físico', 'A — Diagnóstico', 'P — Tratamiento']],
-        body: historias.map((h, i) => [
-          String(historias.length - i),
-          new Date(h.fecha).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
-            '\n' + new Date(h.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }),
-          h.anamnesis     || '—',
-          h.examen_fisico || '—',
-          h.diagnostico   || '—',
-          h.tratamiento   || '—',
-        ]),
-        styles: {
-          fontSize: 8,
-          cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
-          overflow: 'linebreak',
-          valign: 'top',
-        },
-        headStyles: {
-          fillColor: [88, 28, 135],   // purple-900
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          fontSize: 8,
-        },
-        alternateRowStyles: { fillColor: [250, 248, 255] },
-        columnStyles: {
-          0: { cellWidth: 8,  halign: 'center', valign: 'middle' },
-          1: { cellWidth: 22, halign: 'center' },
-          2: { cellWidth: 36 },
-          3: { cellWidth: 36 },
-          4: { cellWidth: 36 },
-          5: { cellWidth: 36 },
-        },
-        tableLineColor: [210, 200, 230],
-        tableLineWidth: 0.2,
-      })
-    }
-
-    // ── Pie de página en cada hoja ──────────────────────────────────────────
-    const totalPages = doc.getNumberOfPages()
-    for (let p = 1; p <= totalPages; p++) {
-      doc.setPage(p)
-      doc.setDrawColor(200, 190, 220)
-      doc.setLineWidth(0.3)
-      doc.line(margen, 287, 210 - margen, 287)
-      doc.setFontSize(7)
-      doc.setTextColor(160, 160, 160)
-      doc.setFont('helvetica', 'normal')
-      doc.text('Veterinaria Los Pinos — Documento generado automáticamente. Solo para uso interno.', margen, 291)
-      doc.text(`Página ${p} / ${totalPages}`, 210 - margen, 291, { align: 'right' })
-    }
-
-    doc.save(`Historia_Clinica_${(paciente?.nombre ?? 'Paciente').replace(/\s+/g, '_')}.pdf`)
-  }
-
-  // ── Render ────────────────────────────────────────────────────────────────
-  const aiBadge = AI_BADGE[aiStatus]
+  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Cargando…</div>;
+  if (error)   return <div className="m-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">{error}</div>;
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50">
+
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center gap-4 sticky top-0 z-10">
-        {pacienteId && (
-          <>
-            <button onClick={() => navigate(-1)}
-              className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-700 transition font-medium">
-              <BackIcon /> Volver
-            </button>
-            <span className="text-slate-300">/</span>
-          </>
-        )}
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-slate-800">
-            {paciente ? `Consulta — ${paciente.nombre}` : 'Nueva Consulta'}
-          </h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
-        </div>
-        {aiBadge && (
-          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${aiBadge.cls}`}>
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />{aiBadge.text}
-          </span>
-        )}
-      </header>
-
-      <main className="flex-1 px-6 py-6 flex flex-col gap-6 max-w-5xl w-full mx-auto">
-
-        {/* Tarjeta del paciente */}
-        {paciente && (
-          <section className="bg-white rounded-xl border border-slate-200 shadow-sm px-6 py-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: 'Paciente',    value: paciente.nombre },
-                { label: 'Especie',     value: paciente.especie },
-                { label: 'Raza / Edad', value: [paciente.raza, paciente.edad != null ? `${paciente.edad} años` : null].filter(Boolean).join(' · ') || '—' },
-                { label: 'Propietario', value: cliente?.nombre ?? '—' },
-              ].map(({ label, value }) => (
-                <div key={label}>
-                  <p className="text-xs text-slate-400 font-medium mb-0.5">{label}</p>
-                  <p className="text-sm text-slate-700 font-semibold">{value}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Zona de Asistencia Híbrida */}
-        <section className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-purple-200 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <SparklesIcon className="w-4 h-4 text-purple-600" />
-              <h2 className="text-sm font-semibold text-purple-900">Asistente de IA — Zona Híbrida</h2>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {['Voz', 'Texto libre', 'Manual'].map(t => (
-                <span key={t} className="text-xs bg-white text-purple-600 border border-purple-200 rounded-full px-2.5 py-0.5 font-medium">{t}</span>
-              ))}
-            </div>
-          </div>
-
-          <div className="px-5 py-4 flex flex-col gap-4">
-            <div>
-              <textarea
-                value={freeText}
-                onChange={e => setFreeText(e.target.value)}
-                disabled={isProcessing}
-                placeholder="Dicta o escribe las notas libres de la consulta aquí…"
-                rows={6}
-                className={[
-                  'w-full resize-y text-sm text-slate-700 placeholder-slate-400',
-                  'border border-purple-200 rounded-xl px-4 py-3 bg-white shadow-inner',
-                  'focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition',
-                  isProcessing ? 'opacity-60 cursor-not-allowed' : '',
-                ].join(' ')}
-              />
-              <p className="text-xs text-purple-400 mt-1 text-right">{freeText.length} caracteres</p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Grabar / Detener */}
-              <button onClick={handleVoiceToggle}
-                disabled={isProcessing && aiStatus !== 'recording'}
-                className={[
-                  'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all border shadow-sm focus:outline-none focus:ring-2',
-                  recorder.isRecording
-                    ? 'bg-red-500 hover:bg-red-600 text-white border-red-500 focus:ring-red-300'
-                    : aiStatus === 'transcribing'
-                      ? 'bg-violet-100 text-violet-400 border-violet-200 cursor-not-allowed'
-                      : 'bg-white hover:bg-purple-50 text-purple-700 border-purple-300 focus:ring-purple-300',
-                ].join(' ')}>
-                {aiStatus === 'transcribing'
-                  ? <><Spinner className="w-4 h-4" /> Transcribiendo…</>
-                  : recorder.isRecording
-                    ? <><StopIcon /><span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Detener — {fmt(recorder.seconds)}</>
-                    : <><MicIcon /> Grabar Consulta</>}
-              </button>
-
-              <span className="text-slate-300 text-lg select-none">|</span>
-
-              {/* Estructurar con IA */}
-              <button onClick={handleOrganize}
-                disabled={!freeText.trim() || isProcessing}
-                className={[
-                  'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-300',
-                  !freeText.trim() || isProcessing
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                    : 'bg-purple-700 hover:bg-purple-600 active:scale-95 text-white border border-purple-700',
-                ].join(' ')}>
-                {aiStatus === 'organizing'
-                  ? <><Spinner className="w-4 h-4" /> Organizando…</>
-                  : <><SparklesIcon /> Estructurar con IA</>}
-              </button>
-
-              {aiStatus === 'done' && (
-                <span className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold">
-                  <CheckIcon className="w-3.5 h-3.5" /> Campos completados
-                </span>
-              )}
-              {(recorder.micError || aiError) && (
-                <span className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
-                  {recorder.micError ?? aiError}
-                </span>
-              )}
-            </div>
-
-            {recorder.isRecording && (
-              <div className="flex items-center gap-2 text-red-600 text-xs font-medium">
-                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                Grabando en tiempo real… habla con claridad cerca del micrófono.
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Campos estructurados SOAP */}
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-              Nota Clínica Estructurada
-            </h2>
-            {aiApplied && (
-              <span className="text-xs bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full px-3 py-0.5 font-medium">
-                Completado por IA — puedes editar libremente
-              </span>
-            )}
-          </div>
-
-          <div className="relative">
-            {/* Overlay de carga mientras la IA procesa */}
-            {isProcessing && (
-              <div className="absolute inset-0 z-10 rounded-xl bg-white/85 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
-                <Spinner className="w-8 h-8 text-purple-500" />
-                <p className="text-sm font-semibold text-purple-800">
-                  {aiStatus === 'transcribing'
-                    ? 'Transcribiendo audio con Whisper…'
-                    : 'Estructurando nota clínica con IA…'}
-                </p>
-                <p className="text-xs text-slate-500">La IA está procesando la consulta, espera un momento</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {FIELDS.map(({ key, label, badge, placeholder, border, badgeColor, ring, rows }) => (
-                <div key={key} className={`bg-white rounded-xl border-l-4 border border-slate-200 ${border} shadow-sm overflow-hidden`}>
-                  <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
-                    <label className="text-sm font-semibold text-slate-700" htmlFor={key}>{label}</label>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>{badge}</span>
-                  </div>
-                  <div className="px-4 py-3">
-                    <textarea
-                      id={key}
-                      value={fields[key]}
-                      onChange={e => {
-                        setFields(prev => ({ ...prev, [key]: e.target.value }))
-                        setSaved(false)
-                        if (aiApplied) setAiApplied(false)
-                      }}
-                      placeholder={placeholder}
-                      rows={rows}
-                      className={`w-full resize-y text-sm text-slate-700 placeholder-slate-300 border border-slate-200 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:ring-2 focus:border-transparent transition ${ring}`}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Guardar */}
-        <div className="flex flex-col items-end gap-2">
-          {saveErr && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{saveErr}</p>
-          )}
-          {!pacienteId && (
-            <p className="text-xs text-slate-400">
-              Sin paciente vinculado — abre esta consulta desde el perfil de una mascota para guardar en la BD.
+      <div className="bg-purple-700 text-white px-5 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="hover:bg-white/20 p-1 rounded transition-colors">
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-base font-bold leading-tight">{paciente?.nombre}</h1>
+            <p className="text-xs text-purple-200">
+              {paciente?.especie}{paciente?.raza ? ` · ${paciente.raza}` : ""}
+              {paciente?.cliente ? ` · ${paciente.cliente.nombre}` : ""}
             </p>
+          </div>
+        </div>
+        <button onClick={() => generarPDF(paciente, historias)} disabled={historias.length === 0}
+          className="flex items-center gap-1.5 text-xs bg-white/15 hover:bg-white/25 disabled:opacity-40 rounded px-3 py-1.5 font-medium transition-colors">
+          <Download size={13} /> PDF
+        </button>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 py-5 space-y-5">
+
+        {/* ── Panel IA / Voz ──────────────────────────────────────────────── */}
+        <div className="border border-slate-200 rounded-md bg-white overflow-hidden">
+
+          {/* Tabs: Voz | Texto */}
+          <div className="flex border-b border-slate-100">
+            <button onClick={() => setModoTexto(false)}
+              className={`px-4 py-2 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-colors ${
+                !modoTexto ? "border-purple-600 text-purple-700" : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}>
+              <Mic size={13} /> Dictado por voz
+            </button>
+            <button onClick={() => setModoTexto(true)}
+              className={`px-4 py-2 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-colors ${
+                modoTexto ? "border-purple-600 text-purple-700" : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}>
+              <FileText size={13} /> Texto libre
+            </button>
+          </div>
+
+          <div className="px-4 py-3 space-y-2">
+            {!modoTexto ? (
+              /* MODO VOZ */
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button onClick={handleGrabar}
+                    disabled={aiState === "transcribing" || aiState === "processing"}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors disabled:opacity-50 ${
+                      isRecording
+                        ? "bg-red-600 hover:bg-red-700 text-white"
+                        : "bg-purple-700 hover:bg-purple-800 text-white"
+                    }`}>
+                    {isRecording
+                      ? <><StopCircle size={15} className="animate-pulse" /> Detener ({fmtSec(seconds)})</>
+                      : <><Mic size={15} /> Grabar consulta</>}
+                  </button>
+
+                  {aiState === "transcribing" && (
+                    <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                      <Loader2 size={13} className="animate-spin" /> Transcribiendo…
+                    </span>
+                  )}
+                  {aiState === "processing" && (
+                    <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                      <Loader2 size={13} className="animate-spin" /> Procesando con IA…
+                    </span>
+                  )}
+                  {aiState === "done" && (
+                    <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+                      <Check size={13} /> Formulario autocompletado
+                    </span>
+                  )}
+                </div>
+
+                {transcripcionIA && (
+                  <div>
+                    <p className={lCls}>Transcripción recibida</p>
+                    <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-3 py-2 max-h-20 overflow-y-auto">
+                      {transcripcionIA}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* MODO TEXTO */
+              <div className="space-y-2">
+                <Field label="Texto de la consulta (pegar o escribir)">
+                  <TAr value={textoManual} onChange={e => setTextoManual(e.target.value)} rows={4}
+                    placeholder="Pegue la transcripción o escriba el resumen de la consulta para que la IA extraiga los campos…" />
+                </Field>
+                <div className="flex items-center gap-3">
+                  <button onClick={handleProcesarTexto}
+                    disabled={!textoManual.trim() || aiState === "processing"}
+                    className="flex items-center gap-2 px-4 py-1.5 bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-md text-sm font-semibold transition-colors">
+                    {aiState === "processing"
+                      ? <><Loader2 size={13} className="animate-spin" /> Procesando…</>
+                      : <><FileText size={13} /> Procesar con IA</>}
+                  </button>
+                  {aiState === "done" && (
+                    <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+                      <Check size={13} /> Formulario autocompletado
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Error IA */}
+            {aiError && (
+              <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                <AlertTriangle size={13} className="shrink-0 mt-px" />
+                <span>{aiError}. Podés continuar completando el formulario en modo manual.</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Badge de inferidos pendientes */}
+        {numInferidos > 0 && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-300 rounded-md">
+            <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+            <span className="text-xs font-semibold text-amber-700">
+              {numInferidos} campo{numInferidos > 1 ? "s" : ""} inferido{numInferidos > 1 ? "s" : ""} por revisar — resaltado{numInferidos > 1 ? "s" : ""} en naranja abajo
+            </span>
+          </div>
+        )}
+
+        {/* ── Formulario ──────────────────────────────────────────────────── */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">
+              {editandoId ? "Editando consulta" : "Nueva consulta"}
+            </h2>
+            {editandoId && (
+              <button onClick={resetForm} className="text-xs text-slate-400 hover:text-slate-600 underline">
+                Cancelar edición
+              </button>
+            )}
+          </div>
+
+          {/* S1 — Anamnesis */}
+          <AccordionSection num="1" title="Anamnesis" isOpen={open.s1} onToggle={() => toggle("s1")}>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Tipo de consulta" hl={highlights.tipo_consulta}>
+                <Sel value={form.tipo_consulta} onChange={setF("tipo_consulta")} options={OPT.tipo_consulta} hl={highlights.tipo_consulta} />
+              </Field>
+              <Field label="Tiempo de evolución" hl={highlights.tiempo_evolucion}>
+                <TIn value={form.tiempo_evolucion} onChange={setF("tiempo_evolucion")} placeholder="Ej: 3 días" hl={highlights.tiempo_evolucion} />
+              </Field>
+              <Field label="Derivado por" hl={highlights.derivado_por}>
+                <TIn value={form.derivado_por} onChange={setF("derivado_por")} placeholder="Colega / clínica" hl={highlights.derivado_por} />
+              </Field>
+            </div>
+            <Field label="Motivo de consulta" hl={highlights.motivo_consulta}>
+              <TAr value={form.motivo_consulta} onChange={setF("motivo_consulta")} rows={2}
+                placeholder="Descripción del motivo principal de la consulta" hl={highlights.motivo_consulta} />
+            </Field>
+            <Field label="Detalle de la enfermedad actual" hl={highlights.detalle}>
+              <TAr value={form.detalle} onChange={setF("detalle")} rows={3} hl={highlights.detalle} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Tipo de alimentación" hl={highlights.alimentacion_tipo}>
+                <TIn value={form.alimentacion_tipo} onChange={setF("alimentacion_tipo")} placeholder="Balanceado / BARF / mixto" hl={highlights.alimentacion_tipo} />
+              </Field>
+              <Field label="Cantidad diaria (g)" hl={highlights.alimentacion_cantidad_gr}>
+                <NIn value={form.alimentacion_cantidad_gr} onChange={setF("alimentacion_cantidad_gr")} placeholder="200" hl={highlights.alimentacion_cantidad_gr} />
+              </Field>
+            </div>
+            <Field label="Antecedentes" hl={highlights.antecedentes}>
+              <TAr value={form.antecedentes} onChange={setF("antecedentes")} rows={3}
+                placeholder="Vacunas previas: polivalente (ene-2026), antirrábica (mar-2026). Desparasitaciones, cirugías, enfermedades anteriores…"
+                hl={highlights.antecedentes} />
+            </Field>
+          </AccordionSection>
+
+          {/* S2 — EOG */}
+          <AccordionSection num="2" title="Examen objetivo general (EOG)" isOpen={open.s2} onToggle={() => toggle("s2")}>
+            <div className="grid grid-cols-5 gap-3">
+              {[
+                ["temperatura_c",           "Temperatura (°C)", "38.5"],
+                ["peso_kg",                 "Peso (kg)",        "5.0" ],
+                ["frecuencia_cardiaca",     "FC (lpm)",         "100" ],
+                ["frecuencia_respiratoria", "FR (rpm)",         "22"  ],
+                ["condicion_corporal",      "CC (1–9)",         "5"   ],
+              ].map(([f, label, ph]) => (
+                <Field key={f} label={label} hl={highlights[f]}>
+                  <NIn value={form[f]} onChange={setF(f)} placeholder={ph} hl={highlights[f]} />
+                </Field>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                ["mucosas",         "Mucosas",         OPT.mucosas        ],
+                ["tllc",            "TLLC",            OPT.tllc           ],
+                ["estado_sensorio", "Estado sensorio", OPT.estado_sensorio],
+                ["hidratacion",     "Hidratación",     OPT.hidratacion    ],
+                ["pulso",           "Pulso",           OPT.pulso          ],
+              ].map(([f, label, opts]) => (
+                <Field key={f} label={label} hl={highlights[f]}>
+                  <Sel value={form[f]} onChange={setF(f)} options={opts} hl={highlights[f]} />
+                </Field>
+              ))}
+              <Field label="Linfonódulos" hl={highlights.linfonodulos}>
+                <TIn value={form.linfonodulos} onChange={setF("linfonodulos")} placeholder="No reactivos" hl={highlights.linfonodulos} />
+              </Field>
+            </div>
+          </AccordionSection>
+
+          {/* S3 — EOP */}
+          <AccordionSection num="3" title="Examen objetivo particular (EOP)" isOpen={open.s3} onToggle={() => toggle("s3")}>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {SISTEMAS_EOP.map(s => (
+                <div key={s} className="grid grid-cols-5 gap-2 items-end">
+                  <Field label={SISTEMA_LABELS[s]} cls="col-span-2">
+                    <Sel value={form.examen_particular[s].estado} onChange={setEop(s,"estado")} options={OPT.sistema_estado} />
+                  </Field>
+                  <Field label="Detalle" cls="col-span-3">
+                    <TIn value={form.examen_particular[s].detalle} onChange={setEop(s,"detalle")} placeholder="Observaciones" />
+                  </Field>
+                </div>
+              ))}
+            </div>
+          </AccordionSection>
+
+          {/* S4 — Diagnóstico */}
+          <AccordionSection num="4" title="Diagnóstico" isOpen={open.s4} onToggle={() => toggle("s4")}>
+            <Field label="Diagnóstico presuntivo" hl={highlights.diagnostico_presuntivo}>
+              <TAr value={form.diagnostico_presuntivo} onChange={setF("diagnostico_presuntivo")} rows={2} hl={highlights.diagnostico_presuntivo} />
+            </Field>
+            <Field label="Diagnósticos diferenciales" hl={highlights.diagnosticos_diferenciales}>
+              <TAr value={form.diagnosticos_diferenciales} onChange={setF("diagnosticos_diferenciales")}
+                rows={2} placeholder="Separados por coma" hl={highlights.diagnosticos_diferenciales} />
+            </Field>
+            <Field label="Diagnóstico definitivo" hl={highlights.diagnostico_definitivo}>
+              <TAr value={form.diagnostico_definitivo} onChange={setF("diagnostico_definitivo")} rows={2} hl={highlights.diagnostico_definitivo} />
+            </Field>
+          </AccordionSection>
+
+          {/* S5 — Plan */}
+          <AccordionSection num="5" title="Plan, tratamiento y vacunas" isOpen={open.s5} onToggle={() => toggle("s5")}>
+            <Field label="Exámenes solicitados" hl={highlights.examenes_solicitados}>
+              <TAr value={form.examenes_solicitados} onChange={setF("examenes_solicitados")} rows={2} hl={highlights.examenes_solicitados} />
+            </Field>
+            <div>
+              <p className={lCls}>Medicamentos</p>
+              <TratamientoList items={form.tratamiento_items}
+                onChange={v => { setForm(p => ({ ...p, tratamiento_items: v })); }} />
+            </div>
+            <div>
+              <p className={lCls}>Vacunas aplicadas</p>
+              <VacunaList items={form.vacunas_items}
+                onChange={v => { setForm(p => ({ ...p, vacunas_items: v })); }} />
+            </div>
+            <Field label="Indicaciones al propietario" hl={highlights.indicaciones}>
+              <TAr value={form.indicaciones} onChange={setF("indicaciones")} rows={2}
+                placeholder="Vacuna aplicada hoy: antirrábica 1 ml SC. Dieta blanda 3 días…"
+                hl={highlights.indicaciones} />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Pronóstico" hl={highlights.pronostico}>
+                <Sel value={form.pronostico} onChange={setF("pronostico")} options={OPT.pronostico} hl={highlights.pronostico} />
+              </Field>
+              <Field label="Próxima cita">
+                <input type="datetime-local" value={form.proxima_cita}
+                  onChange={setF("proxima_cita")}
+                  className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-purple-300 focus:border-purple-300" />
+              </Field>
+            </div>
+          </AccordionSection>
+
+          {errForm && (
+            <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">{errForm}</div>
           )}
-          <button
-            onClick={handleSave}
-            disabled={isProcessing || saving}
-            className={[
-              'flex items-center gap-2 px-7 py-3 rounded-xl text-sm font-bold shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-2',
-              saved
-                ? 'bg-emerald-500 text-white focus:ring-emerald-400'
-                : 'bg-purple-700 hover:bg-purple-600 active:scale-95 text-white focus:ring-purple-400 disabled:opacity-60',
-            ].join(' ')}>
-            {saving ? <Spinner /> : saved ? <CheckIcon /> : <SaveIcon />}
-            {saving ? 'Guardando…' : saved ? 'Historia guardada ✓' : 'Guardar Historia Clínica'}
+
+          <button onClick={handleSave} disabled={guardando}
+            className="w-full flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-md py-2.5 text-sm font-semibold transition-colors">
+            {guardadoOk
+              ? <><Check size={15} /> Guardado</>
+              : guardando ? "Guardando…"
+              : <><Save size={15} /> {editandoId ? "Actualizar consulta" : "Guardar consulta"}</>}
           </button>
         </div>
 
-        {/* ── Historial de Consultas ─────────────────────────────────────── */}
-        {pacienteId && (
-          <section className="flex flex-col gap-3 pb-8">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                  Historial de Consultas
-                </h2>
-                <span className="text-xs bg-slate-100 text-slate-500 font-semibold px-2.5 py-0.5 rounded-full">
-                  {historias.length} {historias.length === 1 ? 'consulta' : 'consultas'}
-                </span>
-              </div>
-              <button
-                onClick={handleDownloadPDF}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-white hover:bg-purple-50 text-purple-700 border border-purple-300 rounded-lg shadow-sm transition focus:outline-none focus:ring-2 focus:ring-purple-300"
-              >
-                <DownloadIcon className="w-4 h-4" />
-                Descargar Historia (PDF)
-              </button>
-            </div>
+        {/* ── Historial ────────────────────────────────────────────────────── */}
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-slate-700">Historial ({historias.length})</h2>
+          {historias.length === 0
+            ? <p className="text-sm text-slate-400 italic">Sin consultas registradas.</p>
+            : historias.map(h => <HistoriaCard key={h.id} h={h} onEdit={handleEdit} />)
+          }
+        </div>
 
-            {loadingHistorias && (
-              <div className="flex items-center gap-2.5 text-slate-400 text-sm py-8 justify-center">
-                <Spinner className="w-5 h-5" /> Cargando historial…
-              </div>
-            )}
-
-            {!loadingHistorias && historias.length === 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 flex flex-col items-center justify-center py-12 text-slate-400">
-                <ClipboardIcon className="w-9 h-9 mb-3 opacity-40" />
-                <p className="text-sm font-medium">No hay consultas registradas para este paciente</p>
-                <p className="text-xs mt-1">Completa el formulario de arriba y guarda para comenzar</p>
-              </div>
-            )}
-
-            {!loadingHistorias && historias.length > 0 && (
-              <div className="flex flex-col gap-3">
-                {historias.map((h, i) => (
-                  <HistoriaCard key={h.id} historia={h} index={historias.length - i} />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-      </main>
+      </div>
     </div>
-  )
+  );
 }
