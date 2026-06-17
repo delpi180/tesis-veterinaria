@@ -13,13 +13,19 @@ import Servicios from './pages/Servicios'
 import Ventas from './pages/Ventas'
 import Caja from './pages/Caja'
 import Usuarios from './pages/Usuarios'
+import Asistencia from './pages/Asistencia'
 import Mediciones from './pages/Mediciones'
-import { getToken, esVeterinario } from './services/api'
+import { getToken, esVeterinario, esAdmin } from './services/api'
 import './App.css'
 
-// Ruta solo para veterinarios; recepcionista es redirigido al inicio
+// Ruta solo para veterinarios; recepcionista es redirigida al inicio
 function SoloVet({ children }) {
   return esVeterinario() ? children : <Navigate to="/" replace />
+}
+
+// Ruta solo para la administradora (recepcionista)
+function SoloAdmin({ children }) {
+  return esAdmin() ? children : <Navigate to="/" replace />
 }
 
 function AppProtegida() {
@@ -41,7 +47,8 @@ function AppProtegida() {
           <Route path="/servicios"              element={<Servicios />} />
           <Route path="/ventas"                 element={<Ventas />} />
           <Route path="/caja"                   element={<Caja />} />
-          <Route path="/usuarios"               element={<SoloVet><Usuarios /></SoloVet>} />
+          <Route path="/asistencia"             element={<SoloAdmin><Asistencia /></SoloAdmin>} />
+          <Route path="/usuarios"               element={<SoloAdmin><Usuarios /></SoloAdmin>} />
           <Route path="/mediciones"             element={<Mediciones />} />
           <Route path="*"                       element={<Navigate to="/" replace />} />
         </Routes>

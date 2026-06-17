@@ -111,7 +111,7 @@ export default function Usuarios() {
       <main className="flex-1 px-6 py-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
         <div className="bg-sky-50 border border-sky-200 rounded-xl px-4 py-3 text-sm text-sky-800 flex items-start gap-2">
           <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />
-          <p>El <strong>veterinario</strong> tiene acceso completo. La <strong>recepcionista</strong> no puede ver historias clínicas ni gestionar usuarios.</p>
+          <p>La <strong>recepcionista</strong> es la administradora: gestiona usuarios, ventas, inventario, turnos y asistencia. El <strong>veterinario</strong> (doctor) atiende y llena las historias clínicas, que quedan firmadas con su nombre.</p>
         </div>
 
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

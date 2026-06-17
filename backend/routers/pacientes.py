@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Cita, Paciente, HistoriaClinica
+from models import Cita, Paciente, HistoriaClinica, Usuario
 from schemas import (
     PacienteOut, PacienteUpdate,
     HistoriaClinicaCreate, HistoriaClinicaOut,
 )
+from core.deps import usuario_actual
 
 router = APIRouter(prefix="/api/pacientes", tags=["Pacientes"])
 
@@ -43,6 +44,7 @@ def _generar_cita_proxima(db: Session, historia: HistoriaClinica) -> None:
         motivo="Control (programado en consulta)",
         estado="pendiente",
         notas=f"Generado automáticamente desde la historia clínica #{historia.id}",
+        veterinario_id=historia.veterinario_id,  # se asigna al doctor que atendió
     ))
 
 
@@ -86,13 +88,20 @@ def eliminar_paciente(paciente_id: int, db: Session = Depends(get_db)):
     status_code=status.HTTP_201_CREATED,
 )
 def crear_historia(
-    paciente_id: int, payload: HistoriaClinicaCreate, db: Session = Depends(get_db)
+    paciente_id: int,
+    payload: HistoriaClinicaCreate,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
 ):
     print(f"[DEBUG] POST /historias/ — paciente_id={paciente_id} payload={payload.model_dump()}")
     if not db.get(Paciente, paciente_id):
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
     try:
-        historia = HistoriaClinica(**payload.model_dump(), paciente_id=paciente_id)
+        historia = HistoriaClinica(
+            **payload.model_dump(),
+            paciente_id=paciente_id,
+            veterinario_id=usuario.id if usuario else None,  # firma del doctor
+        )
         db.add(historia)
         db.flush()  # obtener historia.id antes de generar la cita
         # Si la consulta fijó una próxima cita, agéndala en Turnos automáticamente

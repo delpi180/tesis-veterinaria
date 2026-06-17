@@ -8,7 +8,7 @@ import models  # registra todos los modelos en Base.metadata
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
-    busqueda, inventario,
+    busqueda, inventario, asistencia,
 )
 from core.config import settings
 from core.security import verificar_token, hash_password
@@ -82,6 +82,7 @@ app.include_router(servicios.router)
 app.include_router(ventas.router)
 app.include_router(inventario.router)
 app.include_router(busqueda.router)
+app.include_router(asistencia.router)
 
 
 @app.on_event("startup")
@@ -93,19 +94,29 @@ def startup():
 
 
 def _seed_admin():
-    """Crea el usuario administrador inicial si la tabla está vacía."""
+    """Siembra los usuarios iniciales si la tabla está vacía:
+    - la administradora (recepcionista), que gestiona todo salvo lo clínico;
+    - un doctor de arranque, para poder llenar historias de inmediato.
+    """
     db = SessionLocal()
     try:
         if db.query(models.Usuario).count() == 0:
             db.add(models.Usuario(
                 usuario=settings.auth_usuario,
-                nombre="Administrador",
+                nombre="Recepción (Administradora)",
+                password_hash=hash_password(settings.auth_password),
+                rol="recepcionista",
+                activo=True,
+            ))
+            db.add(models.Usuario(
+                usuario="doctor",
+                nombre="Dr. Veterinario",
                 password_hash=hash_password(settings.auth_password),
                 rol="veterinario",
                 activo=True,
             ))
             db.commit()
-            print(f"[SEED] Usuario administrador '{settings.auth_usuario}' creado.")
+            print(f"[SEED] Usuarios iniciales creados: admin '{settings.auth_usuario}' (recepcionista) y 'doctor' (veterinario).")
     finally:
         db.close()
 

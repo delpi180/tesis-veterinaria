@@ -25,6 +25,7 @@ def crear_cita(payload: CitaCreate, db: Session = Depends(get_db)):
 def listar_citas(
     paciente_id: Optional[int] = Query(None),
     estado: Optional[str] = Query(None),
+    veterinario_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
     q = db.query(Cita)
@@ -32,6 +33,8 @@ def listar_citas(
         q = q.filter(Cita.paciente_id == paciente_id)
     if estado is not None:
         q = q.filter(Cita.estado == estado)
+    if veterinario_id is not None:
+        q = q.filter(Cita.veterinario_id == veterinario_id)
     return q.order_by(Cita.fecha_hora).all()
 
 

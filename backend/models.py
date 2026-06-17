@@ -121,7 +121,15 @@ class HistoriaClinica(Base):
     segundos_registro = Column(Integer)            # tiempo total de llenado
     metodo_registro   = Column(String(10))         # 'manual' | 'ia'
 
-    paciente = relationship("Paciente", back_populates="historias")
+    # Autoría: qué doctor veterinario llenó la historia (la hora es creado_en)
+    veterinario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+
+    paciente    = relationship("Paciente", back_populates="historias")
+    veterinario = relationship("Usuario")
+
+    @property
+    def veterinario_nombre(self):
+        return self.veterinario.nombre if self.veterinario else None
 
 
 class Cita(Base):
@@ -135,7 +143,35 @@ class Cita(Base):
     notas       = Column(Text)
     creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    paciente = relationship("Paciente", back_populates="citas")
+    # Doctor veterinario asignado al turno (opcional)
+    veterinario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+
+    paciente    = relationship("Paciente", back_populates="citas")
+    veterinario = relationship("Usuario")
+
+    @property
+    def veterinario_nombre(self):
+        return self.veterinario.nombre if self.veterinario else None
+
+
+class Asistencia(Base):
+    """Marcaciones de ingreso/salida del personal (control de la recepcionista)."""
+    __tablename__ = "asistencias"
+
+    id            = Column(Integer, primary_key=True)
+    usuario_id    = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    fecha         = Column(Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
+    hora_ingreso  = Column(DateTime(timezone=True))
+    hora_salida   = Column(DateTime(timezone=True), nullable=True)  # null mientras esté "en turno"
+    notas         = Column(String(200))
+    registrado_por = Column(String(50))   # usuario admin que registró la marcación
+    creado_en     = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    usuario = relationship("Usuario")
+
+    @property
+    def usuario_nombre(self):
+        return self.usuario.nombre if self.usuario else None
 
 
 class Evaluador(Base):

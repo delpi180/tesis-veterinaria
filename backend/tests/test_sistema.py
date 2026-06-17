@@ -11,18 +11,48 @@ from sqlalchemy import text
 
 import main
 from database import SessionLocal
+from models import Usuario
+from core.security import hash_password
 
 
 @pytest.fixture(scope="module")
 def client():
-    # Context manager → dispara startup (siembra el admin)
+    # Context manager → dispara startup (siembra los usuarios iniciales)
     with TestClient(main.app) as c:
         yield c
 
 
+def _ensure_user(usuario: str, password: str, rol: str, nombre: str) -> None:
+    """Garantiza un usuario con rol/credenciales conocidos, sin depender del seed."""
+    db = SessionLocal()
+    try:
+        u = db.query(Usuario).filter(Usuario.usuario == usuario).first()
+        if not u:
+            db.add(Usuario(usuario=usuario, nombre=nombre,
+                           password_hash=hash_password(password), rol=rol, activo=True))
+        else:
+            u.rol = rol
+            u.password_hash = hash_password(password)
+            u.activo = True
+        db.commit()
+    finally:
+        db.close()
+
+
 @pytest.fixture(scope="module")
 def admin(client):
-    r = client.post("/api/auth/login", json={"usuario": "admin", "password": "vetlospinos"})
+    """Administradora del sistema = recepcionista."""
+    _ensure_user("qa_admin", "qa1234", "recepcionista", "QA Administradora")
+    r = client.post("/api/auth/login", json={"usuario": "qa_admin", "password": "qa1234"})
+    assert r.status_code == 200
+    return {"Authorization": f"Bearer {r.json()['token']}"}
+
+
+@pytest.fixture(scope="module")
+def doctor(client):
+    """Doctor veterinario (atiende y firma historias)."""
+    _ensure_user("qa_doc", "qa1234", "veterinario", "QA Doctor")
+    r = client.post("/api/auth/login", json={"usuario": "qa_doc", "password": "qa1234"})
     assert r.status_code == 200
     return {"Authorization": f"Bearer {r.json()['token']}"}
 
@@ -49,28 +79,34 @@ def test_token_invalido_rechazado(client):
 
 # ── Roles ────────────────────────────────────────────────────────────────────
 
-def test_roles_recepcionista(client, admin):
-    # crear recepcionista
-    client.post("/api/usuarios/", json={
-        "usuario": "test_recep", "nombre": "Test", "password": "1234", "rol": "recepcionista",
-    }, headers=admin)
-    tok = client.post("/api/auth/login", json={"usuario": "test_recep", "password": "1234"}).json()["token"]
-    RH = {"Authorization": f"Bearer {tok}"}
-    try:
-        # accede a clientes
-        assert client.get("/api/clientes/", headers=RH).status_code == 200
-        # NO accede a usuarios
-        assert client.get("/api/usuarios/", headers=RH).status_code == 403
-        # NO accede a historias clínicas
-        cli = client.get("/api/clientes/", headers=admin).json()
-        if cli and cli[0]["pacientes"]:
-            pid = cli[0]["pacientes"][0]["id"]
-            assert client.get(f"/api/pacientes/{pid}/historias/", headers=RH).status_code == 403
-            assert client.get(f"/api/pacientes/{pid}/historias/", headers=admin).status_code == 200
-    finally:
-        db = SessionLocal()
-        db.execute(text("DELETE FROM usuarios WHERE usuario='test_recep'"))
-        db.commit(); db.close()
+def test_roles(client, admin, doctor):
+    # la recepcionista es la administradora: ve clientes y gestiona usuarios
+    assert client.get("/api/clientes/", headers=admin).status_code == 200
+    assert client.get("/api/usuarios/", headers=admin).status_code == 200
+    # el doctor NO gestiona usuarios (función de la administradora)
+    assert client.get("/api/usuarios/", headers=doctor).status_code == 403
+    # historias clínicas: el doctor sí; la recepcionista no
+    cli = client.get("/api/clientes/", headers=admin).json()
+    if cli and cli[0]["pacientes"]:
+        pid = cli[0]["pacientes"][0]["id"]
+        assert client.get(f"/api/pacientes/{pid}/historias/", headers=admin).status_code == 403
+        assert client.get(f"/api/pacientes/{pid}/historias/", headers=doctor).status_code == 200
+
+
+def test_admin_es_recepcionista_no_ve_historias(client, admin):
+    """La administradora del sistema es recepcionista: no accede a lo clínico."""
+    cli = client.get("/api/clientes/", headers=admin).json()
+    if cli and cli[0]["pacientes"]:
+        pid = cli[0]["pacientes"][0]["id"]
+        assert client.get(f"/api/pacientes/{pid}/historias/", headers=admin).status_code == 403
+
+
+def test_listar_doctores(client, admin, doctor):
+    """El selector de turnos lista doctores activos (accesible a cualquier sesión)."""
+    r = client.get("/api/usuarios/doctores", headers=admin)
+    assert r.status_code == 200
+    nombres = {d["nombre"] for d in r.json()}
+    assert "QA Doctor" in nombres
 
 
 # ── Validaciones ─────────────────────────────────────────────────────────────
@@ -167,3 +203,65 @@ def test_dashboard_resumen(client, admin):
     assert r.status_code == 200
     for clave in ("citas_hoy", "consultas_semana", "stock_bajo", "vacunas_proximas"):
         assert clave in r.json()
+
+
+# ── Autoría de la historia clínica (firma del doctor) ────────────────────────
+
+def test_historia_firma_del_doctor(client, admin, doctor):
+    # cliente + paciente (los crea la recepcionista)
+    cli = client.post("/api/clientes/", json={"nombre": "QA Dueño", "dni": "55667788"}, headers=admin).json()
+    pac = client.post(f"/api/clientes/{cli['id']}/pacientes/",
+                      json={"nombre": "QA Firulais", "especie": "Canino"}, headers=admin).json()
+    try:
+        # el doctor llena la historia → debe quedar firmada con su nombre
+        r = client.post(f"/api/pacientes/{pac['id']}/historias/",
+                        json={"motivo_consulta": "Control"}, headers=doctor)
+        assert r.status_code == 201
+        h = r.json()
+        assert h["veterinario_nombre"] == "QA Doctor"
+        assert h["veterinario_id"] is not None
+    finally:
+        client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
+        db = SessionLocal()
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()
+
+
+# ── Control de asistencia (marcaciones) ──────────────────────────────────────
+
+def _id_doctor(client, admin, nombre="QA Doctor"):
+    docs = client.get("/api/usuarios/doctores", headers=admin).json()
+    return next(d["id"] for d in docs if d["nombre"] == nombre)
+
+
+def test_asistencia_ingreso_salida(client, admin, doctor):
+    doc_id = _id_doctor(client, admin)
+    reg = None
+    try:
+        # ingreso
+        r = client.post("/api/asistencia/ingreso", json={"usuario_id": doc_id}, headers=admin)
+        assert r.status_code == 201
+        reg = r.json()
+        assert reg["hora_ingreso"] is not None
+        assert reg["hora_salida"] is None
+
+        # segundo ingreso abierto el mismo día → 409
+        dup = client.post("/api/asistencia/ingreso", json={"usuario_id": doc_id}, headers=admin)
+        assert dup.status_code == 409
+
+        # salida → calcula horas trabajadas
+        s = client.post(f"/api/asistencia/{reg['id']}/salida", headers=admin)
+        assert s.status_code == 200
+        assert s.json()["hora_salida"] is not None
+        assert s.json()["horas_trabajadas"] is not None
+    finally:
+        if reg:
+            client.delete(f"/api/asistencia/{reg['id']}", headers=admin)
+
+
+def test_asistencia_solo_admin(client, doctor, admin):
+    doc_id = _id_doctor(client, admin)
+    # un doctor NO puede registrar asistencia (es función de la administradora)
+    r = client.post("/api/asistencia/ingreso", json={"usuario_id": doc_id}, headers=doctor)
+    assert r.status_code == 403
+    assert client.get("/api/asistencia/", headers=doctor).status_code == 403

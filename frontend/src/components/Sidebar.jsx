@@ -3,9 +3,9 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, Activity, LogOut, Wallet, UserCog,
-  Menu, X,
+  Clock, Menu, X,
 } from 'lucide-react'
-import { getNombre, getRol, cerrarSesion, esVeterinario } from '../services/api'
+import { getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
 import GlobalSearch from './GlobalSearch'
 
 const PawIcon = () => (
@@ -14,7 +14,7 @@ const PawIcon = () => (
   </svg>
 )
 
-// `vet` => visible solo para veterinario
+// `vet` => solo veterinario · `admin` => solo recepcionista (administradora)
 const SECCION_CLINICA = [
   { label: 'Inicio',   to: '/',         Icon: LayoutDashboard },
   { label: 'Clientes', to: '/clientes', Icon: Users },
@@ -25,7 +25,8 @@ const SECCION_ADMIN = [
   { label: 'Servicios',         to: '/servicios',  Icon: Stethoscope },
   { label: 'Ventas',            to: '/ventas',     Icon: BarChart2 },
   { label: 'Caja',              to: '/caja',       Icon: Wallet },
-  { label: 'Usuarios',          to: '/usuarios',   Icon: UserCog, vet: true },
+  { label: 'Asistencia',        to: '/asistencia', Icon: Clock,    admin: true },
+  { label: 'Usuarios',          to: '/usuarios',   Icon: UserCog,  admin: true },
 ]
 const SECCION_TESIS = [
   { label: 'Mediciones', to: '/mediciones', Icon: Activity },
@@ -60,7 +61,10 @@ export default function Sidebar() {
   const [abierto, setAbierto] = useState(false)
   const nombre = getNombre() || 'Veterinario'
   const rol = getRol() || 'veterinario'
-  const visible = (items) => items.filter(i => !i.vet || esVeterinario())
+  const visible = (items) => items.filter(i =>
+    (!i.vet   || esVeterinario()) &&
+    (!i.admin || esAdmin())
+  )
 
   const handleLogout = () => {
     cerrarSesion()

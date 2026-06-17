@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Stethoscope } from 'lucide-react'
 import { api } from '../services/api'
 import { estadoStyle, estadoLabel, ESTADOS_CITA, waRecordatorio } from '../utils/citas'
 
@@ -11,12 +11,13 @@ const NOMBRES_MES = [
 const DIAS_SEMANA = ['Lu','Ma','Mi','Ju','Vi','Sa','Do']
 
 const FORM_INICIAL = {
-  pacienteId: '',
-  fecha:      '',
-  hora:       '09:00',
-  motivo:     '',
-  estado:     'pendiente',
-  notas:      '',
+  pacienteId:    '',
+  fecha:         '',
+  hora:          '09:00',
+  motivo:        '',
+  estado:        'pendiente',
+  notas:         '',
+  veterinarioId: '',
 }
 
 function formatHora(iso) {
@@ -51,6 +52,7 @@ export default function Turnos() {
   const [selected,    setSelected]    = useState(now.getDate())
   const [citas,       setCitas]       = useState([])
   const [pacienteMap, setPacienteMap] = useState({})
+  const [doctores,    setDoctores]    = useState([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
 
@@ -71,8 +73,9 @@ export default function Turnos() {
     Promise.all([
       api.get('/api/clientes/'),
       api.get('/api/citas/'),
+      api.get('/api/usuarios/doctores'),
     ])
-      .then(([clientes, citasData]) => {
+      .then(([clientes, citasData, doctoresData]) => {
         const map = {}
         clientes.forEach(c => {
           c.pacientes.forEach(p => {
@@ -84,6 +87,7 @@ export default function Turnos() {
         })
         setPacienteMap(map)
         setCitas(citasData)
+        setDoctores(doctoresData)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -173,11 +177,12 @@ export default function Turnos() {
     setErrorModal(null)
     try {
       await api.post('/api/citas/', {
-        paciente_id: parseInt(form.pacienteId, 10),
-        fecha_hora:  `${form.fecha}T${form.hora}:00`,
-        motivo:      form.motivo.trim() || null,
-        estado:      form.estado,
-        notas:       form.notas.trim() || null,
+        paciente_id:    parseInt(form.pacienteId, 10),
+        fecha_hora:     `${form.fecha}T${form.hora}:00`,
+        motivo:         form.motivo.trim() || null,
+        estado:         form.estado,
+        notas:          form.notas.trim() || null,
+        veterinario_id: form.veterinarioId ? parseInt(form.veterinarioId, 10) : null,
       })
       const nuevasCitas = await api.get('/api/citas/')
       setCitas(nuevasCitas)
@@ -328,6 +333,12 @@ export default function Turnos() {
                         <User className="w-3 h-3" />
                         <span>{info.propietario}</span>
                       </div>
+                      {cita.veterinario_nombre && (
+                        <div className="flex items-center gap-1 text-xs text-purple-700 font-medium">
+                          <Stethoscope className="w-3 h-3" />
+                          <span>{cita.veterinario_nombre}</span>
+                        </div>
+                      )}
                       {/* Acciones: estado + recordatorio */}
                       <div className="flex items-center gap-2 pt-1">
                         <select
@@ -385,6 +396,7 @@ export default function Turnos() {
                   <th className="text-left px-5 py-3 font-semibold">Paciente</th>
                   <th className="text-left px-5 py-3 font-semibold">Motivo</th>
                   <th className="text-left px-5 py-3 font-semibold">Propietario</th>
+                  <th className="text-left px-5 py-3 font-semibold">Doctor</th>
                   <th className="text-left px-5 py-3 font-semibold">Estado</th>
                   <th className="text-center px-5 py-3 font-semibold">Acciones</th>
                 </tr>
@@ -411,6 +423,11 @@ export default function Turnos() {
                       </td>
                       <td className="px-5 py-3 text-slate-600">{cita.motivo ?? '—'}</td>
                       <td className="px-5 py-3 text-slate-500">{info.propietario}</td>
+                      <td className="px-5 py-3 text-slate-600">
+                        {cita.veterinario_nombre
+                          ? <span className="inline-flex items-center gap-1 text-purple-700"><Stethoscope className="w-3 h-3" />{cita.veterinario_nombre}</span>
+                          : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="px-5 py-3">
                         <select
                           value={cita.estado}
@@ -522,6 +539,21 @@ export default function Turnos() {
                     value={form.motivo}
                     onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
                   />
+                </div>
+
+                {/* Veterinario asignado */}
+                <div className="flex flex-col gap-1">
+                  <label className={labelCls}>Veterinario asignado</label>
+                  <select
+                    className={inputCls}
+                    value={form.veterinarioId}
+                    onChange={e => setForm(f => ({ ...f, veterinarioId: e.target.value }))}
+                  >
+                    <option value="">— Sin asignar —</option>
+                    {doctores.map(d => (
+                      <option key={d.id} value={d.id}>{d.nombre}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Estado */}

@@ -134,6 +134,10 @@ class HistoriaClinicaOut(BaseModel):
     segundos_registro: Optional[int] = None
     metodo_registro:   Optional[str] = None
 
+    # Autoría: doctor que la llenó (la hora de llenado es creado_en)
+    veterinario_id:     Optional[int] = None
+    veterinario_nombre: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -237,20 +241,24 @@ class CitaBase(BaseModel):
 
 
 class CitaCreate(CitaBase):
-    paciente_id: int
+    paciente_id:    int
+    veterinario_id: Optional[int] = None
 
 
 class CitaUpdate(BaseModel):
-    fecha_hora: Optional[datetime] = None
-    motivo:     Optional[str] = None
-    estado:     Optional[str] = None
-    notas:      Optional[str] = None
+    fecha_hora:     Optional[datetime] = None
+    motivo:         Optional[str] = None
+    estado:         Optional[str] = None
+    notas:          Optional[str] = None
+    veterinario_id: Optional[int] = None
 
 
 class CitaResponse(CitaBase):
-    id:          int
-    paciente_id: int
-    creado_en:   datetime
+    id:                 int
+    paciente_id:        int
+    creado_en:          datetime
+    veterinario_id:     Optional[int] = None
+    veterinario_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -593,5 +601,43 @@ class UsuarioOut(BaseModel):
     rol:       str
     activo:    bool
     creado_en: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DoctorOut(BaseModel):
+    """Versión mínima de un doctor, para selectores (asignar a turno)."""
+    id:     int
+    nombre: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Asistencia (control de marcaciones de personal)
+# ---------------------------------------------------------------------------
+
+class AsistenciaIngresoReq(BaseModel):
+    usuario_id: int
+    notas:      Optional[str] = None
+
+
+class AsistenciaOut(BaseModel):
+    id:             int
+    usuario_id:     int
+    usuario_nombre: Optional[str] = None
+    fecha:          date
+    hora_ingreso:   Optional[datetime] = None
+    hora_salida:    Optional[datetime] = None
+    notas:          Optional[str] = None
+    registrado_por: Optional[str] = None
+
+    @computed_field
+    @property
+    def horas_trabajadas(self) -> Optional[float]:
+        if self.hora_ingreso and self.hora_salida:
+            segundos = (self.hora_salida - self.hora_ingreso).total_seconds()
+            return round(segundos / 3600, 2) if segundos > 0 else 0.0
+        return None
 
     model_config = ConfigDict(from_attributes=True)

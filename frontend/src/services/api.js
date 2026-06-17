@@ -10,6 +10,8 @@ export const getUsuario = () => localStorage.getItem(USER_KEY)
 export const getNombre  = () => localStorage.getItem(NAME_KEY)
 export const getRol     = () => localStorage.getItem(ROL_KEY)
 export const esVeterinario = () => getRol() === 'veterinario'
+/** La administradora del sistema es la recepcionista. */
+export const esAdmin = () => getRol() === 'recepcionista'
 
 export function setSesion({ token, usuario, nombre, rol }) {
   localStorage.setItem(TOKEN_KEY, token)

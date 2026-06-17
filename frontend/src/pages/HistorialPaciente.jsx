@@ -92,6 +92,11 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen }) {
               {h.motivo_consulta || '(sin motivo)'}
               {h.diagnostico_presuntivo ? ` · Dx: ${h.diagnostico_presuntivo}` : ''}
             </span>
+            {h.veterinario_nombre && (
+              <span className="block text-xs text-purple-200/90 truncate">
+                Atendido por: {h.veterinario_nombre}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-2">
             {h.peso_kg && <span className="text-xs bg-white/20 px-2 py-0.5 rounded">{h.peso_kg} kg</span>}
@@ -352,7 +357,8 @@ function generarPDF(paciente, cliente, historias) {
     autoTable(doc, {
       startY: (doc.lastAutoTable ? doc.lastAutoTable.finalY : 26) + 6,
       body: [[`Consulta ${i + 1} — ${fmtFechaHora(h.fecha || h.creado_en)}` +
-        (h.tipo_consulta ? ` · ${getLabel('tipo_consulta', h.tipo_consulta)}` : '')]],
+        (h.tipo_consulta ? ` · ${getLabel('tipo_consulta', h.tipo_consulta)}` : '') +
+        (h.veterinario_nombre ? ` · Atendido por: ${h.veterinario_nombre}` : '')]],
       theme: 'plain',
       styles: { fontSize: 11, fontStyle: 'bold', textColor: _MORADO, cellPadding: { top: 2, bottom: 1, left: 0 } },
       margin: { left: _M, right: _M },
@@ -376,7 +382,12 @@ function fichaConsultaPDF(paciente, cliente, h) {
   doc.setDrawColor(150); doc.setLineWidth(0.3)
   doc.line(_W - _M - 70, y, _W - _M, y)
   doc.setTextColor(110); doc.setFontSize(9)
-  doc.text('Médico Veterinario', _W - _M - 35, y + 5, { align: 'center' })
+  if (h.veterinario_nombre) {
+    doc.text(h.veterinario_nombre, _W - _M - 35, y + 5, { align: 'center' })
+    doc.text('Médico Veterinario', _W - _M - 35, y + 9, { align: 'center' })
+  } else {
+    doc.text('Médico Veterinario', _W - _M - 35, y + 5, { align: 'center' })
+  }
 
   doc.save(`Consulta_${paciente?.nombre ?? 'paciente'}_${fmtFecha(h.fecha || h.creado_en).replace(/\s/g, '')}.pdf`)
 }
