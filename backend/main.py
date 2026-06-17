@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from database import engine, Base, SessionLocal
-import models  # registra todos los modelos con Base antes de create_all
+from database import SessionLocal
+import models  # registra todos los modelos en Base.metadata
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
@@ -86,7 +86,9 @@ app.include_router(busqueda.router)
 
 @app.on_event("startup")
 def startup():
-    Base.metadata.create_all(bind=engine)
+    # El esquema lo gestiona Alembic (ver prestart.py / startCommand en
+    # render.yaml). No usamos create_all para evitar que la BD quede sin
+    # control de migraciones.
     _seed_admin()
 
 

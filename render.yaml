@@ -10,8 +10,9 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    # Aplica migraciones (crea/actualiza el esquema) antes de levantar el servidor
-    startCommand: alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT
+    # prestart.py reconcilia el estado de Alembic con la BD (maneja esquemas
+    # legados creados por create_all) y aplica migraciones antes de arrancar.
+    startCommand: python prestart.py && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
