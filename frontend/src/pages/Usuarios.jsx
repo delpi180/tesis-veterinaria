@@ -126,7 +126,7 @@ export default function Usuarios() {
               <Spinner /> <span className="text-sm">Cargando…</span>
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                   <th className="text-left px-5 py-3 font-semibold">Usuario</th>
@@ -173,7 +173,7 @@ export default function Usuarios() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </section>
       </main>

@@ -16,21 +16,6 @@
   --transition-theme: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-.dark {
-  --bg-primary: #0f172a;       /* slate-900 */
-  --bg-card: #1e293b;          /* slate-800 */
-  --bg-header: #1e293b;
-  --text-primary: #f1f5f9;     /* slate-100 */
-  --text-secondary: #94a3b8;   /* slate-400 */
-  --border-color: #334155;     /* slate-700 */
-  --hover-bg: #334155;
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
-  --input-bg: #334155;
-  --table-stripe: #1e293b;
-  --purple-gradient-from: #9333ea;
-  --purple-gradient-to: #8b5cf6;
-}
-
 *, *::before, *::after { box-sizing: border-box; }
 
 body {

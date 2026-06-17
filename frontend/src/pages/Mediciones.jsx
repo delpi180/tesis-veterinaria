@@ -206,7 +206,7 @@ function TiemposPanel() {
           <span className="ml-auto text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{d.recientes.length}</span>
         </div>
         <div className="max-h-72 overflow-y-auto">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 sticky top-0 bg-white">
                 <th className="text-left px-5 py-2.5 font-semibold">Fecha</th>
@@ -231,7 +231,7 @@ function TiemposPanel() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
     </div>
@@ -325,7 +325,7 @@ function ExactitudPanel() {
             <Metrica label="F1-score" val={res.f1} />
           </div>
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                   <th className="text-left px-4 py-2 font-semibold">Campo</th>
@@ -349,7 +349,7 @@ function ExactitudPanel() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </div>
       )}
@@ -1079,7 +1079,7 @@ export default function Mediciones() {
                       Detalle por evaluador
                     </p>
                   </div>
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto"><table className="w-full text-sm">
                     <thead>
                       <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                         <th className="text-left px-5 py-3 font-semibold">Evaluador</th>
@@ -1118,7 +1118,7 @@ export default function Mediciones() {
                         )
                       })}
                     </tbody>
-                  </table>
+                  </table></div>
                 </div>
 
               </>

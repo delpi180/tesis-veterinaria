@@ -227,7 +227,7 @@ export default function Clientes() {
           )}
 
           {!loading && clientesFiltrados.length > 0 && (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                   <th className="text-left px-5 py-3 font-semibold">DNI</th>
@@ -269,7 +269,7 @@ export default function Clientes() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </section>
       </main>

@@ -10,7 +10,8 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    # Aplica migraciones (crea/actualiza el esquema) antes de levantar el servidor
+    startCommand: alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -18,3 +19,13 @@ services:
         fromDatabase:
           name: tesis-veterinaria-db
           property: connectionString
+      # Claves de IA — definir el valor en el panel de Render (no se versionan)
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      # Seguridad de autenticación — definir en el panel de Render
+      - key: AUTH_PASSWORD
+        sync: false
+      - key: AUTH_SECRET
+        sync: false

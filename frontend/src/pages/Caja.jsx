@@ -5,7 +5,7 @@ import autoTable from 'jspdf-autotable'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
 
-const fmtMoneda = (n) => `$${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtMoneda = (n) => `S/ ${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtHora = (iso) => new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
 
 // Fecha local (YYYY-MM-DD) — evita el desfase de toISOString() que usa UTC
@@ -150,7 +150,7 @@ export default function Caja() {
               {data.ventas.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-12">Sin ventas registradas el {data.fecha}</p>
               ) : (
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto"><table className="w-full text-sm">
                   <thead>
                     <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                       <th className="text-left px-5 py-3 font-semibold">Boleta</th>
@@ -174,7 +174,7 @@ export default function Caja() {
                       )
                     })}
                   </tbody>
-                </table>
+                </table></div>
               )}
             </section>
           </>

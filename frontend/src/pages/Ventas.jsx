@@ -8,7 +8,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api } from '../services/api'
 
-const fmtMoneda = (n) => `$${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const fmtFecha = (iso) =>
   new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -504,7 +504,7 @@ export default function Ventas() {
           )}
 
           {!loading && ventas.length > 0 && (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                   <th className="text-left px-5 py-3 font-semibold">Boleta</th>
@@ -550,7 +550,7 @@ export default function Ventas() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </section>
 

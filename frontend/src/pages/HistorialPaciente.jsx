@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Syringe } from 'lucide-react'
+import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -237,110 +237,31 @@ function GraficoEvolucion({ historias }) {
   )
 }
 
-// ── PDF de todo el historial ────────────────────────────────────────────────
-function generarPDF(paciente, cliente, historias) {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  doc.setFillColor(88, 28, 135)
-  doc.rect(0, 0, 297, 18, 'F')
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(12); doc.setFont(undefined, 'bold')
-  doc.text('Veterinaria Los Pinos — Historia Clínica', 12, 12)
+// ── Helpers PDF compartidos ──────────────────────────────────────────────────
+const _MORADO = [88, 28, 135]
+const _W = 210, _M = 14
+
+function _seccion(doc, title, rows) {
+  const body = rows.filter(([, v]) => v !== null && v !== undefined && v !== '')
+  if (!body.length) return
   autoTable(doc, {
-    startY: 22,
-    head: [['Paciente', 'Especie / Raza', 'Propietario']],
-    body: [[
-      paciente?.nombre ?? '',
-      `${paciente?.especie ?? ''} / ${paciente?.raza ?? ''}`,
-      cliente?.nombre ?? '',
-    ]],
-    headStyles: { fillColor: [88, 28, 135], fontSize: 8 },
-    styles: { fontSize: 8 }, margin: { left: 12, right: 12 },
-  })
-  const filas = historias.map((h, i) => {
-    const constantes = [
-      h.peso_kg ? `Peso: ${h.peso_kg} kg` : null,
-      h.temperatura_c ? `T°: ${h.temperatura_c} °C` : null,
-      h.frecuencia_cardiaca ? `FC: ${h.frecuencia_cardiaca} lpm` : null,
-      h.mucosas ? `Muc: ${getLabel('mucosas', h.mucosas)}` : null,
-      h.hidratacion ? `Hid: ${getLabel('hidratacion', h.hidratacion)}` : null,
-    ].filter(Boolean).join('\n')
-    const tto = (h.tratamiento_items || []).filter(t => t.medicamento)
-      .map(t => `• ${[t.medicamento, t.dosis, t.via, t.frecuencia].filter(Boolean).join(' ')}`)
-      .join('\n')
-    return [
-      i + 1,
-      new Date(h.fecha || h.creado_en).toLocaleDateString('es-PE'),
-      [h.motivo_consulta, getLabel('tipo_consulta', h.tipo_consulta)].filter(Boolean).join('\n'),
-      constantes,
-      h.diagnostico_presuntivo ?? '',
-      tto || (h.indicaciones ?? ''),
-    ]
-  })
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 5,
-    head: [['#', 'Fecha', 'Motivo / Tipo', 'Constantes EOG', 'Dx Presuntivo', 'Tratamiento']],
-    body: filas,
-    headStyles: { fillColor: [88, 28, 135], fontSize: 8 },
+    startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : 30,
+    head: [[{ content: title, colSpan: 2 }]],
+    body,
+    theme: 'grid',
+    headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
     columnStyles: {
-      0: { cellWidth: 8 }, 1: { cellWidth: 20 }, 2: { cellWidth: 45 },
-      3: { cellWidth: 45 }, 4: { cellWidth: 55 }, 5: { cellWidth: 85 },
+      0: { cellWidth: 42, fontStyle: 'bold', textColor: [90, 90, 90] },
+      1: { cellWidth: _W - 2 * _M - 42 },
     },
-    margin: { left: 12, right: 12 },
-    styles: { fontSize: 7.5, cellPadding: 2 },
+    styles: { fontSize: 9, cellPadding: 2, valign: 'top', overflow: 'linebreak' },
+    margin: { left: _M, right: _M },
   })
-  doc.save(`Historial_${paciente?.nombre ?? 'paciente'}.pdf`)
 }
 
-// ── Ficha detallada de UNA consulta (mascota + dueño + datos clínicos) ───────
-function fichaConsultaPDF(paciente, cliente, h) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
-  const W = 210, M = 14
-  const morado = [88, 28, 135]
-
-  // Encabezado
-  doc.setFillColor(...morado)
-  doc.rect(0, 0, W, 24, 'F')
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(15); doc.setFont(undefined, 'bold')
-  doc.text('Veterinaria Los Pinos', M, 11)
-  doc.setFontSize(9); doc.setFont(undefined, 'normal')
-  doc.text('Ficha de Consulta Clínica', M, 18)
-  doc.setFontSize(9)
-  doc.text(`Fecha: ${fmtFechaHora(h.fecha || h.creado_en)}`, W - M, 11, { align: 'right' })
-  doc.text(`Consulta N° ${h.id}`, W - M, 18, { align: 'right' })
-
-  const section = (title, rows) => {
-    const body = rows.filter(([, v]) => v !== null && v !== undefined && v !== '')
-    if (!body.length) return
-    autoTable(doc, {
-      startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : 30,
-      head: [[{ content: title, colSpan: 2 }]],
-      body,
-      theme: 'grid',
-      headStyles: { fillColor: morado, fontSize: 9, halign: 'left', textColor: 255 },
-      columnStyles: {
-        0: { cellWidth: 42, fontStyle: 'bold', textColor: [90, 90, 90] },
-        1: { cellWidth: W - 2 * M - 42 },
-      },
-      styles: { fontSize: 9, cellPadding: 2, valign: 'top', overflow: 'linebreak' },
-      margin: { left: M, right: M },
-    })
-  }
-
-  const edad = paciente?.edad != null ? `${paciente.edad} año${paciente.edad !== 1 ? 's' : ''}` : ''
-  section('Datos del paciente', [
-    ['Nombre', paciente?.nombre],
-    ['Especie / Raza', [paciente?.especie, paciente?.raza].filter(Boolean).join(' / ')],
-    ['Edad', edad],
-    ['Peso en consulta', h.peso_kg ? `${h.peso_kg} kg` : null],
-  ])
-  section('Datos del propietario', [
-    ['Nombre', cliente?.nombre],
-    ['DNI', cliente?.dni],
-    ['Teléfono', cliente?.telefono],
-    ['Dirección', cliente?.direccion],
-  ])
-  section('Anamnesis', [
+// Renderiza TODAS las secciones clínicas de una consulta (datos completos)
+function _seccionesClinicas(doc, h) {
+  _seccion(doc, 'Anamnesis', [
     ['Motivo', h.motivo_consulta],
     ['Tiempo de evolución', h.tiempo_evolucion],
     ['Tipo de consulta', getLabel('tipo_consulta', h.tipo_consulta)],
@@ -349,7 +270,8 @@ function fichaConsultaPDF(paciente, cliente, h) {
     ['Detalle', h.detalle],
     ['Antecedentes', h.antecedentes],
   ])
-  section('Examen objetivo general (EOG)', [
+  _seccion(doc, 'Examen objetivo general (EOG)', [
+    ['Peso', h.peso_kg ? `${h.peso_kg} kg` : null],
     ['Temperatura', h.temperatura_c ? `${h.temperatura_c} °C` : null],
     ['Frec. cardiaca', h.frecuencia_cardiaca ? `${h.frecuencia_cardiaca} lpm` : null],
     ['Frec. respiratoria', h.frecuencia_respiratoria ? `${h.frecuencia_respiratoria} rpm` : null],
@@ -369,8 +291,8 @@ function fichaConsultaPDF(paciente, cliente, h) {
       : [val.estado ? getLabel('sistema_estado', val.estado) : null, val.detalle].filter(Boolean).join(' — ')
     return texto ? [SISTEMA_LABELS[s], texto] : null
   }).filter(Boolean)
-  section('Examen objetivo particular (EOP)', eop)
-  section('Diagnóstico', [
+  _seccion(doc, 'Examen objetivo particular (EOP)', eop)
+  _seccion(doc, 'Diagnóstico', [
     ['Presuntivo', h.diagnostico_presuntivo],
     ['Diferenciales', h.diagnosticos_diferenciales],
     ['Definitivo', h.diagnostico_definitivo],
@@ -379,7 +301,7 @@ function fichaConsultaPDF(paciente, cliente, h) {
     .map(t => `• ${[t.medicamento, t.dosis, t.via, t.frecuencia, t.duracion].filter(Boolean).join(' · ')}`).join('\n')
   const vac = (h.vacunas_items || []).filter(v => v.vacuna)
     .map(v => `• ${[v.vacuna, v.lote, v.proxima_dosis ? `próx. ${v.proxima_dosis}` : null].filter(Boolean).join(' · ')}`).join('\n')
-  section('Plan / Tratamiento', [
+  _seccion(doc, 'Plan / Tratamiento', [
     ['Exámenes solicitados', h.examenes_solicitados],
     ['Tratamiento', tto],
     ['Vacunas', vac],
@@ -387,74 +309,76 @@ function fichaConsultaPDF(paciente, cliente, h) {
     ['Pronóstico', getLabel('pronostico', h.pronostico)],
     ['Próxima cita', h.proxima_cita ? fmtFecha(h.proxima_cita) : null],
   ])
+}
+
+function _cabecera(doc, subtitulo, derechaArriba, derechaAbajo) {
+  doc.setFillColor(..._MORADO)
+  doc.rect(0, 0, _W, 24, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(15); doc.setFont(undefined, 'bold')
+  doc.text('Veterinaria Los Pinos', _M, 11)
+  doc.setFontSize(9); doc.setFont(undefined, 'normal')
+  doc.text(subtitulo, _M, 18)
+  if (derechaArriba) doc.text(derechaArriba, _W - _M, 11, { align: 'right' })
+  if (derechaAbajo)  doc.text(derechaAbajo, _W - _M, 18, { align: 'right' })
+}
+
+function _datosCabecera(doc, paciente, cliente) {
+  const edad = paciente?.edad != null ? `${paciente.edad} año${paciente.edad !== 1 ? 's' : ''}` : ''
+  _seccion(doc, 'Datos del paciente', [
+    ['Nombre', paciente?.nombre],
+    ['Especie / Raza', [paciente?.especie, paciente?.raza].filter(Boolean).join(' / ')],
+    ['Sexo / Edad', [paciente?.sexo, edad].filter(Boolean).join(' · ')],
+  ])
+  _seccion(doc, 'Datos del propietario', [
+    ['Nombre', cliente?.nombre],
+    ['DNI', cliente?.dni],
+    ['Teléfono', cliente?.telefono],
+    ['Dirección', cliente?.direccion],
+  ])
+}
+
+// ── PDF de TODO el historial (completo: todas las consultas, todos los campos) ─
+function generarPDF(paciente, cliente, historias) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  _cabecera(doc, 'Historia Clínica Completa', `${(historias || []).length} consulta(s)`, '')
+  _datosCabecera(doc, paciente, cliente)
+
+  // Cronológico ascendente (de la más antigua a la más reciente)
+  const orden = [...(historias || [])].sort(
+    (a, b) => new Date(a.fecha || a.creado_en) - new Date(b.fecha || b.creado_en))
+
+  orden.forEach((h, i) => {
+    autoTable(doc, {
+      startY: (doc.lastAutoTable ? doc.lastAutoTable.finalY : 26) + 6,
+      body: [[`Consulta ${i + 1} — ${fmtFechaHora(h.fecha || h.creado_en)}` +
+        (h.tipo_consulta ? ` · ${getLabel('tipo_consulta', h.tipo_consulta)}` : '')]],
+      theme: 'plain',
+      styles: { fontSize: 11, fontStyle: 'bold', textColor: _MORADO, cellPadding: { top: 2, bottom: 1, left: 0 } },
+      margin: { left: _M, right: _M },
+    })
+    _seccionesClinicas(doc, h)
+  })
+
+  doc.save(`Historial_${paciente?.nombre ?? 'paciente'}.pdf`)
+}
+
+// ── Ficha detallada de UNA consulta (mascota + dueño + datos clínicos) ───────
+function fichaConsultaPDF(paciente, cliente, h) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  _cabecera(doc, 'Ficha de Consulta Clínica',
+    `Fecha: ${fmtFechaHora(h.fecha || h.creado_en)}`, `Consulta N° ${h.id}`)
+  _datosCabecera(doc, paciente, cliente)
+  _seccionesClinicas(doc, h)
 
   // Firma
   const y = Math.min(doc.lastAutoTable.finalY + 22, 280)
   doc.setDrawColor(150); doc.setLineWidth(0.3)
-  doc.line(W - M - 70, y, W - M, y)
+  doc.line(_W - _M - 70, y, _W - _M, y)
   doc.setTextColor(110); doc.setFontSize(9)
-  doc.text('Médico Veterinario', W - M - 35, y + 5, { align: 'center' })
+  doc.text('Médico Veterinario', _W - _M - 35, y + 5, { align: 'center' })
 
   doc.save(`Consulta_${paciente?.nombre ?? 'paciente'}_${fmtFecha(h.fecha || h.creado_en).replace(/\s/g, '')}.pdf`)
-}
-
-// ── Carnet de vacunación (PDF) ────────────────────────────────────────────────
-function carnetVacunacionPDF(paciente, cliente, historias) {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
-  const W = 210, M = 14
-  const morado = [88, 28, 135]
-
-  doc.setFillColor(...morado); doc.rect(0, 0, W, 24, 'F')
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(15); doc.setFont(undefined, 'bold')
-  doc.text('Veterinaria Los Pinos', M, 11)
-  doc.setFontSize(10); doc.setFont(undefined, 'normal')
-  doc.text('Carnet de Vacunación', M, 18)
-
-  autoTable(doc, {
-    startY: 30,
-    body: [[
-      `Paciente: ${paciente?.nombre ?? ''}`,
-      `Especie/Raza: ${[paciente?.especie, paciente?.raza].filter(Boolean).join(' / ')}`,
-      `Propietario: ${cliente?.nombre ?? ''}`,
-    ]],
-    theme: 'plain', styles: { fontSize: 9 }, margin: { left: M, right: M },
-  })
-
-  // Reunir todas las vacunas de todas las consultas (cronológico ascendente)
-  const filas = []
-  ;[...historias]
-    .sort((a, b) => new Date(a.fecha || a.creado_en) - new Date(b.fecha || b.creado_en))
-    .forEach(h => {
-      (h.vacunas_items || []).forEach(v => {
-        if (v && v.vacuna) {
-          filas.push([
-            v.vacuna,
-            v.lote || '—',
-            fmtFecha(h.fecha || h.creado_en),
-            v.proxima_dosis || '—',
-          ])
-        }
-      })
-    })
-
-  if (filas.length === 0) {
-    doc.setTextColor(120); doc.setFontSize(10)
-    doc.text('No hay vacunas registradas para este paciente.', M, doc.lastAutoTable.finalY + 12)
-  } else {
-    autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 4,
-      head: [['Vacuna', 'Lote', 'Fecha aplicada', 'Próxima dosis']],
-      body: filas,
-      headStyles: { fillColor: morado, fontSize: 9 },
-      styles: { fontSize: 9, cellPadding: 2.5 },
-      margin: { left: M, right: M },
-    })
-  }
-
-  doc.setTextColor(150); doc.setFontSize(8)
-  doc.text('Documento generado por el sistema de Veterinaria Los Pinos', W / 2, 285, { align: 'center' })
-  doc.save(`Carnet_${paciente?.nombre ?? 'paciente'}.pdf`)
 }
 
 // ── Página ───────────────────────────────────────────────────────────────────
@@ -525,13 +449,6 @@ export default function HistorialPaciente() {
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={() => carnetVacunacionPDF(paciente, cliente, ordenadas)}
-            disabled={ordenadas.length === 0}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-sky-700 border border-sky-200 rounded-lg hover:bg-sky-50 transition disabled:opacity-40"
-          >
-            <Syringe className="w-4 h-4" /> Carnet
-          </button>
           <button
             onClick={() => generarPDF(paciente, cliente, ordenadas)}
             disabled={ordenadas.length === 0}

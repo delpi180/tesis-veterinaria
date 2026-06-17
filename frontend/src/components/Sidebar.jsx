@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, Calendar, ClipboardList,
+  LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, Activity, LogOut, Wallet, UserCog,
   Menu, X,
 } from 'lucide-react'
 import { getNombre, getRol, cerrarSesion, esVeterinario } from '../services/api'
-import ThemeToggle from './ThemeToggle'
+import GlobalSearch from './GlobalSearch'
 
 const PawIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
@@ -16,10 +16,9 @@ const PawIcon = () => (
 
 // `vet` => visible solo para veterinario
 const SECCION_CLINICA = [
-  { label: 'Inicio',             to: '/',          Icon: LayoutDashboard },
-  { label: 'Clientes',           to: '/clientes',  Icon: Users },
-  { label: 'Turnos',             to: '/turnos',    Icon: Calendar },
-  { label: 'Historias Clínicas', to: '/consultas', Icon: ClipboardList, vet: true },
+  { label: 'Inicio',   to: '/',         Icon: LayoutDashboard },
+  { label: 'Clientes', to: '/clientes', Icon: Users },
+  { label: 'Turnos',   to: '/turnos',   Icon: Calendar },
 ]
 const SECCION_ADMIN = [
   { label: 'Inventario',        to: '/inventario', Icon: Package },
@@ -116,6 +115,9 @@ export default function Sidebar() {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-5 flex flex-col gap-1 overflow-y-auto">
+          <div className="mb-2">
+            <GlobalSearch />
+          </div>
           <Seccion titulo="Clínica" items={SECCION_CLINICA} />
           <Seccion titulo="Administración" items={SECCION_ADMIN} />
           <Seccion titulo="Tesis" items={SECCION_TESIS} />
@@ -123,8 +125,7 @@ export default function Sidebar() {
 
         {/* Footer */}
         <div className="px-4 py-4 border-t border-purple-800">
-          <ThemeToggle />
-          <div className="flex items-center gap-3 mt-3">
+          <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white text-xs font-bold uppercase">
               {nombre.charAt(0)}
             </div>

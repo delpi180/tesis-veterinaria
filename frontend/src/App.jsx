@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
-import GlobalSearch from './components/GlobalSearch'
 import { ToastProvider } from './components/Toast'
 import Login from './pages/Login'
 import Inicio from './pages/Inicio'
@@ -28,23 +27,25 @@ function AppProtegida() {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <GlobalSearch />
-      <Routes>
-        <Route path="/"                       element={<Inicio />} />
-        <Route path="/clientes"               element={<Clientes />} />
-        <Route path="/clientes/:id"           element={<DetalleCliente />} />
-        <Route path="/consultas"              element={<SoloVet><HistoriasClinicas /></SoloVet>} />
-        <Route path="/consultas/:pacienteId"  element={<SoloVet><HistoriasClinicas /></SoloVet>} />
-        <Route path="/pacientes/:pacienteId/historial" element={<SoloVet><HistorialPaciente /></SoloVet>} />
-        <Route path="/turnos"                 element={<Turnos />} />
-        <Route path="/inventario"             element={<Inventario />} />
-        <Route path="/servicios"              element={<Servicios />} />
-        <Route path="/ventas"                 element={<Ventas />} />
-        <Route path="/caja"                   element={<Caja />} />
-        <Route path="/usuarios"               element={<SoloVet><Usuarios /></SoloVet>} />
-        <Route path="/mediciones"             element={<Mediciones />} />
-        <Route path="*"                       element={<Navigate to="/" replace />} />
-      </Routes>
+      {/* min-w-0 evita que gráficos/tablas anchos rompan el centrado del contenido */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Routes>
+          <Route path="/"                       element={<Inicio />} />
+          <Route path="/clientes"               element={<Clientes />} />
+          <Route path="/clientes/:id"           element={<DetalleCliente />} />
+          <Route path="/consultas"              element={<SoloVet><HistoriasClinicas /></SoloVet>} />
+          <Route path="/consultas/:pacienteId"  element={<SoloVet><HistoriasClinicas /></SoloVet>} />
+          <Route path="/pacientes/:pacienteId/historial" element={<SoloVet><HistorialPaciente /></SoloVet>} />
+          <Route path="/turnos"                 element={<Turnos />} />
+          <Route path="/inventario"             element={<Inventario />} />
+          <Route path="/servicios"              element={<Servicios />} />
+          <Route path="/ventas"                 element={<Ventas />} />
+          <Route path="/caja"                   element={<Caja />} />
+          <Route path="/usuarios"               element={<SoloVet><Usuarios /></SoloVet>} />
+          <Route path="/mediciones"             element={<Mediciones />} />
+          <Route path="*"                       element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
     </div>
   )
 }

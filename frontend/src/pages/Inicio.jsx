@@ -5,13 +5,13 @@ import {
   Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 import {
-  Stethoscope, Users, DollarSign, AlertTriangle,
+  Stethoscope, Users, Coins, AlertTriangle,
   Clock, PawPrint, ChevronRight, TrendingUp, Syringe, MessageCircle, Package,
 } from 'lucide-react'
 import { api, getUsuario } from '../services/api'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
 
-const fmtMoneda = (n) => `$${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtMoneda = (n) => `S/ ${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtHora = (iso) =>
   new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
 
@@ -69,7 +69,7 @@ export default function Inicio() {
     {
       label: 'Ingresos del Día', value: fmtMoneda(data?.ingresos_dia),
       sub: `${fmtMoneda(data?.ingresos_mes)} en el mes`,
-      Icon: DollarSign, bg: 'bg-emerald-50', border: 'border-emerald-200',
+      Icon: Coins, bg: 'bg-emerald-50', border: 'border-emerald-200',
       icon: 'text-emerald-600', ring: 'bg-emerald-100',
     },
     {

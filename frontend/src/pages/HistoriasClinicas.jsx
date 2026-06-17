@@ -438,58 +438,121 @@ function HistoriaCard({ h, onEdit }) {
 
 // ── PDF ──────────────────────────────────────────────────────────────────────
 
-function generarPDF(paciente, historias) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  doc.setFillColor(88, 28, 135);
-  doc.rect(0, 0, 297, 18, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
-  doc.text("Veterinaria Los Pinos — Historia Clínica", 12, 12);
+const _PDF_W = 210, _PDF_M = 14, _PDF_MORADO = [88, 28, 135];
+
+function _seccionPDF(doc, title, rows) {
+  const body = rows.filter(([, v]) => v !== null && v !== undefined && v !== "");
+  if (!body.length) return;
   autoTable(doc, {
-    startY: 22,
-    head: [["Paciente", "Especie / Raza", "Propietario"]],
-    body: [[
-      paciente.nombre ?? "",
-      `${paciente.especie ?? ""} / ${paciente.raza ?? ""}`,
-      paciente.cliente ? paciente.cliente.nombre : "",
-    ]],
-    headStyles: { fillColor: [88, 28, 135], fontSize: 8 },
-    styles: { fontSize: 8 }, margin: { left: 12, right: 12 },
-  });
-  const filas = historias.map((h, i) => {
-    const constantes = [
-      h.peso_kg       ? `Peso: ${h.peso_kg} kg`        : null,
-      h.temperatura_c ? `T°: ${h.temperatura_c} °C`    : null,
-      h.frecuencia_cardiaca ? `FC: ${h.frecuencia_cardiaca} lpm` : null,
-      h.mucosas       ? `Muc: ${getLabel("mucosas", h.mucosas)}` : null,
-      h.hidratacion   ? `Hid: ${getLabel("hidratacion", h.hidratacion)}` : null,
-    ].filter(Boolean).join("\n");
-    const tto = (h.tratamiento_items || []).filter(t => t.medicamento)
-      .map(t => `• ${[t.medicamento,t.dosis,t.via,t.frecuencia].filter(Boolean).join(" ")}`)
-      .join("\n");
-    return [
-      i + 1,
-      new Date(h.fecha || h.creado_en).toLocaleDateString("es-PE"),
-      [h.motivo_consulta, getLabel("tipo_consulta", h.tipo_consulta)].filter(Boolean).join("\n"),
-      constantes,
-      h.diagnostico_presuntivo ?? "",
-      tto || (h.indicaciones ?? ""),
-    ];
-  });
-  autoTable(doc, {
-    startY: doc.lastAutoTable.finalY + 5,
-    head: [["#", "Fecha", "Motivo / Tipo", "Constantes EOG", "Dx Presuntivo", "Tratamiento"]],
-    body: filas,
-    headStyles: { fillColor: [88, 28, 135], fontSize: 8 },
+    startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : 30,
+    head: [[{ content: title, colSpan: 2 }]],
+    body,
+    theme: "grid",
+    headStyles: { fillColor: _PDF_MORADO, fontSize: 9, halign: "left", textColor: 255 },
     columnStyles: {
-      0: { cellWidth: 8 }, 1: { cellWidth: 20 }, 2: { cellWidth: 45 },
-      3: { cellWidth: 45 }, 4: { cellWidth: 55 }, 5: { cellWidth: 85 },
+      0: { cellWidth: 42, fontStyle: "bold", textColor: [90, 90, 90] },
+      1: { cellWidth: _PDF_W - 2 * _PDF_M - 42 },
     },
-    margin: { left: 12, right: 12 },
-    styles: { fontSize: 7.5, cellPadding: 2 },
+    styles: { fontSize: 9, cellPadding: 2, valign: "top", overflow: "linebreak" },
+    margin: { left: _PDF_M, right: _PDF_M },
   });
-  doc.save(`HC_${paciente.nombre ?? "paciente"}.pdf`);
+}
+
+function _seccionesClinicasPDF(doc, h) {
+  _seccionPDF(doc, "Anamnesis", [
+    ["Motivo", h.motivo_consulta],
+    ["Tiempo de evolución", h.tiempo_evolucion],
+    ["Tipo de consulta", getLabel("tipo_consulta", h.tipo_consulta)],
+    ["Derivado por", h.derivado_por],
+    ["Alimentación", [h.alimentacion_tipo, h.alimentacion_cantidad_gr ? `${h.alimentacion_cantidad_gr} g` : null].filter(Boolean).join(" · ")],
+    ["Detalle", h.detalle],
+    ["Antecedentes", h.antecedentes],
+  ]);
+  _seccionPDF(doc, "Examen objetivo general (EOG)", [
+    ["Peso", h.peso_kg ? `${h.peso_kg} kg` : null],
+    ["Temperatura", h.temperatura_c ? `${h.temperatura_c} °C` : null],
+    ["Frec. cardiaca", h.frecuencia_cardiaca ? `${h.frecuencia_cardiaca} lpm` : null],
+    ["Frec. respiratoria", h.frecuencia_respiratoria ? `${h.frecuencia_respiratoria} rpm` : null],
+    ["Condición corporal", h.condicion_corporal ? `${h.condicion_corporal}/9` : null],
+    ["Mucosas", getLabel("mucosas", h.mucosas)],
+    ["TLLC", getLabel("tllc", h.tllc)],
+    ["Sensorio", getLabel("estado_sensorio", h.estado_sensorio)],
+    ["Hidratación", getLabel("hidratacion", h.hidratacion)],
+    ["Pulso", getLabel("pulso", h.pulso)],
+    ["Linfonódulos", h.linfonodulos],
+  ]);
+  const eop = SISTEMAS_EOP.map(s => {
+    const val = (h.examen_particular || {})[s];
+    if (!val) return null;
+    const texto = typeof val === "string"
+      ? val
+      : [val.estado ? getLabel("sistema_estado", val.estado) : null, val.detalle].filter(Boolean).join(" — ");
+    return texto ? [SISTEMA_LABELS[s], texto] : null;
+  }).filter(Boolean);
+  _seccionPDF(doc, "Examen objetivo particular (EOP)", eop);
+  _seccionPDF(doc, "Diagnóstico", [
+    ["Presuntivo", h.diagnostico_presuntivo],
+    ["Diferenciales", h.diagnosticos_diferenciales],
+    ["Definitivo", h.diagnostico_definitivo],
+  ]);
+  const tto = (h.tratamiento_items || []).filter(t => t.medicamento)
+    .map(t => `• ${[t.medicamento, t.dosis, t.via, t.frecuencia, t.duracion].filter(Boolean).join(" · ")}`).join("\n");
+  const vac = (h.vacunas_items || []).filter(v => v.vacuna)
+    .map(v => `• ${[v.vacuna, v.lote, v.proxima_dosis ? `próx. ${v.proxima_dosis}` : null].filter(Boolean).join(" · ")}`).join("\n");
+  _seccionPDF(doc, "Plan / Tratamiento", [
+    ["Exámenes solicitados", h.examenes_solicitados],
+    ["Tratamiento", tto],
+    ["Vacunas", vac],
+    ["Indicaciones", h.indicaciones],
+    ["Pronóstico", getLabel("pronostico", h.pronostico)],
+    ["Próxima cita", h.proxima_cita ? new Date(h.proxima_cita).toLocaleDateString("es-PE") : null],
+  ]);
+}
+
+// PDF de la historia clínica COMPLETA (todas las consultas, todos los campos)
+function generarPDF(paciente, historias) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  doc.setFillColor(..._PDF_MORADO);
+  doc.rect(0, 0, _PDF_W, 24, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(15); doc.setFont(undefined, "bold");
+  doc.text("Veterinaria Los Pinos", _PDF_M, 11);
+  doc.setFontSize(9); doc.setFont(undefined, "normal");
+  doc.text("Historia Clínica Completa", _PDF_M, 18);
+  doc.text(`${(historias || []).length} consulta(s)`, _PDF_W - _PDF_M, 18, { align: "right" });
+
+  const cliente = paciente?.cliente;
+  const edad = paciente?.edad != null ? `${paciente.edad} año${paciente.edad !== 1 ? "s" : ""}` : "";
+  _seccionPDF(doc, "Datos del paciente", [
+    ["Nombre", paciente?.nombre],
+    ["Especie / Raza", [paciente?.especie, paciente?.raza].filter(Boolean).join(" / ")],
+    ["Sexo / Edad", [paciente?.sexo, edad].filter(Boolean).join(" · ")],
+  ]);
+  _seccionPDF(doc, "Datos del propietario", [
+    ["Nombre", cliente?.nombre],
+    ["DNI", cliente?.dni],
+    ["Teléfono", cliente?.telefono],
+    ["Dirección", cliente?.direccion],
+  ]);
+
+  const orden = [...(historias || [])].sort(
+    (a, b) => new Date(a.fecha || a.creado_en) - new Date(b.fecha || b.creado_en));
+
+  orden.forEach((h, i) => {
+    const fecha = new Date(h.fecha || h.creado_en).toLocaleString("es-PE", {
+      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+    autoTable(doc, {
+      startY: (doc.lastAutoTable ? doc.lastAutoTable.finalY : 26) + 6,
+      body: [[`Consulta ${i + 1} — ${fecha}` + (h.tipo_consulta ? ` · ${getLabel("tipo_consulta", h.tipo_consulta)}` : "")]],
+      theme: "plain",
+      styles: { fontSize: 11, fontStyle: "bold", textColor: _PDF_MORADO, cellPadding: { top: 2, bottom: 1, left: 0 } },
+      margin: { left: _PDF_M, right: _PDF_M },
+    });
+    _seccionesClinicasPDF(doc, h);
+  });
+
+  doc.save(`HC_${paciente?.nombre ?? "paciente"}.pdf`);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

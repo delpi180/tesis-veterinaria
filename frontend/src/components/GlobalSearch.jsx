@@ -45,7 +45,7 @@ export default function GlobalSearch() {
     }
     setLoading(true);
     try {
-      const data = await api.get(`/api/busqueda?q=${encodeURIComponent(q.trim())}`);
+      const data = await api.get(`/api/busqueda/?q=${encodeURIComponent(q.trim())}`);
       setResults(data);
     } catch {
       setResults({ clientes: [], mascotas: [], citas: [] });
@@ -73,28 +73,18 @@ export default function GlobalSearch() {
 
   return (
     <>
-      {/* Trigger button */}
+      {/* Trigger button (estilizado para el sidebar morado) */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm
+        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm
+                   text-purple-200 bg-purple-900/50 hover:bg-purple-800 border border-purple-800
                    transition-colors cursor-pointer"
-        style={{
-          backgroundColor: 'var(--hover-bg)',
-          color: 'var(--text-secondary)',
-          border: '1px solid var(--border-color)',
-        }}
         title="Búsqueda global (Ctrl+K)"
       >
-        <Search size={15} />
-        <span className="hidden sm:inline">Buscar...</span>
-        <kbd
-          className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono"
-          style={{
-            backgroundColor: 'var(--bg-primary)',
-            border: '1px solid var(--border-color)',
-            color: 'var(--text-secondary)',
-          }}
-        >
+        <Search size={15} className="shrink-0" />
+        <span className="flex-1 text-left">Buscar...</span>
+        <kbd className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono
+                        bg-purple-950 border border-purple-700 text-purple-300">
           Ctrl+K
         </kbd>
       </button>

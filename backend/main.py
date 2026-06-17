@@ -8,7 +8,7 @@ import models  # registra todos los modelos con Base antes de create_all
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
-    busqueda,
+    busqueda, inventario,
 )
 from core.config import settings
 from core.security import verificar_token, hash_password
@@ -80,6 +80,7 @@ app.include_router(encuestas.router)
 app.include_router(productos.router)
 app.include_router(servicios.router)
 app.include_router(ventas.router)
+app.include_router(inventario.router)
 app.include_router(busqueda.router)
 
 

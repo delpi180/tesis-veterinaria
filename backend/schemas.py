@@ -534,6 +534,40 @@ class MovimientoOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Inventario conversacional (entrada por voz/texto)
+# ---------------------------------------------------------------------------
+
+class InventarioInterpretarReq(BaseModel):
+    texto: str
+
+
+class InvItemPreview(BaseModel):
+    nombre:       str
+    categoria:    Optional[str]   = None
+    cantidad:     int
+    precio:       Optional[float] = None
+    unidad:       Optional[str]   = None
+    producto_id:  Optional[int]   = None   # si hizo match con uno existente
+    codigo:       Optional[str]   = None
+    accion:       str                      # 'nuevo' | 'entrada'
+    stock_actual: Optional[int]   = None
+
+
+class InvItemAplicar(BaseModel):
+    nombre:      str
+    categoria:   Optional[Literal['comida', 'accesorio', 'medicamento']] = None
+    cantidad:    int             = Field(ge=1)
+    precio:      Optional[float] = Field(None, gt=0)
+    unidad:      Optional[str]   = None
+    producto_id: Optional[int]   = None
+    accion:      Literal['nuevo', 'entrada']
+
+
+class InventarioAplicarReq(BaseModel):
+    items: list[InvItemAplicar] = Field(min_length=1)
+
+
+# ---------------------------------------------------------------------------
 # Usuarios / Autenticación
 # ---------------------------------------------------------------------------
 

@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Package, AlertTriangle, DollarSign, Search, Pencil, Trash2, X, Filter, History, ArrowDownUp } from 'lucide-react'
-import { api } from '../services/api'
+import { Package, AlertTriangle, Coins, Search, Pencil, Trash2, X, Filter, History, ArrowDownUp, Sparkles, Mic, StopCircle, Plus } from 'lucide-react'
+import { api, authHeaders } from '../services/api'
 import { useToast } from '../components/Toast'
+import { useAudioRecorder } from '../hooks/useAudioRecorder'
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 // Categorías admitidas por el backend (schemas.ProductoCreate)
 const CATEGORIAS = ['comida', 'accesorio', 'medicamento']
@@ -33,7 +36,7 @@ const FORM_INICIAL = {
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
 
-const fmtMoneda = (n) => `$${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const Spinner = () => (
   <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-500">
@@ -127,7 +130,7 @@ function KardexModal({ producto, onClose, onStockCambiado }) {
           ) : movs.length === 0 ? (
             <p className="text-xs text-slate-400 text-center py-10">Sin movimientos registrados</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 sticky top-0 bg-white">
                   <th className="text-left px-5 py-2.5 font-semibold">Fecha</th>
@@ -154,7 +157,180 @@ function KardexModal({ producto, onClose, onStockCambiado }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal: entrada de mercadería por voz/texto (IA) ──────────────────────────
+const EJEMPLO_INV = 'Llegaron veinte cajas de amoxicilina a tres soles cada una, diez pipetas de Bravecto a ochenta soles, y agrega un producto nuevo: alimento Royal Canin de tres kilos, comida, a sesenta y cinco soles, cinco bolsas.'
+
+function EntradaIAModal({ onClose, onAplicado }) {
+  const toast = useToast()
+  const [texto, setTexto]     = useState('')
+  const [items, setItems]     = useState(null)   // null = aún no interpretado
+  const [cargando, setCargando] = useState(false)
+  const [aplicando, setAplicando] = useState(false)
+  const { isRecording, seconds, micError, start, stop } = useAudioRecorder()
+
+  const interpretarTexto = async () => {
+    if (!texto.trim()) { toast.error('Escribe o dicta qué llegó.'); return }
+    setCargando(true)
+    try {
+      setItems(await api.post('/api/inventario/interpretar', { texto }))
+    } catch (e) { toast.error(e.message) } finally { setCargando(false) }
+  }
+
+  const grabar = async () => {
+    if (isRecording) {
+      setCargando(true)
+      try {
+        const blob = await stop()
+        if (!blob) throw new Error('No se capturó audio.')
+        const fd = new FormData()
+        fd.append('audio', blob, 'inventario.webm')
+        const res = await fetch(`${BASE_URL}/api/inventario/interpretar-audio`, {
+          method: 'POST', body: fd, headers: authHeaders(),
+        })
+        if (!res.ok) {
+          const b = await res.json().catch(() => ({}))
+          throw new Error(b?.detail ?? `Error (HTTP ${res.status})`)
+        }
+        setItems(await res.json())
+      } catch (e) { toast.error(e.message) } finally { setCargando(false) }
+    } else {
+      await start()
+    }
+  }
+
+  const setItem = (i, campo, valor) => setItems(its => its.map((it, idx) => idx === i ? { ...it, [campo]: valor } : it))
+  const quitar  = (i) => setItems(its => its.filter((_, idx) => idx !== i))
+
+  const aplicar = async () => {
+    const faltaPrecio = items.find(it => it.accion === 'nuevo' && !(Number(it.precio) > 0))
+    if (faltaPrecio) { toast.error(`"${faltaPrecio.nombre}" es nuevo y necesita precio.`); return }
+    setAplicando(true)
+    try {
+      const r = await api.post('/api/inventario/aplicar', {
+        items: items.map(it => ({
+          nombre: it.nombre, categoria: it.categoria || null,
+          cantidad: parseInt(it.cantidad, 10), precio: it.precio ? Number(it.precio) : null,
+          unidad: it.unidad || null, producto_id: it.producto_id || null, accion: it.accion,
+        })),
+      })
+      toast.success(`Inventario actualizado: ${r.creados.length} nuevo(s), ${r.actualizados.length} repuesto(s).`)
+      onAplicado()
+    } catch (e) { toast.error(e.message) } finally { setAplicando(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-500" /> Entrada de mercadería por voz/texto
+          </p>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 flex flex-col gap-3 overflow-y-auto">
+          <p className="text-xs text-slate-500">
+            Dicta o escribe qué productos llegaron (cantidad y precio). La IA arma la lista; tú la revisas y confirmas.
+          </p>
+          <textarea
+            rows={3} value={texto} onChange={e => setTexto(e.target.value)}
+            placeholder={`Ej: ${EJEMPLO_INV}`}
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white resize-none"
+          />
+          <div className="flex items-center gap-2">
+            <button onClick={grabar} disabled={cargando}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg transition disabled:opacity-50 ${isRecording ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+              {isRecording ? <><StopCircle className="w-4 h-4" /> Detener ({seconds}s)</> : <><Mic className="w-4 h-4" /> Dictar</>}
+            </button>
+            <button onClick={interpretarTexto} disabled={cargando || isRecording}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
+              <Sparkles className="w-4 h-4" /> {cargando ? 'Interpretando…' : 'Interpretar'}
+            </button>
+            {micError && <span className="text-xs text-rose-600">{micError}</span>}
+          </div>
+
+          {/* Vista previa editable */}
+          {items && (
+            items.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-lg">
+                No se detectaron productos. Reformula el texto.
+              </p>
+            ) : (
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto"><table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 bg-slate-50">
+                      <th className="text-left px-3 py-2 font-semibold">Producto</th>
+                      <th className="text-left px-3 py-2 font-semibold">Categoría</th>
+                      <th className="text-center px-3 py-2 font-semibold">Cant.</th>
+                      <th className="text-right px-3 py-2 font-semibold">Precio</th>
+                      <th className="text-center px-3 py-2 font-semibold">Acción</th>
+                      <th className="px-2 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((it, i) => (
+                      <tr key={i} className="border-b border-slate-50">
+                        <td className="px-3 py-2">
+                          <input value={it.nombre} onChange={e => setItem(i, 'nombre', e.target.value)}
+                            className="w-full text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300" />
+                          {it.codigo && <span className="text-xs font-mono text-slate-400">{it.codigo} · stock {it.stock_actual}</span>}
+                        </td>
+                        <td className="px-3 py-2">
+                          <select value={it.categoria ?? ''} onChange={e => setItem(i, 'categoria', e.target.value || null)}
+                            className="text-xs border border-slate-200 rounded px-1.5 py-1 bg-white">
+                            <option value="">—</option>
+                            {CATEGORIAS.map(c => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <input type="number" min="1" value={it.cantidad} onChange={e => setItem(i, 'cantidad', e.target.value)}
+                            className="w-16 text-sm text-center border border-slate-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300" />
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <input type="number" min="0" step="0.01" value={it.precio ?? ''} onChange={e => setItem(i, 'precio', e.target.value)}
+                            placeholder={it.accion === 'nuevo' ? 'req.' : '—'}
+                            className={`w-20 text-sm text-right border rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300 ${it.accion === 'nuevo' && !(Number(it.precio) > 0) ? 'border-rose-300 bg-rose-50' : 'border-slate-200'}`} />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${it.accion === 'nuevo' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {it.accion === 'nuevo' ? 'Nuevo' : `+ stock`}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2">
+                          <button onClick={() => quitar(i)} className="p-1 rounded text-slate-300 hover:text-rose-600">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table></div>
+              </div>
+            )
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+            Cancelar
+          </button>
+          {items && items.length > 0 && (
+            <button onClick={aplicar} disabled={aplicando}
+              className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition disabled:opacity-50">
+              {aplicando ? 'Guardando…' : 'Confirmar y guardar'}
+            </button>
           )}
         </div>
       </div>
@@ -168,6 +344,7 @@ export default function Inventario() {
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
   const [kardexProd, setKardexProd] = useState(null)
+  const [entradaIA,  setEntradaIA]  = useState(false)
 
   // ── Filtros ────────────────────────────────────────────────────────────────
   const [busqueda,    setBusqueda]    = useState('')
@@ -307,12 +484,20 @@ export default function Inventario() {
           <h1 className="text-xl font-bold text-slate-800">Inventario y Productos</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
         </div>
-        <button
-          onClick={abrirNuevo}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
-        >
-          + Nuevo Producto
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setEntradaIA(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 hover:bg-purple-50 text-sm font-semibold rounded-lg transition"
+          >
+            <Sparkles className="w-4 h-4" /> Entrada por voz/texto
+          </button>
+          <button
+            onClick={abrirNuevo}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
+          >
+            <Plus className="w-4 h-4" /> Nuevo Producto
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 px-6 py-6 flex flex-col gap-5 max-w-6xl w-full mx-auto">
@@ -346,7 +531,7 @@ export default function Inventario() {
           </div>
           <div className="bg-white border border-emerald-200 rounded-xl px-5 py-4 flex items-center gap-4 shadow-sm">
             <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-emerald-600" />
+              <Coins className="w-5 h-5 text-emerald-600" />
             </div>
             <div>
               <p className="text-xs text-slate-400 font-medium">Valor en inventario</p>
@@ -431,7 +616,7 @@ export default function Inventario() {
 
           {!loading && productos.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto"><table className="w-full text-sm">
                 <thead>
                   <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                     <th className="text-left px-5 py-3 font-semibold">Código</th>
@@ -516,7 +701,7 @@ export default function Inventario() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </div>
           )}
 
@@ -698,6 +883,14 @@ export default function Inventario() {
             setProductos(prev => prev.map(x => x.id === actualizado.id ? actualizado : x))
             setKardexProd(actualizado)
           }}
+        />
+      )}
+
+      {/* Modal entrada conversacional (voz/texto) */}
+      {entradaIA && (
+        <EntradaIAModal
+          onClose={() => setEntradaIA(false)}
+          onAplicado={() => { setEntradaIA(false); cargar() }}
         />
       )}
 

@@ -230,7 +230,7 @@ export default function Turnos() {
               </button>
             </div>
 
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr>
                   {DIAS_SEMANA.map(d => (
@@ -273,7 +273,7 @@ export default function Turnos() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
 
             <div className="px-5 py-3 border-t border-slate-100 flex items-center gap-4 text-xs text-slate-500">
               <span className="flex items-center gap-1.5">
@@ -377,7 +377,7 @@ export default function Turnos() {
           ) : citasProximas.length === 0 ? (
             <p className="text-xs text-slate-400 px-5 py-8 text-center">No hay turnos próximos registrados</p>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                   <th className="text-left px-5 py-3 font-semibold">Fecha</th>
@@ -438,7 +438,7 @@ export default function Turnos() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
           )}
         </section>
 
