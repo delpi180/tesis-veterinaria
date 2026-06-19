@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, Activity, LogOut, Wallet, UserCog,
-  Clock, Menu, X,
+  Clock, ClipboardList, History, Menu, X,
 } from 'lucide-react'
 import { getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
 import GlobalSearch from './GlobalSearch'
@@ -16,9 +16,10 @@ const PawIcon = () => (
 
 // `vet` => solo veterinario · `admin` => solo recepcionista (administradora)
 const SECCION_CLINICA = [
-  { label: 'Inicio',   to: '/',         Icon: LayoutDashboard },
-  { label: 'Clientes', to: '/clientes', Icon: Users },
-  { label: 'Turnos',   to: '/turnos',   Icon: Calendar },
+  { label: 'Inicio',    to: '/',          Icon: LayoutDashboard },
+  { label: 'Mi panel',  to: '/mi-panel',  Icon: ClipboardList, vet: true },
+  { label: 'Clientes',  to: '/clientes',  Icon: Users },
+  { label: 'Turnos',    to: '/turnos',    Icon: Calendar },
 ]
 const SECCION_ADMIN = [
   { label: 'Inventario',        to: '/inventario', Icon: Package },
@@ -26,6 +27,7 @@ const SECCION_ADMIN = [
   { label: 'Ventas',            to: '/ventas',     Icon: BarChart2 },
   { label: 'Caja',              to: '/caja',       Icon: Wallet },
   { label: 'Asistencia',        to: '/asistencia', Icon: Clock,    admin: true },
+  { label: 'Actividad',         to: '/actividad',  Icon: History,  admin: true },
   { label: 'Usuarios',          to: '/usuarios',   Icon: UserCog,  admin: true },
 ]
 const SECCION_TESIS = [

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -11,13 +11,15 @@ router = APIRouter(prefix="/api/citas", tags=["Citas"])
 
 
 @router.post("/", response_model=CitaResponse, status_code=status.HTTP_201_CREATED)
-def crear_cita(payload: CitaCreate, db: Session = Depends(get_db)):
-    if not db.get(Paciente, payload.paciente_id):
+def crear_cita(payload: CitaCreate, request: Request, db: Session = Depends(get_db)):
+    paciente = db.get(Paciente, payload.paciente_id)
+    if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
     cita = Cita(**payload.model_dump())
     db.add(cita)
     db.commit()
     db.refresh(cita)
+    request.state.actividad_detalle = f"{paciente.nombre}"
     return cita
 
 
@@ -47,7 +49,7 @@ def obtener_cita(cita_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{cita_id}", response_model=CitaResponse)
-def actualizar_cita(cita_id: int, payload: CitaUpdate, db: Session = Depends(get_db)):
+def actualizar_cita(cita_id: int, payload: CitaUpdate, request: Request, db: Session = Depends(get_db)):
     cita = db.get(Cita, cita_id)
     if not cita:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
@@ -55,6 +57,7 @@ def actualizar_cita(cita_id: int, payload: CitaUpdate, db: Session = Depends(get
         setattr(cita, campo, valor)
     db.commit()
     db.refresh(cita)
+    request.state.actividad_detalle = cita.paciente.nombre if cita.paciente else None
     return cita
 
 

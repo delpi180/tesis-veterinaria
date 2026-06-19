@@ -2,7 +2,7 @@ from datetime import time
 
 import base64
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -90,12 +90,15 @@ def eliminar_paciente(paciente_id: int, db: Session = Depends(get_db)):
 def crear_historia(
     paciente_id: int,
     payload: HistoriaClinicaCreate,
+    request: Request,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(usuario_actual),
 ):
     print(f"[DEBUG] POST /historias/ — paciente_id={paciente_id} payload={payload.model_dump()}")
-    if not db.get(Paciente, paciente_id):
+    paciente = db.get(Paciente, paciente_id)
+    if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    request.state.actividad_detalle = paciente.nombre
     try:
         historia = HistoriaClinica(
             **payload.model_dump(),

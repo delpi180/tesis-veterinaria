@@ -38,6 +38,8 @@ def crear_usuario(payload: UsuarioCreate, request: Request, db: Session = Depend
         password_hash=hash_password(payload.password),
         rol=payload.rol,
         activo=payload.activo,
+        hora_entrada=payload.hora_entrada,
+        dias_laborales=payload.dias_laborales,
     )
     db.add(u)
     db.commit()

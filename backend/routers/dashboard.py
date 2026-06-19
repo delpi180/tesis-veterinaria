@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Cita, Cliente, HistoriaClinica, Paciente, Producto, Venta
+from models import Asistencia, Cita, Cliente, HistoriaClinica, Paciente, Producto, Venta
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
@@ -44,7 +44,10 @@ def resumen_dashboard(db: Session = Depends(get_db)):
     # ── Citas de hoy (con paciente y propietario) ─────────────────────────────
     citas_hoy = (
         db.query(Cita)
-        .options(joinedload(Cita.paciente).joinedload(Paciente.cliente))
+        .options(
+            joinedload(Cita.paciente).joinedload(Paciente.cliente),
+            joinedload(Cita.veterinario),
+        )
         .filter(Cita.fecha_hora >= hoy_ini, Cita.fecha_hora < hoy_fin)
         .order_by(Cita.fecha_hora)
         .all()
@@ -60,8 +63,26 @@ def resumen_dashboard(db: Session = Depends(get_db)):
             "especie": c.paciente.especie if c.paciente else None,
             "cliente_id": c.paciente.cliente_id if c.paciente else None,
             "propietario": c.paciente.cliente.nombre if c.paciente and c.paciente.cliente else None,
+            "veterinario": c.veterinario.nombre if c.veterinario else None,
         }
         for c in citas_hoy
+    ]
+
+    # ── Doctores en turno ahora (asistencia de hoy sin salida) ────────────────
+    presentes_rows = (
+        db.query(Asistencia)
+        .options(joinedload(Asistencia.usuario))
+        .filter(Asistencia.fecha == hoy, Asistencia.hora_salida.is_(None))
+        .order_by(Asistencia.hora_ingreso)
+        .all()
+    )
+    presentes = [
+        {
+            "usuario_id": a.usuario_id,
+            "nombre": a.usuario.nombre if a.usuario else None,
+            "hora_ingreso": a.hora_ingreso.isoformat() if a.hora_ingreso else None,
+        }
+        for a in presentes_rows
     ]
 
     # ── Consultas por día de la semana actual ─────────────────────────────────
@@ -186,6 +207,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
 
     return {
         "citas_hoy": citas_hoy_out,
+        "presentes": presentes,
         "consultas_semana": consultas_semana,
         "consultas_hoy": consultas_hoy,
         "ingresos_dia": float(ingresos_dia),

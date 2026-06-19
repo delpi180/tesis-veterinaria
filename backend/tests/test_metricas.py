@@ -1,22 +1,12 @@
 """Tests de las métricas de tesis: tiempo de registro y exactitud."""
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 import main
 from database import SessionLocal
 
-
-@pytest.fixture(scope="module")
-def client():
-    with TestClient(main.app) as c:
-        yield c
-
-
-@pytest.fixture(scope="module")
-def admin(client):
-    r = client.post("/api/auth/login", json={"usuario": "admin", "password": "vetlospinos"})
-    return {"Authorization": f"Bearer {r.json()['token']}"}
+# client / admin (recepcionista) / doctor (veterinario) provienen de conftest.py.
+# Las historias clínicas las crea el doctor (rol veterinario).
 
 
 # ── Lógica de coincidencia para exactitud ────────────────────────────────────
@@ -44,7 +34,7 @@ def test_vacio():
 
 # ── Endpoint de tiempos ──────────────────────────────────────────────────────
 
-def test_metricas_tiempo(client, admin):
+def test_metricas_tiempo(client, admin, doctor):
     cli = client.get("/api/clientes/", headers=admin).json()
     if not cli or not cli[0]["pacientes"]:
         pytest.skip("Sin pacientes para probar")
@@ -52,13 +42,13 @@ def test_metricas_tiempo(client, admin):
 
     ids = []
     try:
-        # una historia manual (lenta) y una con IA (rápida)
+        # una historia manual (lenta) y una con IA (rápida) — las crea el doctor
         h1 = client.post(f"/api/pacientes/{pid}/historias/", json={
             "motivo_consulta": "test manual", "segundos_registro": 300, "metodo_registro": "manual",
-        }, headers=admin).json()
+        }, headers=doctor).json()
         h2 = client.post(f"/api/pacientes/{pid}/historias/", json={
             "motivo_consulta": "test ia", "segundos_registro": 90, "metodo_registro": "ia",
-        }, headers=admin).json()
+        }, headers=doctor).json()
         ids = [h1["id"], h2["id"]]
 
         r = client.get("/api/encuestas/tiempos", headers=admin)
@@ -76,7 +66,7 @@ def test_metricas_tiempo(client, admin):
 
 # ── Próxima cita → genera turno en la agenda ─────────────────────────────────
 
-def test_proxima_cita_genera_turno(client, admin):
+def test_proxima_cita_genera_turno(client, admin, doctor):
     cli = client.get("/api/clientes/", headers=admin).json()
     if not cli or not cli[0]["pacientes"]:
         pytest.skip("Sin pacientes para probar")
@@ -87,7 +77,7 @@ def test_proxima_cita_genera_turno(client, admin):
         antes = len(client.get(f"/api/citas/?paciente_id={pid}", headers=admin).json())
         h = client.post(f"/api/pacientes/{pid}/historias/", json={
             "motivo_consulta": "test cita", "proxima_cita": "2026-12-20T10:30:00",
-        }, headers=admin).json()
+        }, headers=doctor).json()
         hid = h["id"]
         citas = client.get(f"/api/citas/?paciente_id={pid}", headers=admin).json()
         assert len(citas) == antes + 1

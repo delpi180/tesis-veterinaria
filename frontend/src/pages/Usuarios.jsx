@@ -11,7 +11,12 @@ const ROL_PILL = {
   recepcionista: 'bg-sky-100 text-sky-700',
 }
 
-const FORM_INICIAL = { usuario: '', nombre: '', password: '', rol: 'recepcionista', activo: true }
+const FORM_INICIAL = { usuario: '', nombre: '', password: '', rol: 'recepcionista', activo: true, hora_entrada: '', dias_laborales: '' }
+
+const DIAS = [
+  ['lun', 'Lun'], ['mar', 'Mar'], ['mie', 'Mié'], ['jue', 'Jue'],
+  ['vie', 'Vie'], ['sab', 'Sáb'], ['dom', 'Dom'],
+]
 
 const Spinner = () => (
   <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-400">
@@ -48,9 +53,19 @@ export default function Usuarios() {
   const abrirNuevo = () => { setEditId(null); setForm(FORM_INICIAL); setErrorModal(null); setModalAbierto(true) }
   const abrirEditar = (u) => {
     setEditId(u.id)
-    setForm({ usuario: u.usuario, nombre: u.nombre, password: '', rol: u.rol, activo: u.activo })
+    setForm({
+      usuario: u.usuario, nombre: u.nombre, password: '', rol: u.rol, activo: u.activo,
+      hora_entrada: u.hora_entrada || '', dias_laborales: u.dias_laborales || '',
+    })
     setErrorModal(null); setModalAbierto(true)
   }
+
+  const toggleDia = (code) => setForm(f => {
+    const set = new Set((f.dias_laborales || '').split(',').filter(Boolean))
+    set.has(code) ? set.delete(code) : set.add(code)
+    const ordenado = DIAS.map(([c]) => c).filter(c => set.has(c))
+    return { ...f, dias_laborales: ordenado.join(',') }
+  })
   const cerrar = () => { setModalAbierto(false); setEditId(null); setErrorModal(null) }
 
   const guardar = async (e) => {
@@ -62,15 +77,21 @@ export default function Usuarios() {
     }
     setGuardando(true); setErrorModal(null)
     try {
+      // El horario laboral solo aplica a doctores; para recepción se limpia.
+      const esDoctor = form.rol === 'veterinario'
+      const horario = {
+        hora_entrada:   esDoctor ? (form.hora_entrada || null) : null,
+        dias_laborales: esDoctor ? (form.dias_laborales || null) : null,
+      }
       if (editId) {
-        const payload = { nombre: form.nombre.trim(), rol: form.rol, activo: form.activo }
+        const payload = { nombre: form.nombre.trim(), rol: form.rol, activo: form.activo, ...horario }
         if (form.password) payload.password = form.password
         await api.put(`/api/usuarios/${editId}`, payload)
         toast.success('Usuario actualizado')
       } else {
         await api.post('/api/usuarios/', {
           usuario: form.usuario.trim(), nombre: form.nombre.trim(),
-          password: form.password, rol: form.rol, activo: form.activo,
+          password: form.password, rol: form.rol, activo: form.activo, ...horario,
         })
         toast.success('Usuario creado')
       }
@@ -217,6 +238,32 @@ export default function Usuarios() {
                     </select>
                   </div>
                 </div>
+                {form.rol === 'veterinario' && (
+                  <div className="flex flex-col gap-3 border border-slate-100 bg-slate-50/60 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Horario laboral del doctor</p>
+                    <div className="flex flex-col gap-1">
+                      <label className={labelCls}>Hora de ingreso</label>
+                      <input type="time" className={inputCls} value={form.hora_entrada}
+                        onChange={e => setForm(f => ({ ...f, hora_entrada: e.target.value }))} />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className={labelCls}>Días a laborar</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {DIAS.map(([code, lbl]) => {
+                          const activo = (form.dias_laborales || '').split(',').includes(code)
+                          return (
+                            <button key={code} type="button" onClick={() => toggleDia(code)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition ${activo
+                                ? 'bg-purple-600 text-white border-purple-600'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-purple-300'}`}>
+                              {lbl}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                   <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-300"
                     checked={form.activo} onChange={e => setForm(f => ({ ...f, activo: e.target.checked }))} />

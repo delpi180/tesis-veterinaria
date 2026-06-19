@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, LogIn, LogOut, Trash2, Stethoscope, Filter } from 'lucide-react'
+import { Clock, LogIn, LogOut, Trash2, Stethoscope, Filter, BarChart3, AlertTriangle, RefreshCw } from 'lucide-react'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
 
@@ -37,7 +37,9 @@ export default function Asistencia() {
   const [doctores, setDoctores] = useState([])
   const [hoyRegs,  setHoyRegs]  = useState([])   // marcaciones de hoy (para los botones)
   const [registros, setRegistros] = useState([]) // reporte filtrado
+  const [resumen,  setResumen]  = useState([])   // totales por doctor
   const [loading,  setLoading]  = useState(true)
+  const [refrescando, setRefrescando] = useState(false)
 
   const [filtros, setFiltros] = useState({ usuarioId: '', desde: hoyStr(), hasta: hoyStr() })
 
@@ -57,8 +59,12 @@ export default function Asistencia() {
     if (filtros.usuarioId) p.set('usuario_id', filtros.usuarioId)
     if (filtros.desde)     p.set('desde', filtros.desde)
     if (filtros.hasta)     p.set('hasta', filtros.hasta)
-    const data = await api.get(`/api/asistencia/?${p.toString()}`)
+    const [data, res] = await Promise.all([
+      api.get(`/api/asistencia/?${p.toString()}`),
+      api.get(`/api/asistencia/resumen?${p.toString()}`),
+    ])
     setRegistros(Array.isArray(data) ? data : [])
+    setResumen(Array.isArray(res) ? res : [])
   }
 
   const cargarTodo = async () => {
@@ -72,6 +78,19 @@ export default function Asistencia() {
     }
   }
   useEffect(() => { cargarTodo() }, [])
+
+  // Auto-actualización cada 20 s (silenciosa)
+  useEffect(() => {
+    const t = setInterval(() => { Promise.all([cargarHoy(), cargarReporte()]).catch(() => {}) }, 20000)
+    return () => clearInterval(t)
+  }, [filtros])
+
+  const refrescar = async () => {
+    setRefrescando(true)
+    try { await Promise.all([cargarDoctores(), cargarHoy(), cargarReporte()]) }
+    catch (e) { toast.error(e.message) }
+    finally { setRefrescando(false) }
+  }
 
   // Marcación abierta de hoy para un doctor (sin hora de salida)
   const abiertaDe = (docId) => hoyRegs.find(r => r.usuario_id === docId && !r.hora_salida)
@@ -112,9 +131,15 @@ export default function Asistencia() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10">
-        <h1 className="text-xl font-bold text-slate-800">Control de Asistencia</h1>
-        <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
+      <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Control de Asistencia</h1>
+          <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
+        </div>
+        <button onClick={refrescar} disabled={refrescando}
+          className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+          <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
+        </button>
       </header>
 
       <main className="flex-1 px-6 py-6 flex flex-col gap-6 max-w-5xl w-full mx-auto">
@@ -169,6 +194,40 @@ export default function Asistencia() {
           )}
         </section>
 
+        {/* ── Resumen por doctor (según el rango filtrado) ──────────── */}
+        {resumen.length > 0 && (
+          <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-purple-500" />
+              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Resumen de horas por doctor</h2>
+            </div>
+            <div className="overflow-x-auto"><table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
+                  <th className="text-left px-5 py-3 font-semibold">Doctor</th>
+                  <th className="text-center px-5 py-3 font-semibold">Días</th>
+                  <th className="text-right px-5 py-3 font-semibold">Total horas</th>
+                  <th className="text-center px-5 py-3 font-semibold">Tardanzas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumen.map((r, i) => (
+                  <tr key={r.usuario_id} className={`border-b border-slate-50 ${i % 2 ? 'bg-slate-50/30' : ''}`}>
+                    <td className="px-5 py-3 font-medium text-slate-800">{r.usuario_nombre ?? `#${r.usuario_id}`}</td>
+                    <td className="px-5 py-3 text-center text-slate-600">{r.dias}</td>
+                    <td className="px-5 py-3 text-right font-semibold text-purple-700">{r.total_horas} h</td>
+                    <td className="px-5 py-3 text-center">
+                      {r.tardanzas > 0
+                        ? <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">{r.tardanzas}</span>
+                        : <span className="text-xs text-emerald-600">0</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table></div>
+          </section>
+        )}
+
         {/* ── Reporte / historial ───────────────────────────────────── */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center gap-3">
@@ -210,7 +269,16 @@ export default function Asistencia() {
                   <tr key={r.id} className={`border-b border-slate-50 ${i % 2 ? 'bg-slate-50/30' : ''}`}>
                     <td className="px-5 py-3 font-medium text-slate-800">{r.usuario_nombre ?? `#${r.usuario_id}`}</td>
                     <td className="px-5 py-3 text-slate-600">{fmtFecha(r.fecha)}</td>
-                    <td className="px-5 py-3 text-emerald-700">{fmtHora(r.hora_ingreso)}</td>
+                    <td className="px-5 py-3">
+                      <span className="text-emerald-700">{fmtHora(r.hora_ingreso)}</span>
+                      {r.tardanza_min > 0 ? (
+                        <span className="ml-2 inline-flex items-center gap-0.5 text-[11px] font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">
+                          <AlertTriangle className="w-3 h-3" /> +{r.tardanza_min} min
+                        </span>
+                      ) : r.tardanza_min === 0 ? (
+                        <span className="ml-2 text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">A tiempo</span>
+                      ) : null}
+                    </td>
                     <td className="px-5 py-3 text-rose-700">
                       {r.hora_salida ? fmtHora(r.hora_salida) : <span className="text-amber-500 font-medium">En turno</span>}
                     </td>

@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar'
 import { ToastProvider } from './components/Toast'
 import Login from './pages/Login'
 import Inicio from './pages/Inicio'
+import MiPanel from './pages/MiPanel'
 import Clientes from './pages/Clientes'
 import DetalleCliente from './pages/DetalleCliente'
 import HistoriasClinicas from './pages/HistoriasClinicas'
@@ -14,6 +15,7 @@ import Ventas from './pages/Ventas'
 import Caja from './pages/Caja'
 import Usuarios from './pages/Usuarios'
 import Asistencia from './pages/Asistencia'
+import Actividad from './pages/Actividad'
 import Mediciones from './pages/Mediciones'
 import { getToken, esVeterinario, esAdmin } from './services/api'
 import './App.css'
@@ -37,6 +39,7 @@ function AppProtegida() {
       <div className="flex-1 min-w-0 flex flex-col">
         <Routes>
           <Route path="/"                       element={<Inicio />} />
+          <Route path="/mi-panel"               element={<SoloVet><MiPanel /></SoloVet>} />
           <Route path="/clientes"               element={<Clientes />} />
           <Route path="/clientes/:id"           element={<DetalleCliente />} />
           <Route path="/consultas"              element={<SoloVet><HistoriasClinicas /></SoloVet>} />
@@ -48,6 +51,7 @@ function AppProtegida() {
           <Route path="/ventas"                 element={<Ventas />} />
           <Route path="/caja"                   element={<Caja />} />
           <Route path="/asistencia"             element={<SoloAdmin><Asistencia /></SoloAdmin>} />
+          <Route path="/actividad"              element={<SoloAdmin><Actividad /></SoloAdmin>} />
           <Route path="/usuarios"               element={<SoloAdmin><Usuarios /></SoloAdmin>} />
           <Route path="/mediciones"             element={<Mediciones />} />
           <Route path="*"                       element={<Navigate to="/" replace />} />

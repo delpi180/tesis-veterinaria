@@ -580,35 +580,57 @@ class InventarioAplicarReq(BaseModel):
 # ---------------------------------------------------------------------------
 
 class UsuarioCreate(BaseModel):
-    usuario:  str = Field(min_length=3, max_length=50)
-    nombre:   str
-    password: str = Field(min_length=4)
-    rol:      Literal['veterinario', 'recepcionista'] = 'veterinario'
-    activo:   bool = True
+    usuario:        str = Field(min_length=3, max_length=50)
+    nombre:         str
+    password:       str = Field(min_length=4)
+    rol:            Literal['veterinario', 'recepcionista'] = 'veterinario'
+    activo:         bool = True
+    hora_entrada:   Optional[str] = None
+    dias_laborales: Optional[str] = None
 
 
 class UsuarioUpdate(BaseModel):
-    nombre:   Optional[str] = None
-    password: Optional[str] = Field(None, min_length=4)
-    rol:      Optional[Literal['veterinario', 'recepcionista']] = None
-    activo:   Optional[bool] = None
+    nombre:         Optional[str] = None
+    password:       Optional[str] = Field(None, min_length=4)
+    rol:            Optional[Literal['veterinario', 'recepcionista']] = None
+    activo:         Optional[bool] = None
+    hora_entrada:   Optional[str] = None
+    dias_laborales: Optional[str] = None
 
 
 class UsuarioOut(BaseModel):
-    id:        int
-    usuario:   str
-    nombre:    str
-    rol:       str
-    activo:    bool
-    creado_en: datetime
+    id:             int
+    usuario:        str
+    nombre:         str
+    rol:            str
+    activo:         bool
+    creado_en:      datetime
+    hora_entrada:   Optional[str] = None
+    dias_laborales: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ActividadOut(BaseModel):
+    id:      int
+    usuario: Optional[str] = None
+    rol:     Optional[str] = None
+    accion:  Optional[str] = None
+    detalle: Optional[str] = None
+    metodo:  Optional[str] = None
+    ruta:    Optional[str] = None
+    estado:  Optional[int] = None
+    fecha:   datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class DoctorOut(BaseModel):
     """Versión mínima de un doctor, para selectores (asignar a turno)."""
-    id:     int
-    nombre: str
+    id:             int
+    nombre:         str
+    hora_entrada:   Optional[str] = None
+    dias_laborales: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -623,14 +645,15 @@ class AsistenciaIngresoReq(BaseModel):
 
 
 class AsistenciaOut(BaseModel):
-    id:             int
-    usuario_id:     int
-    usuario_nombre: Optional[str] = None
-    fecha:          date
-    hora_ingreso:   Optional[datetime] = None
-    hora_salida:    Optional[datetime] = None
-    notas:          Optional[str] = None
-    registrado_por: Optional[str] = None
+    id:                  int
+    usuario_id:          int
+    usuario_nombre:      Optional[str] = None
+    fecha:               date
+    hora_ingreso:        Optional[datetime] = None
+    hora_salida:         Optional[datetime] = None
+    notas:               Optional[str] = None
+    registrado_por:      Optional[str] = None
+    hora_entrada_perfil: Optional[str] = None   # horario pactado del doctor
 
     @computed_field
     @property
@@ -639,5 +662,18 @@ class AsistenciaOut(BaseModel):
             segundos = (self.hora_salida - self.hora_ingreso).total_seconds()
             return round(segundos / 3600, 2) if segundos > 0 else 0.0
         return None
+
+    @computed_field
+    @property
+    def tardanza_min(self) -> Optional[int]:
+        """Minutos de tardanza respecto al horario pactado (0 = a tiempo)."""
+        if not (self.hora_ingreso and self.hora_entrada_perfil):
+            return None
+        try:
+            sh, sm = (int(x) for x in self.hora_entrada_perfil.split(":"))
+        except (ValueError, AttributeError):
+            return None
+        diff = (self.hora_ingreso.hour * 60 + self.hora_ingreso.minute) - (sh * 60 + sm)
+        return diff if diff > 0 else 0
 
     model_config = ConfigDict(from_attributes=True)

@@ -16,6 +16,10 @@ class Usuario(Base):
     activo        = Column(Boolean, default=True)
     creado_en     = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    # Perfil laboral del doctor (lo asigna la administradora)
+    hora_entrada   = Column(String(5))    # horario de ingreso pactado, "HH:MM"
+    dias_laborales = Column(String(40))   # CSV de días: "lun,mar,mie,jue,vie"
+
 
 class Cliente(Base):
     __tablename__ = "clientes"
@@ -154,6 +158,21 @@ class Cita(Base):
         return self.veterinario.nombre if self.veterinario else None
 
 
+class Actividad(Base):
+    """Bitácora de auditoría: registra cada acción que modifica datos."""
+    __tablename__ = "actividades"
+
+    id      = Column(Integer, primary_key=True)
+    usuario = Column(String(50))     # username que ejecutó la acción
+    rol     = Column(String(20))     # veterinario | recepcionista
+    accion  = Column(String(150))    # descripción legible (ej. "Registró una historia clínica")
+    detalle = Column(String(200))    # contexto: a qué paciente/entidad aplicó
+    metodo  = Column(String(10))     # POST | PUT | DELETE
+    ruta    = Column(String(200))    # endpoint afectado
+    estado  = Column(Integer)        # código HTTP de respuesta
+    fecha   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class Asistencia(Base):
     """Marcaciones de ingreso/salida del personal (control de la recepcionista)."""
     __tablename__ = "asistencias"
@@ -172,6 +191,10 @@ class Asistencia(Base):
     @property
     def usuario_nombre(self):
         return self.usuario.nombre if self.usuario else None
+
+    @property
+    def hora_entrada_perfil(self):
+        return self.usuario.hora_entrada if self.usuario else None
 
 
 class Evaluador(Base):

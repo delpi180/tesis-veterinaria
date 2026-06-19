@@ -6,55 +6,11 @@ Se ejecutan contra la base de datos configurada en .env. Limpian sus propios dat
     ./venv/Scripts/python.exe -m pytest tests/ -v
 """
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-import main
 from database import SessionLocal
-from models import Usuario
-from core.security import hash_password
 
-
-@pytest.fixture(scope="module")
-def client():
-    # Context manager → dispara startup (siembra los usuarios iniciales)
-    with TestClient(main.app) as c:
-        yield c
-
-
-def _ensure_user(usuario: str, password: str, rol: str, nombre: str) -> None:
-    """Garantiza un usuario con rol/credenciales conocidos, sin depender del seed."""
-    db = SessionLocal()
-    try:
-        u = db.query(Usuario).filter(Usuario.usuario == usuario).first()
-        if not u:
-            db.add(Usuario(usuario=usuario, nombre=nombre,
-                           password_hash=hash_password(password), rol=rol, activo=True))
-        else:
-            u.rol = rol
-            u.password_hash = hash_password(password)
-            u.activo = True
-        db.commit()
-    finally:
-        db.close()
-
-
-@pytest.fixture(scope="module")
-def admin(client):
-    """Administradora del sistema = recepcionista."""
-    _ensure_user("qa_admin", "qa1234", "recepcionista", "QA Administradora")
-    r = client.post("/api/auth/login", json={"usuario": "qa_admin", "password": "qa1234"})
-    assert r.status_code == 200
-    return {"Authorization": f"Bearer {r.json()['token']}"}
-
-
-@pytest.fixture(scope="module")
-def doctor(client):
-    """Doctor veterinario (atiende y firma historias)."""
-    _ensure_user("qa_doc", "qa1234", "veterinario", "QA Doctor")
-    r = client.post("/api/auth/login", json={"usuario": "qa_doc", "password": "qa1234"})
-    assert r.status_code == 200
-    return {"Authorization": f"Bearer {r.json()['token']}"}
+# Los fixtures client / admin (recepcionista) / doctor (veterinario) viven en conftest.py
 
 
 # ── Autenticación ────────────────────────────────────────────────────────────
@@ -234,8 +190,16 @@ def _id_doctor(client, admin, nombre="QA Doctor"):
     return next(d["id"] for d in docs if d["nombre"] == nombre)
 
 
+def _limpiar_asistencia(doc_id):
+    """Borra marcaciones previas del doctor para aislar el test."""
+    db = SessionLocal()
+    db.execute(text("DELETE FROM asistencias WHERE usuario_id=:u"), {"u": doc_id})
+    db.commit(); db.close()
+
+
 def test_asistencia_ingreso_salida(client, admin, doctor):
     doc_id = _id_doctor(client, admin)
+    _limpiar_asistencia(doc_id)
     reg = None
     try:
         # ingreso
@@ -259,9 +223,142 @@ def test_asistencia_ingreso_salida(client, admin, doctor):
             client.delete(f"/api/asistencia/{reg['id']}", headers=admin)
 
 
+def test_asistencia_resumen_y_tardanza(client, admin):
+    doc_id = _id_doctor(client, admin)
+    _limpiar_asistencia(doc_id)
+    # asigna un horario temprano para forzar tardanza (la marcación es "ahora")
+    client.put(f"/api/usuarios/{doc_id}",
+               json={"hora_entrada": "00:01", "dias_laborales": "lun,mar,mie,jue,vie,sab,dom"}, headers=admin)
+    reg = client.post("/api/asistencia/ingreso", json={"usuario_id": doc_id}, headers=admin).json()
+    try:
+        # la marcación expone el horario pactado y los minutos de tardanza
+        assert reg["hora_entrada_perfil"] == "00:01"
+        assert reg["tardanza_min"] is not None and reg["tardanza_min"] > 0
+        # el resumen agrega por doctor
+        r = client.get("/api/asistencia/resumen", headers=admin)
+        assert r.status_code == 200
+        fila = next((x for x in r.json() if x["usuario_id"] == doc_id), None)
+        assert fila and fila["dias"] >= 1 and fila["tardanzas"] >= 1
+    finally:
+        client.delete(f"/api/asistencia/{reg['id']}", headers=admin)
+
+
+def test_resumen_solo_admin(client, doctor):
+    assert client.get("/api/asistencia/resumen", headers=doctor).status_code == 403
+
+
 def test_asistencia_solo_admin(client, doctor, admin):
     doc_id = _id_doctor(client, admin)
     # un doctor NO puede registrar asistencia (es función de la administradora)
     r = client.post("/api/asistencia/ingreso", json={"usuario_id": doc_id}, headers=doctor)
     assert r.status_code == 403
     assert client.get("/api/asistencia/", headers=doctor).status_code == 403
+
+
+# ── Panel personal del doctor ────────────────────────────────────────────────
+
+def test_mi_panel_doctor(client, doctor):
+    r = client.get("/api/mi-panel/", headers=doctor)
+    assert r.status_code == 200
+    d = r.json()
+    for clave in ("doctor", "mis_turnos", "seguimiento", "resumen_historias", "asistencia_hoy"):
+        assert clave in d
+    assert d["doctor"]["nombre"] == "QA Doctor"
+
+
+def test_mi_panel_no_para_recepcion(client, admin):
+    # la administradora (recepcionista) no tiene panel clínico personal
+    assert client.get("/api/mi-panel/", headers=admin).status_code == 403
+
+
+# ── Datos compartidos entre cuentas (una sola base de datos) ─────────────────
+
+def test_admin_se_refleja_en_doctor(client, admin, doctor):
+    """Lo que hace la administradora lo ve el doctor en su cuenta."""
+    doc_id = _id_doctor(client, admin)
+    _limpiar_asistencia(doc_id)
+    # admin configura el horario del doctor
+    client.put(f"/api/usuarios/{doc_id}",
+               json={"hora_entrada": "09:00", "dias_laborales": "lun,mar,mie,jue,vie"}, headers=admin)
+    # admin crea cliente + paciente + turno asignado al doctor
+    cli = client.post("/api/clientes/", json={"nombre": "Compartido", "dni": "44556677"}, headers=admin).json()
+    pac = client.post(f"/api/clientes/{cli['id']}/pacientes/",
+                      json={"nombre": "Shared", "especie": "Canino"}, headers=admin).json()
+    cita = None
+    try:
+        cita = client.post("/api/citas/", json={
+            "paciente_id": pac["id"], "fecha_hora": "2027-01-15T10:00:00",
+            "motivo": "Control", "veterinario_id": doc_id,
+        }, headers=admin).json()
+
+        # el doctor ve el turno y su horario en SU panel
+        panel = client.get("/api/mi-panel/", headers=doctor).json()
+        assert any(t["id"] == cita["id"] for t in panel["mis_turnos"])
+        assert panel["asistencia_hoy"]["hora_entrada_perfil"] == "09:00"
+
+        # admin marca asistencia del doctor → el doctor la ve
+        client.post("/api/asistencia/ingreso", json={"usuario_id": doc_id}, headers=admin)
+        panel2 = client.get("/api/mi-panel/", headers=doctor).json()
+        assert panel2["asistencia_hoy"]["marcado"] is True
+    finally:
+        _limpiar_asistencia(doc_id)
+        if cita:
+            client.delete(f"/api/citas/{cita['id']}", headers=admin)
+        client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
+        db = SessionLocal()
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()
+
+
+def test_actividad_se_registra(client, admin):
+    """Cada acción que modifica datos queda en la bitácora."""
+    cli = client.post("/api/clientes/", json={"nombre": "AuditCli", "dni": "66778899"}, headers=admin).json()
+    try:
+        r = client.get("/api/actividad/", headers=admin)
+        assert r.status_code == 200
+        assert any(a["accion"] == "Registró un cliente" and a["usuario"] == "qa_admin" for a in r.json())
+    finally:
+        db = SessionLocal()
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()
+
+
+def test_actividad_solo_admin(client, doctor):
+    assert client.get("/api/actividad/", headers=doctor).status_code == 403
+
+
+def test_actividad_filtros(client, admin):
+    """Los filtros por fecha y usuario no deben romper (regresión del 500)."""
+    from datetime import date
+    hoy = date.today().isoformat()
+    r = client.get(f"/api/actividad/?desde={hoy}&hasta={hoy}", headers=admin)
+    assert r.status_code == 200 and isinstance(r.json(), list)
+    r2 = client.get("/api/actividad/?usuario=qa_admin", headers=admin)
+    assert r2.status_code == 200
+    assert all(a["usuario"] == "qa_admin" for a in r2.json())
+
+
+def test_doctor_persiste_y_se_comparte(client, admin, doctor):
+    """Lo que registra el doctor se guarda y queda disponible al volver a leer."""
+    cli = client.post("/api/clientes/", json={"nombre": "PersistDueño", "dni": "33445566"}, headers=admin).json()
+    pac = client.post(f"/api/clientes/{cli['id']}/pacientes/",
+                      json={"nombre": "Persist", "especie": "Felino"}, headers=admin).json()
+    try:
+        # el doctor crea una historia con varios campos
+        h = client.post(f"/api/pacientes/{pac['id']}/historias/",
+                        json={"motivo_consulta": "Vacuna antirrábica", "peso_kg": 5.2}, headers=doctor).json()
+
+        # se relee desde la base (otra petición) y persiste con la firma del doctor
+        again = client.get(f"/api/pacientes/{pac['id']}/historias/{h['id']}", headers=doctor).json()
+        assert again["motivo_consulta"] == "Vacuna antirrábica"
+        assert float(again["peso_kg"]) == 5.2
+        assert again["veterinario_nombre"] == "QA Doctor"
+
+        # aparece en el resumen del panel del doctor
+        panel = client.get("/api/mi-panel/", headers=doctor).json()
+        assert panel["resumen_historias"]["total"] >= 1
+    finally:
+        client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
+        db = SessionLocal()
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()

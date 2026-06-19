@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronDown, Plus, Trash2, Download, Save, Check,
   ArrowLeft, Mic, StopCircle, AlertTriangle, Loader2, FileText,
@@ -567,6 +567,7 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 export default function HistoriasClinicas() {
   const { pacienteId: id } = useParams();
   const navigate = useNavigate();
+  const { state: navState } = useLocation();   // { citaId } cuando se viene de "Atender"
 
   // ── Datos
   const [paciente,  setPaciente]  = useState(null);
@@ -797,6 +798,10 @@ export default function HistoriasClinicas() {
         payload.metodo_registro = usoIA.current ? "ia" : "manual";
         const r = await api.post(`/api/pacientes/${id}/historias/`, payload);
         setHistorias(p => [r, ...p]);
+        // Si se vino de "Atender" un turno, márcalo como atendido
+        if (navState?.citaId) {
+          try { await api.put(`/api/citas/${navState.citaId}`, { estado: "atendida" }); } catch { /* no crítico */ }
+        }
       }
       setGuardadoOk(true);
       setTimeout(() => setGuardadoOk(false), 2500);

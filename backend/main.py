@@ -1,3 +1,5 @@
+import re
+
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -8,7 +10,7 @@ import models  # registra todos los modelos en Base.metadata
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
-    busqueda, inventario, asistencia,
+    busqueda, inventario, asistencia, mi_panel, actividad,
 )
 from core.config import settings
 from core.security import verificar_token, hash_password
@@ -28,6 +30,62 @@ def _es_ruta_clinica(path: str) -> bool:
         "/historias" in path
         or path in {"/api/procesar-historia", "/api/transcribe", "/api/process-soap"}
     )
+
+
+# ── Bitácora de actividad (auditoría) ────────────────────────────────────────
+
+_ACCIONES = {
+    ("POST", "/api/citas"): "Creó un turno",
+    ("PUT", "/api/citas/{id}"): "Editó un turno",
+    ("DELETE", "/api/citas/{id}"): "Eliminó un turno",
+    ("POST", "/api/clientes"): "Registró un cliente",
+    ("PUT", "/api/clientes/{id}"): "Editó un cliente",
+    ("DELETE", "/api/clientes/{id}"): "Eliminó un cliente",
+    ("POST", "/api/clientes/{id}/pacientes"): "Registró una mascota",
+    ("PUT", "/api/pacientes/{id}"): "Editó una mascota",
+    ("DELETE", "/api/pacientes/{id}"): "Eliminó una mascota",
+    ("POST", "/api/pacientes/{id}/historias"): "Registró una historia clínica",
+    ("PUT", "/api/pacientes/{id}/historias/{id}"): "Editó una historia clínica",
+    ("POST", "/api/asistencia/ingreso"): "Marcó ingreso de asistencia",
+    ("POST", "/api/asistencia/{id}/salida"): "Marcó salida de asistencia",
+    ("DELETE", "/api/asistencia/{id}"): "Eliminó una marcación",
+    ("POST", "/api/ventas"): "Registró una venta",
+    ("POST", "/api/usuarios"): "Creó un usuario",
+    ("PUT", "/api/usuarios/{id}"): "Editó un usuario",
+    ("DELETE", "/api/usuarios/{id}"): "Eliminó un usuario",
+    ("POST", "/api/productos"): "Creó un producto",
+    ("PUT", "/api/productos/{id}"): "Editó un producto",
+    ("DELETE", "/api/productos/{id}"): "Eliminó un producto",
+    ("POST", "/api/productos/{id}/ajuste-stock"): "Ajustó stock de un producto",
+    ("POST", "/api/servicios"): "Creó un servicio",
+    ("PUT", "/api/servicios/{id}"): "Editó un servicio",
+    ("DELETE", "/api/servicios/{id}"): "Eliminó un servicio",
+    ("POST", "/api/inventario/aplicar"): "Actualizó inventario por dictado",
+}
+
+
+def _describir_accion(metodo: str, path: str) -> str:
+    p = re.sub(r"/\d+", "/{id}", path).rstrip("/")
+    return _ACCIONES.get((metodo, p), f"{metodo} {p}")
+
+
+def _registrar_actividad(usuario, rol, metodo, ruta, estado, detalle=None):
+    """Guarda una entrada en la bitácora (no rompe la petición si falla)."""
+    db = None
+    try:
+        db = SessionLocal()
+        db.add(models.Actividad(
+            usuario=usuario, rol=rol,
+            accion=_describir_accion(metodo, ruta),
+            detalle=detalle,
+            metodo=metodo, ruta=ruta, estado=estado,
+        ))
+        db.commit()
+    except Exception as e:
+        print(f"[ACT] no se pudo registrar actividad: {e}")
+    finally:
+        if db is not None:
+            db.close()
 
 
 # Auth middleware: se registra ANTES que CORS para que CORS quede por fuera
@@ -56,7 +114,25 @@ async def auth_middleware(request: Request, call_next):
             )
         request.state.usuario = sesion["usuario"]
         request.state.rol = sesion["rol"]
-    return await call_next(request)
+
+    response = await call_next(request)
+
+    # Bitácora: registra acciones que modifican datos (POST/PUT/DELETE con éxito)
+    if (
+        request.method in ("POST", "PUT", "DELETE")
+        and path.startswith("/api/")
+        and path not in RUTAS_PUBLICAS
+        and not path.startswith("/api/actividad")
+        and getattr(request.state, "usuario", None)
+        and response.status_code < 400
+    ):
+        _registrar_actividad(
+            request.state.usuario, getattr(request.state, "rol", None),
+            request.method, path, response.status_code,
+            detalle=getattr(request.state, "actividad_detalle", None),
+        )
+
+    return response
 
 
 app.add_middleware(
@@ -83,6 +159,8 @@ app.include_router(ventas.router)
 app.include_router(inventario.router)
 app.include_router(busqueda.router)
 app.include_router(asistencia.router)
+app.include_router(mi_panel.router)
+app.include_router(actividad.router)
 
 
 @app.on_event("startup")

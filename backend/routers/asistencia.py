@@ -62,6 +62,7 @@ def marcar_ingreso(payload: AsistenciaIngresoReq, request: Request, db: Session 
     db.add(asistencia)
     db.commit()
     db.refresh(asistencia)
+    request.state.actividad_detalle = doctor.nombre
     return asistencia
 
 
@@ -78,6 +79,7 @@ def marcar_salida(asistencia_id: int, request: Request, db: Session = Depends(ge
     asistencia.hora_salida = _ahora_local()
     db.commit()
     db.refresh(asistencia)
+    request.state.actividad_detalle = asistencia.usuario.nombre if asistencia.usuario else None
     return asistencia
 
 
@@ -99,6 +101,50 @@ def listar_asistencia(
     if hasta:
         q = q.filter(Asistencia.fecha <= hasta)
     return q.order_by(Asistencia.fecha.desc(), Asistencia.hora_ingreso.desc()).all()
+
+
+@router.get("/resumen")
+def resumen_asistencia(
+    request: Request,
+    desde: Optional[str] = Query(None, description="Fecha inicio YYYY-MM-DD"),
+    hasta: Optional[str] = Query(None, description="Fecha fin YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """Totales por doctor en el rango: días, horas trabajadas y tardanzas."""
+    solo_admin(request)
+
+    q = db.query(Asistencia)
+    if desde:
+        q = q.filter(Asistencia.fecha >= desde)
+    if hasta:
+        q = q.filter(Asistencia.fecha <= hasta)
+
+    agg: dict[int, dict] = {}
+    for r in q.all():
+        a = agg.setdefault(r.usuario_id, {
+            "usuario_id": r.usuario_id,
+            "usuario_nombre": r.usuario_nombre,
+            "dias": 0,
+            "total_horas": 0.0,
+            "tardanzas": 0,
+        })
+        a["dias"] += 1
+        if r.hora_ingreso and r.hora_salida:
+            seg = (r.hora_salida - r.hora_ingreso).total_seconds()
+            if seg > 0:
+                a["total_horas"] += seg / 3600
+        if r.hora_ingreso and r.hora_entrada_perfil:
+            try:
+                sh, sm = (int(x) for x in r.hora_entrada_perfil.split(":"))
+                if (r.hora_ingreso.hour * 60 + r.hora_ingreso.minute) - (sh * 60 + sm) > 0:
+                    a["tardanzas"] += 1
+            except (ValueError, AttributeError):
+                pass
+
+    salida = sorted(agg.values(), key=lambda x: (x["usuario_nombre"] or "").lower())
+    for a in salida:
+        a["total_horas"] = round(a["total_horas"], 2)
+    return salida
 
 
 @router.delete("/{asistencia_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Stethoscope } from 'lucide-react'
-import { api } from '../services/api'
+import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Stethoscope, Pencil, RefreshCw } from 'lucide-react'
+import { api, esVeterinario } from '../services/api'
 import { estadoStyle, estadoLabel, ESTADOS_CITA, waRecordatorio } from '../utils/citas'
 
 const NOMBRES_MES = [
@@ -58,19 +58,22 @@ export default function Turnos() {
 
   // ── Modal ──────────────────────────────────────────────────────────────────
   const [modalAbierto, setModalAbierto] = useState(false)
+  const [editId,       setEditId]       = useState(null)
   const [form,         setForm]         = useState(FORM_INICIAL)
   const [guardando,    setGuardando]    = useState(false)
   const [errorModal,   setErrorModal]   = useState(null)
+  const [filtroDoctor, setFiltroDoctor] = useState('')   // filtrar agenda por doctor
+  const [refrescando,  setRefrescando]  = useState(false)
 
   const todayDay   = now.getDate()
   const todayMonth = now.getMonth()
   const todayYear  = now.getFullYear()
   const isCurrentMonth = viewYear === todayYear && viewMonth === todayMonth
 
-  useEffect(() => {
-    setLoading(true)
+  const cargar = (silencioso = false) => {
+    if (!silencioso) setLoading(true)
     setError(null)
-    Promise.all([
+    return Promise.all([
       api.get('/api/clientes/'),
       api.get('/api/citas/'),
       api.get('/api/usuarios/doctores'),
@@ -91,7 +94,16 @@ export default function Turnos() {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }
+  useEffect(() => { cargar() }, [])
+
+  // Auto-actualización cada 20 s (no mientras el modal está abierto)
+  useEffect(() => {
+    const t = setInterval(() => { if (!modalAbierto) cargar(true) }, 20000)
+    return () => clearInterval(t)
+  }, [modalAbierto])
+
+  const refrescar = async () => { setRefrescando(true); await cargar(true); setRefrescando(false) }
 
   // Cambia el estado de una cita (confirmar / atender / cancelar) — alineado con la agenda
   const cambiarEstado = async (cita, nuevoEstado) => {
@@ -104,16 +116,21 @@ export default function Turnos() {
     }
   }
 
+  // Agenda filtrada opcionalmente por doctor asignado
+  const citasVisibles = filtroDoctor
+    ? citas.filter(c => String(c.veterinario_id) === String(filtroDoctor))
+    : citas
+
   const citasDelDia = (dia) => {
     if (!dia) return []
-    return citas.filter(c => {
+    return citasVisibles.filter(c => {
       const d = new Date(c.fecha_hora)
       return d.getFullYear() === viewYear && d.getMonth() === viewMonth && d.getDate() === dia
     })
   }
 
   const diasConTurno = new Set(
-    citas
+    citasVisibles
       .filter(c => {
         const d = new Date(c.fecha_hora)
         return d.getFullYear() === viewYear && d.getMonth() === viewMonth
@@ -122,7 +139,7 @@ export default function Turnos() {
   )
 
   const hoyInicio = new Date(todayYear, todayMonth, todayDay)
-  const citasProximas = [...citas]
+  const citasProximas = [...citasVisibles]
     .filter(c => new Date(c.fecha_hora) >= hoyInicio)
     .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora))
     .slice(0, 20)
@@ -156,13 +173,32 @@ export default function Turnos() {
     const dia = selected ?? todayDay
     const mm  = String(viewMonth + 1).padStart(2, '0')
     const dd  = String(dia).padStart(2, '0')
+    setEditId(null)
     setForm({ ...FORM_INICIAL, fecha: `${viewYear}-${mm}-${dd}` })
+    setErrorModal(null)
+    setModalAbierto(true)
+  }
+
+  const abrirEditar = (cita) => {
+    const d = new Date(cita.fecha_hora)
+    const pad = (n) => String(n).padStart(2, '0')
+    setEditId(cita.id)
+    setForm({
+      pacienteId:    String(cita.paciente_id),
+      fecha:         `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      hora:          `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+      motivo:        cita.motivo ?? '',
+      estado:        cita.estado,
+      notas:         cita.notas ?? '',
+      veterinarioId: cita.veterinario_id ? String(cita.veterinario_id) : '',
+    })
     setErrorModal(null)
     setModalAbierto(true)
   }
 
   const cerrarModal = () => {
     setModalAbierto(false)
+    setEditId(null)
     setForm(FORM_INICIAL)
     setErrorModal(null)
   }
@@ -175,15 +211,19 @@ export default function Turnos() {
     }
     setGuardando(true)
     setErrorModal(null)
+    const payload = {
+      fecha_hora:     `${form.fecha}T${form.hora}:00`,
+      motivo:         form.motivo.trim() || null,
+      estado:         form.estado,
+      notas:          form.notas.trim() || null,
+      veterinario_id: form.veterinarioId ? parseInt(form.veterinarioId, 10) : null,
+    }
     try {
-      await api.post('/api/citas/', {
-        paciente_id:    parseInt(form.pacienteId, 10),
-        fecha_hora:     `${form.fecha}T${form.hora}:00`,
-        motivo:         form.motivo.trim() || null,
-        estado:         form.estado,
-        notas:          form.notas.trim() || null,
-        veterinario_id: form.veterinarioId ? parseInt(form.veterinarioId, 10) : null,
-      })
+      if (editId) {
+        await api.put(`/api/citas/${editId}`, payload)
+      } else {
+        await api.post('/api/citas/', { ...payload, paciente_id: parseInt(form.pacienteId, 10) })
+      }
       const nuevasCitas = await api.get('/api/citas/')
       setCitas(nuevasCitas)
       cerrarModal()
@@ -193,6 +233,33 @@ export default function Turnos() {
       setGuardando(false)
     }
   }
+
+  // Aviso si el doctor asignado no labora ese día (según su perfil)
+  const avisoHorario = (() => {
+    if (!form.veterinarioId || !form.fecha) return null
+    const doc = doctores.find(d => String(d.id) === String(form.veterinarioId))
+    if (!doc || !doc.dias_laborales) return null
+    const codigos = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab']
+    const [y, m, d] = form.fecha.split('-').map(Number)
+    const code = codigos[new Date(y, m - 1, d).getDay()]
+    const labora = doc.dias_laborales.split(',').includes(code)
+    return labora ? null : `${doc.nombre} no tiene ese día en su horario laboral.`
+  })()
+
+  // Aviso si el doctor ya tiene otro turno a esa misma fecha y hora
+  const avisoChoque = (() => {
+    if (!form.veterinarioId || !form.fecha || !form.hora) return null
+    const pad = (n) => String(n).padStart(2, '0')
+    const choca = citas.some(c => {
+      if (editId && c.id === editId) return false
+      if (String(c.veterinario_id) !== String(form.veterinarioId)) return false
+      const d = new Date(c.fecha_hora)
+      const fechaC = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      const horaC = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+      return fechaC === form.fecha && horaC === form.hora
+    })
+    return choca ? 'Este doctor ya tiene un turno a esa hora.' : null
+  })()
 
   const opcionesPacientes = Object.entries(pacienteMap)
     .sort(([, a], [, b]) =>
@@ -204,9 +271,26 @@ export default function Turnos() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10">
-        <h1 className="text-xl font-bold text-slate-800">Turnos y Agenda</h1>
-        <p className="text-xs text-slate-400 mt-0.5 capitalize">{displayDate}</p>
+      <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Turnos y Agenda</h1>
+          <p className="text-xs text-slate-400 mt-0.5 capitalize">{displayDate}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500">Doctor:</span>
+          <select
+            value={filtroDoctor}
+            onChange={e => setFiltroDoctor(e.target.value)}
+            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+          >
+            <option value="">Todos</option>
+            {doctores.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+          </select>
+          <button onClick={refrescar} disabled={refrescando}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+            <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 px-6 py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
@@ -339,7 +423,7 @@ export default function Turnos() {
                           <span>{cita.veterinario_nombre}</span>
                         </div>
                       )}
-                      {/* Acciones: estado + recordatorio */}
+                      {/* Acciones: estado + editar + recordatorio */}
                       <div className="flex items-center gap-2 pt-1">
                         <select
                           value={cita.estado}
@@ -348,6 +432,24 @@ export default function Turnos() {
                         >
                           {ESTADOS_CITA.map(s => <option key={s} value={s}>{estadoLabel(s)}</option>)}
                         </select>
+                        {esVeterinario() && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/consultas/${cita.paciente_id}`, { state: { citaId: cita.id } })}
+                            title="Atender (registrar historia)"
+                            className="px-2.5 h-7 rounded-lg bg-purple-700 hover:bg-purple-600 text-white text-xs font-semibold transition shrink-0"
+                          >
+                            Atender
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => abrirEditar(cita)}
+                          title="Editar turno"
+                          className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition shrink-0"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
                         {info.telefono && (
                           <a
                             href={waRecordatorio(info.telefono, info.propietario, info.nombre, cita)}
@@ -439,6 +541,14 @@ export default function Turnos() {
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => abrirEditar(cita)}
+                            title="Editar turno"
+                            className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
                           {info.telefono && (
                             <a
                               href={waRecordatorio(info.telefono, info.propietario, info.nombre, cita)}
@@ -471,7 +581,7 @@ export default function Turnos() {
 
             {/* Cabecera */}
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <p className="text-sm font-bold text-slate-800">Nuevo Turno</p>
+              <p className="text-sm font-bold text-slate-800">{editId ? 'Editar Turno' : 'Nuevo Turno'}</p>
               <button
                 onClick={cerrarModal}
                 className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400"
@@ -492,6 +602,7 @@ export default function Turnos() {
                   <select
                     className={inputCls}
                     value={form.pacienteId}
+                    disabled={!!editId}
                     onChange={e => setForm(f => ({ ...f, pacienteId: e.target.value }))}
                   >
                     <option value="">— Seleccionar mascota —</option>
@@ -554,6 +665,16 @@ export default function Turnos() {
                       <option key={d.id} value={d.id}>{d.nombre}</option>
                     ))}
                   </select>
+                  {avisoHorario && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1.5 rounded-lg">
+                      ⚠️ {avisoHorario}
+                    </p>
+                  )}
+                  {avisoChoque && (
+                    <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1.5 rounded-lg">
+                      ⛔ {avisoChoque}
+                    </p>
+                  )}
                 </div>
 
                 {/* Estado */}
