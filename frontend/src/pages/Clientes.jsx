@@ -116,10 +116,11 @@ export default function Clientes() {
   const [showForm,    setShowForm]    = useState(false)
   const [searchTerm,  setSearchTerm]  = useState('')
 
-  const cargar = async () => {
+  const cargar = async (q = '') => {
     setLoading(true); setError(null)
     try {
-      const data = await api.get('/api/clientes/')
+      const url = q.trim() ? `/api/clientes/?q=${encodeURIComponent(q.trim())}` : '/api/clientes/'
+      const data = await api.get(url)
       setClientes(Array.isArray(data) ? data : [])
     } catch (e) {
       setError(e.message)
@@ -128,21 +129,19 @@ export default function Clientes() {
     }
   }
 
-  useEffect(() => { cargar() }, [])
+  // Carga inicial + búsqueda en el servidor (con debounce al escribir)
+  useEffect(() => {
+    const t = setTimeout(() => cargar(searchTerm), searchTerm ? 350 : 0)
+    return () => clearTimeout(t)
+  }, [searchTerm])
 
   const handleSuccess = (nuevo) => {
     setShowForm(false)
     setTimeout(() => setClientes(prev => [nuevo, ...prev]), 100)
   }
 
-  // Filtro en memoria — sin petición extra al backend
-  const term = searchTerm.trim().toLowerCase()
-  const clientesFiltrados = term
-    ? clientes.filter(c =>
-        c.nombre.toLowerCase().includes(term) ||
-        (c.dni ?? '').toLowerCase().includes(term)
-      )
-    : clientes
+  const term = searchTerm.trim()
+  const clientesFiltrados = clientes   // el servidor ya filtra
 
   const today = new Date().toLocaleDateString('es-MX', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',

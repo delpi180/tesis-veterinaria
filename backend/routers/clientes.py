@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import Cliente, Paciente
@@ -28,8 +31,17 @@ def crear_cliente(payload: ClienteCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/", response_model=list[ClienteOut])
-def listar_clientes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(Cliente).offset(skip).limit(limit).all()
+def listar_clientes(
+    q: Optional[str] = Query(None, description="Busca por nombre o DNI"),
+    skip: int = 0,
+    limit: int = Query(300, le=1000),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Cliente).options(joinedload(Cliente.pacientes))
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(or_(Cliente.nombre.ilike(like), Cliente.dni.ilike(like)))
+    return query.order_by(Cliente.nombre).offset(skip).limit(limit).all()
 
 
 @router.get("/{cliente_id}", response_model=ClienteOut)

@@ -203,6 +203,12 @@ class ClienteBase(BaseModel):
     telefono:  Optional[str] = None
     direccion: Optional[str] = None
 
+
+class ClienteCreate(ClienteBase):
+    dni: str  # requerido al crear
+
+    # La validación de DNI/teléfono SOLO aplica a la entrada (crear/editar),
+    # nunca a la salida: así datos heredados/migrados (RUC, etc.) se pueden listar.
     @model_validator(mode='after')
     def _validar_contacto(self):
         if self.dni is not None and self.dni.strip():
@@ -216,10 +222,6 @@ class ClienteBase(BaseModel):
                 raise ValueError("El teléfono debe tener entre 6 y 12 dígitos")
             self.telefono = tel
         return self
-
-
-class ClienteCreate(ClienteBase):
-    dni: str  # requerido al crear
 
 
 class ClienteOut(ClienteBase):
