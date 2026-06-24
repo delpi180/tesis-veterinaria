@@ -6,8 +6,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Cita, Paciente
+from models import Cita, Paciente, Usuario
 from schemas import CitaCreate, CitaUpdate, CitaResponse
+from core.deps import usuario_actual
 
 router = APIRouter(prefix="/api/citas", tags=["Citas"])
 
@@ -91,11 +92,21 @@ async def poll_sse_events():
 
 
 @router.post("/", response_model=CitaResponse, status_code=status.HTTP_201_CREATED)
-def crear_cita(payload: CitaCreate, request: Request, db: Session = Depends(get_db)):
+def crear_cita(
+    payload: CitaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
     paciente = db.get(Paciente, payload.paciente_id)
     if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
-    cita = Cita(**payload.model_dump())
+    datos = payload.model_dump()
+    # Trazabilidad: si lo crea un doctor y no eligió otro veterinario, se le asigna
+    # a él automáticamente → así el turno SIEMPRE aparece en su "Mi panel".
+    if datos.get("veterinario_id") is None and usuario and usuario.rol == "veterinario":
+        datos["veterinario_id"] = usuario.id
+    cita = Cita(**datos)
     db.add(cita)
     db.commit()
     db.refresh(cita)

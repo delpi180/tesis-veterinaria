@@ -396,3 +396,25 @@ def test_reportes(client, admin):
     d = r.json()
     for clave in ("total_ventas", "ingreso_total", "top_productos", "top_servicios", "atenciones_por_doctor"):
         assert clave in d
+
+
+def test_turno_creado_por_doctor_se_autoasigna(client, doctor, admin):
+    """Trazabilidad: si un doctor crea un turno sin elegir veterinario, se le
+    asigna a el automaticamente y aparece en su Mi panel (sin perdidas)."""
+    cli = client.post("/api/clientes/", json={"nombre": "QA Auto", "dni": "55554444"}, headers=admin).json()
+    pac = client.post(f"/api/clientes/{cli['id']}/pacientes/",
+                      json={"nombre": "AutoPet", "especie": "Canino"}, headers=admin).json()
+    try:
+        cita = client.post("/api/citas/", json={
+            "paciente_id": pac["id"], "fecha_hora": "2027-05-01T10:00:00",
+        }, headers=doctor).json()
+        # se autoasigno al doctor
+        assert cita["veterinario_nombre"] == "QA Doctor"
+        # y aparece en su panel
+        panel = client.get("/api/mi-panel/", headers=doctor).json()
+        assert any(t["id"] == cita["id"] for t in panel["mis_turnos"])
+    finally:
+        client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
+        db = SessionLocal()
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()
