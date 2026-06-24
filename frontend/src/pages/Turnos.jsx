@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Stethoscope, Pencil, RefreshCw, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Stethoscope, Pencil, RefreshCw, Trash2, Printer } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { api, esVeterinario } from '../services/api'
 import { estadoStyle, estadoLabel, ESTADOS_CITA, waRecordatorio } from '../utils/citas'
 
@@ -117,6 +119,42 @@ export default function Turnos() {
   }, [modalAbierto]);
 
   const refrescar = async () => { setRefrescando(true); await cargar(true); setRefrescando(false) }
+
+  // Imprime/descarga la agenda del día seleccionado en PDF (para el mostrador)
+  const imprimirAgenda = () => {
+    const dia = selected ?? todayDay
+    const lista = citasDelDia(dia).slice().sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora))
+    const fechaTxt = new Date(viewYear, viewMonth, dia)
+      .toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+    doc.setFillColor(91, 33, 182); doc.rect(0, 0, 210, 20, 'F')
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont(undefined, 'bold')
+    doc.text('Veterinaria Los Pinos — Agenda del día', 14, 9)
+    doc.setFontSize(10); doc.setFont(undefined, 'normal')
+    doc.text(fechaTxt.charAt(0).toUpperCase() + fechaTxt.slice(1), 14, 16)
+    if (lista.length === 0) {
+      doc.setTextColor(80); doc.text('Sin turnos para este día.', 14, 30)
+    } else {
+      autoTable(doc, {
+        startY: 26,
+        head: [['Hora', 'Paciente', 'Especie', 'Dueño', 'Teléfono', 'Motivo', 'Doctor', 'Estado']],
+        body: lista.map(c => [
+          formatHora(c.fecha_hora),
+          c.paciente_nombre ?? '—',
+          c.paciente_especie ?? '—',
+          c.propietario ?? '—',
+          c.telefono ?? '—',
+          c.motivo ?? '—',
+          c.veterinario_nombre ?? 'Sin asignar',
+          estadoLabel(c.estado),
+        ]),
+        styles: { fontSize: 9, cellPadding: 2 },
+        headStyles: { fillColor: [91, 33, 182] },
+        margin: { left: 14, right: 14 },
+      })
+    }
+    doc.save(`Agenda_${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}.pdf`)
+  }
 
   // Búsqueda de mascota por nombre o DNI/nombre del dueño (en el servidor, con debounce)
   useEffect(() => {
@@ -431,11 +469,21 @@ export default function Turnos() {
 
           {/* ── Panel del día seleccionado ───────────────────────── */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                {panelEsHoy ? 'Turnos de Hoy' : `Turnos del día ${panelDia}`}
-              </p>
-              <p className="text-xs text-slate-400 mt-0.5 capitalize">{panelFecha}</p>
+            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                  {panelEsHoy ? 'Turnos de Hoy' : `Turnos del día ${panelDia}`}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5 capitalize">{panelFecha}</p>
+              </div>
+              <button
+                onClick={imprimirAgenda}
+                disabled={turnosDia.length === 0}
+                title="Imprimir agenda del día (PDF)"
+                className="flex items-center gap-1 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg px-2.5 py-1.5 hover:bg-purple-50 transition disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              >
+                <Printer className="w-3.5 h-3.5" /> Imprimir
+              </button>
             </div>
 
             <div className="flex flex-col divide-y divide-slate-50 flex-1">
