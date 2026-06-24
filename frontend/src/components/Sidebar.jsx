@@ -95,7 +95,6 @@ export default function Sidebar() {
         </button>
         <span className="font-bold text-sm">Veterinaria Los Pinos</span>
       </div>
-      <div className="md:hidden h-12" />
 
       {/* Overlay móvil */}
       {abierto && <div className="md:hidden fixed inset-0 bg-black/50 z-40" onClick={cerrar} />}
