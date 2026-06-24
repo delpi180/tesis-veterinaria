@@ -196,6 +196,11 @@ export default function Ventas() {
   // ── Modal nueva venta (POS) ────────────────────────────────────────────────
   const [modalAbierto, setModalAbierto] = useState(false)
   const [clienteId,    setClienteId]    = useState('')
+  const [cliBusq,       setCliBusq]       = useState('')
+  const [cliBuscando,   setCliBuscando]   = useState(false)
+  const [cliResultados, setCliResultados] = useState([])
+  const [cliSelLabel,   setCliSelLabel]   = useState('')
+  const [selectedClientObj, setSelectedClientObj] = useState(null)
   const [metodoPago,   setMetodoPago]   = useState('efectivo')
   const [carrito,      setCarrito]      = useState([])  // [{ tipo, id, nombre, precio, cantidad, precio_variable, stock }]
   const [tab,          setTab]          = useState('producto')  // 'producto' | 'servicio'
@@ -251,13 +256,64 @@ export default function Ventas() {
   // con el cliente ya seleccionado.
   useEffect(() => {
     if (state?.abrirVenta) {
-      setClienteId(state.clienteId ? String(state.clienteId) : '')
+      const cid = state.clienteId ? String(state.clienteId) : ''
+      setClienteId(cid)
+      if (cid) {
+        const targetCli = clientes.find(c => String(c.id) === cid)
+        if (targetCli) {
+          setSelectedClientObj(targetCli)
+          setCliSelLabel(`${targetCli.nombre}${targetCli.dni ? ` (${targetCli.dni})` : ''}`)
+        } else {
+          api.get(`/api/clientes/${cid}`)
+            .then(c => {
+              setSelectedClientObj(c)
+              setCliSelLabel(`${c.nombre}${c.dni ? ` (${c.dni})` : ''}`)
+            })
+            .catch(() => {
+              setSelectedClientObj(null)
+              setCliSelLabel(`Cliente #${cid}`)
+            })
+        }
+      } else {
+        setSelectedClientObj(null)
+        setCliSelLabel('')
+      }
       setCarrito([]); setTab('servicio'); setCatBusqueda(''); setCatCategoria('')
       setErrorModal(null)
       setModalAbierto(true)
       navigate('.', { replace: true, state: null })  // limpia el state para no reabrir
     }
-  }, [state])
+  }, [state, clientes])
+
+  // Búsqueda de cliente por nombre o DNI (en el servidor, con debounce)
+  useEffect(() => {
+    if (!modalAbierto) return
+    const q = cliBusq.trim()
+    if (!q) { setCliResultados([]); return }
+    setCliBuscando(true)
+    const t = setTimeout(() => {
+      api.get(`/api/clientes/?q=${encodeURIComponent(q)}&limit=12`)
+        .then(res => {
+          setCliResultados(Array.isArray(res) ? res : [])
+        })
+        .catch(() => setCliResultados([]))
+        .finally(() => setCliBuscando(false))
+    }, 350)
+    return () => clearTimeout(t)
+  }, [cliBusq, modalAbierto])
+
+  const elegirCliente = (c) => {
+    setClienteId(String(c.id))
+    setSelectedClientObj(c)
+    setCliSelLabel(`${c.nombre}${c.dni ? ` (${c.dni})` : ''}`)
+    setCliBusq(''); setCliResultados([])
+  }
+
+  const limpiarCliente = () => {
+    setClienteId('')
+    setSelectedClientObj(null)
+    setCliSelLabel('')
+  }
 
   const clienteMap = Object.fromEntries(clientes.map(c => [c.id, c]))
 
@@ -295,11 +351,15 @@ export default function Ventas() {
 
   // ── Carrito (POS) ──────────────────────────────────────────────────────────
   const abrirModal = () => {
-    setClienteId(''); setMetodoPago('efectivo'); setCarrito([]); setTab('producto')
+    setClienteId(''); setCliSelLabel(''); setCliBusq(''); setCliResultados([]); setSelectedClientObj(null)
+    setMetodoPago('efectivo'); setCarrito([]); setTab('producto')
     setCatBusqueda(''); setCatCategoria(''); setErrorModal(null)
     setModalAbierto(true)
   }
-  const cerrarModal = () => { setModalAbierto(false); setErrorModal(null) }
+  const cerrarModal = () => {
+    setModalAbierto(false); setErrorModal(null)
+    setClienteId(''); setCliSelLabel(''); setCliBusq(''); setCliResultados([]); setSelectedClientObj(null)
+  }
 
   const lineaKey = (tipo, id) => `${tipo}-${id}`
 
@@ -369,8 +429,9 @@ export default function Ventas() {
           : { servicio_id: l.id, cantidad: l.cantidad, ...(l.precio_variable ? { precio: Number(l.precio) } : {}) }
         ),
       })
+      const cliInfo = selectedClientObj || clienteMap[venta.cliente_id]
       cerrarModal()
-      if (venta) generarBoleta(venta, clienteMap[venta.cliente_id])
+      if (venta) generarBoleta(venta, cliInfo)
       await cargar()
     } catch (err) {
       setErrorModal(err.message)
@@ -566,13 +627,43 @@ export default function Ventas() {
             {/* Cabecera */}
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
               <p className="text-sm font-bold text-slate-800 whitespace-nowrap">Nueva Venta</p>
-              <div className="flex-1 max-w-xs">
-                <select className={inputCls} value={clienteId} onChange={e => setClienteId(e.target.value)}>
-                  <option value="">— Seleccionar cliente * —</option>
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre}{c.dni ? ` (${c.dni})` : ''}</option>
-                  ))}
-                </select>
+              <div className="flex-1 max-w-xs relative">
+                {clienteId ? (
+                  <div className="flex items-center justify-between gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5 text-xs">
+                    <span className="text-slate-800 font-semibold truncate flex-1 min-w-0">
+                      {cliSelLabel}
+                    </span>
+                    <button type="button" onClick={limpiarCliente}
+                      className="text-purple-600 hover:text-purple-800 font-semibold shrink-0">Cambiar</button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={cliBusq}
+                      onChange={e => setCliBusq(e.target.value)}
+                      placeholder="Buscar por DNI o nombre…"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+                      autoComplete="off"
+                    />
+                    {cliBusq.trim() && (
+                      <div className="absolute z-50 mt-1 right-0 w-64 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg">
+                        {cliBuscando ? (
+                          <p className="text-xs text-slate-400 px-3 py-2">Buscando…</p>
+                        ) : cliResultados.length === 0 ? (
+                          <p className="text-xs text-slate-400 px-3 py-2">Sin coincidencias</p>
+                        ) : (
+                          cliResultados.map(c => (
+                            <button key={c.id} type="button" onClick={() => elegirCliente(c)}
+                              className="block w-full text-left text-xs px-3 py-2 hover:bg-purple-50 transition border-b border-slate-50 last:border-b-0">
+                              {c.nombre}{c.dni ? ` (${c.dni})` : ''}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
               <button onClick={cerrarModal} className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400">
                 <X className="w-4 h-4" />
