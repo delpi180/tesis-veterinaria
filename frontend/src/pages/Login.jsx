@@ -15,7 +15,7 @@ const ROLES = {
     titulo: 'Administrador',
     subtitulo: 'Recepción · gestión y caja',
     rolBackend: 'recepcionista',
-    destino: '/',
+    destino: '/recepcion',
     Icon: UserCog,
   },
   veterinario: {
