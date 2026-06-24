@@ -167,13 +167,23 @@ function PacienteForm({ clienteId, onSuccess, onCancel, visible }) {
 function AgendarCitaModal({ paciente, onClose, onCreated }) {
   const _d = new Date()
   const hoy = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`
-  const [form, setForm] = useState({ fecha: hoy, hora: '09:00', motivo: '', notas: '' })
+  const [form, setForm] = useState({ fecha: hoy, hora: '09:00', motivo: '', notas: '', veterinario_id: '' })
+  const [doctores, setDoctores] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState(null)
 
+  useEffect(() => {
+    api.get('/api/usuarios/doctores')
+      .then(setDoctores)
+      .catch(err => console.error('Error al obtener doctores:', err))
+  }, [])
+
   const submit = async (e) => {
     e.preventDefault()
-    if (!form.fecha || !form.hora) { setError('Fecha y hora son obligatorias.'); return }
+    if (!form.fecha || !form.hora || !form.veterinario_id) { 
+      setError('Fecha, hora y veterinario son obligatorios.'); 
+      return 
+    }
     setSaving(true); setError(null)
     try {
       await api.post('/api/citas/', {
@@ -182,6 +192,7 @@ function AgendarCitaModal({ paciente, onClose, onCreated }) {
         motivo:      form.motivo.trim() || null,
         estado:      'pendiente',
         notas:       form.notas.trim() || null,
+        veterinario_id: parseInt(form.veterinario_id, 10),
       })
       onCreated()
     } catch (err) {
@@ -217,6 +228,16 @@ function AgendarCitaModal({ paciente, onClose, onCreated }) {
               <label className={labelCls}>Motivo</label>
               <input type="text" className={inputCls} placeholder="Ej. Control, Vacunación…"
                 value={form.motivo} onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className={labelCls}>Veterinario asignado <span className="text-rose-500">*</span></label>
+              <select className={inputCls} value={form.veterinario_id}
+                onChange={e => setForm(f => ({ ...f, veterinario_id: e.target.value }))} required>
+                <option value="">— Seleccione un veterinario —</option>
+                {doctores.map(doc => (
+                  <option key={doc.id} value={doc.id}>{doc.nombre}</option>
+                ))}
+              </select>
             </div>
             <div className="flex flex-col gap-1">
               <label className={labelCls}>Notas</label>
