@@ -126,7 +126,8 @@ function buildPayload(form) {
       const n = Number(v);
       out[k] = isNaN(n) ? null : n;
     } else if (k === "proxima_cita") {
-      out[k] = v ? v + ":00" : null;
+      // Interpreta como hora LOCAL y la envía como instante UTC correcto (evita el corrimiento de 5h)
+      out[k] = v ? new Date(v + ":00").toISOString() : null;
     } else {
       out[k] = v;
     }

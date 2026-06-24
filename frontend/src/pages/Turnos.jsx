@@ -251,7 +251,9 @@ export default function Turnos() {
     setGuardando(true)
     setErrorModal(null)
     const payload = {
-      fecha_hora:     `${form.fecha}T${form.hora}:00`,
+      // Interpreta la fecha/hora como LOCAL y la envía como instante UTC correcto,
+      // así no se corre 5 horas (Perú UTC-5) al guardar/mostrar.
+      fecha_hora:     new Date(`${form.fecha}T${form.hora}:00`).toISOString(),
       motivo:         form.motivo.trim() || null,
       estado:         form.estado,
       notas:          form.notas.trim() || null,
