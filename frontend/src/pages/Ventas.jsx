@@ -208,6 +208,7 @@ export default function Ventas() {
   const [catCategoria, setCatCategoria] = useState('')
   const [guardando,    setGuardando]    = useState(false)
   const [errorModal,   setErrorModal]   = useState(null)
+  const [posVista,     setPosVista]     = useState('catalogo') // 'catalogo' | 'carrito' (solo móvil)
 
   const cargar = async () => {
     setLoading(true); setError(null)
@@ -353,11 +354,11 @@ export default function Ventas() {
   const abrirModal = () => {
     setClienteId(''); setCliSelLabel(''); setCliBusq(''); setCliResultados([]); setSelectedClientObj(null)
     setMetodoPago('efectivo'); setCarrito([]); setTab('producto')
-    setCatBusqueda(''); setCatCategoria(''); setErrorModal(null)
+    setCatBusqueda(''); setCatCategoria(''); setErrorModal(null); setPosVista('catalogo')
     setModalAbierto(true)
   }
   const cerrarModal = () => {
-    setModalAbierto(false); setErrorModal(null)
+    setModalAbierto(false); setErrorModal(null); setPosVista('catalogo')
     setClienteId(''); setCliSelLabel(''); setCliBusq(''); setCliResultados([]); setSelectedClientObj(null)
   }
 
@@ -620,12 +621,12 @@ export default function Ventas() {
       {/* ── Modal POS: Nueva Venta ────────────────────────────────────────────── */}
       {modalAbierto && (
         <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center md:p-4"
           onClick={(e) => { if (e.target === e.currentTarget) cerrarModal() }}
         >
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[92vh] flex flex-col">
+          <div className="bg-white md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-4xl md:max-h-[92vh] flex flex-col">
             {/* Cabecera */}
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
+            <div className="px-4 md:px-5 py-3 md:py-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
               <p className="text-sm font-bold text-slate-800 whitespace-nowrap">Nueva Venta</p>
               <div className="flex-1 max-w-xs relative">
                 {clienteId ? (
@@ -670,11 +671,32 @@ export default function Ventas() {
               </button>
             </div>
 
+            {/* Toggle móvil Catálogo / Carrito */}
+            <div className="md:hidden flex border-b border-slate-100 shrink-0">
+              <button type="button" onClick={() => setPosVista('catalogo')}
+                className={`flex-1 py-2.5 text-xs font-semibold text-center transition ${
+                  posVista === 'catalogo' ? 'text-purple-700 border-b-2 border-purple-700 bg-purple-50/50' : 'text-slate-500'
+                }`}>
+                <Package className="w-3.5 h-3.5 inline mr-1" />Catálogo
+              </button>
+              <button type="button" onClick={() => setPosVista('carrito')}
+                className={`flex-1 py-2.5 text-xs font-semibold text-center transition relative ${
+                  posVista === 'carrito' ? 'text-purple-700 border-b-2 border-purple-700 bg-purple-50/50' : 'text-slate-500'
+                }`}>
+                <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />Carrito
+                {carrito.length > 0 && (
+                  <span className="absolute -top-1 right-1/4 bg-purple-700 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                    {carrito.length}
+                  </span>
+                )}
+              </button>
+            </div>
+
             {/* Cuerpo: catálogo (izq) + carrito (der) */}
-            <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 divide-x divide-slate-100">
+            <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 md:divide-x divide-slate-100">
 
               {/* ── Catálogo ─────────────────────────────────────────────── */}
-              <div className="flex flex-col min-h-0">
+              <div className={`flex flex-col min-h-0 ${posVista !== 'catalogo' ? 'hidden md:flex' : 'flex'}`}>
                 {/* Tabs */}
                 <div className="px-4 pt-3 flex gap-2">
                   <button
@@ -713,14 +735,14 @@ export default function Ventas() {
                 </div>
 
                 {/* Lista clicable */}
-                <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-1.5 min-h-[240px]">
+                <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-1.5">
                   {tab === 'producto' && productosFiltrados.map(p => {
                     const enCarrito = carrito.find(l => l.key === lineaKey('producto', p.id))
                     const agotado = p.stock <= 0
                     const tope = enCarrito && enCarrito.cantidad >= p.stock
                     return (
                       <button
-                        key={p.id} type="button" onClick={() => agregarProducto(p)} disabled={agotado || tope}
+                        key={p.id} type="button" onClick={() => { agregarProducto(p) }} disabled={agotado || tope}
                         className="text-left border border-slate-200 rounded-lg px-3 py-2 hover:border-purple-300 hover:bg-purple-50/40 transition flex items-center justify-between gap-2 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed"
                       >
                         <div className="min-w-0">
@@ -744,7 +766,7 @@ export default function Ventas() {
 
                   {tab === 'servicio' && serviciosFiltrados.map(s => (
                     <button
-                      key={s.id} type="button" onClick={() => agregarServicio(s)}
+                      key={s.id} type="button" onClick={() => { agregarServicio(s) }}
                       className="text-left border border-slate-200 rounded-lg px-3 py-2 hover:border-sky-300 hover:bg-sky-50/40 transition flex items-center justify-between gap-2"
                     >
                       <div className="min-w-0">
@@ -764,21 +786,38 @@ export default function Ventas() {
                     <p className="text-xs text-slate-400 text-center py-8">Sin servicios que coincidan</p>
                   )}
                 </div>
+
+                {/* Botón flotante móvil: ir al carrito */}
+                {posVista === 'catalogo' && carrito.length > 0 && (
+                  <div className="md:hidden px-4 py-3 border-t border-slate-100 shrink-0">
+                    <button type="button" onClick={() => setPosVista('carrito')}
+                      className="w-full py-2.5 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition shadow">
+                      <ShoppingCart className="w-4 h-4" />
+                      Ver carrito ({carrito.length}) — {fmtMoneda(totalCarrito)}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* ── Carrito ──────────────────────────────────────────────── */}
-              <div className="flex flex-col min-h-0">
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+              <div className={`flex flex-col min-h-0 ${posVista !== 'carrito' ? 'hidden md:flex' : 'flex'}`}>
+                {/* Botón volver al catálogo (solo móvil) */}
+                <button type="button" onClick={() => setPosVista('catalogo')}
+                  className="md:hidden px-4 py-2 text-xs text-purple-700 font-semibold flex items-center gap-1 border-b border-slate-100 shrink-0 hover:bg-purple-50/50 transition">
+                  ← Seguir agregando
+                </button>
+
+                <div className="px-4 py-3 border-b border-slate-100 items-center gap-2 hidden md:flex">
                   <ShoppingCart className="w-4 h-4 text-purple-500" />
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Carrito</span>
                   <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{carrito.length}</span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2 min-h-[200px]">
+                <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
                   {carrito.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-2 py-10">
                       <ShoppingCart className="w-8 h-8" />
-                      <p className="text-xs text-slate-400">Agrega productos o servicios desde la izquierda</p>
+                      <p className="text-xs text-slate-400">Agrega productos o servicios desde el catálogo</p>
                     </div>
                   )}
                   {carrito.map(l => (
@@ -811,7 +850,7 @@ export default function Ventas() {
                         {/* Precio */}
                         {l.precio_variable ? (
                           <div className="flex items-center gap-1">
-                            <span className="text-xs text-slate-400">$</span>
+                            <span className="text-xs text-slate-400">S/</span>
                             <input
                               type="number" min="0" step="0.01" placeholder="Monto"
                               value={l.precio}
@@ -832,7 +871,7 @@ export default function Ventas() {
                 </div>
 
                 {/* Pie del carrito */}
-                <div className="px-4 py-3 border-t border-slate-100">
+                <div className="px-4 py-3 border-t border-slate-100 shrink-0">
                   {errorModal && (
                     <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg mb-3">{errorModal}</p>
                   )}
@@ -860,13 +899,13 @@ export default function Ventas() {
                   </div>
                   <div className="flex gap-2">
                     <button type="button" onClick={cerrarModal}
-                      className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+                      className="px-4 py-2.5 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
                       Cancelar
                     </button>
                     <button type="button" onClick={handleGuardar} disabled={guardando}
-                      className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                      className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
                       <FileText className="w-4 h-4" />
-                      {guardando ? 'Registrando…' : 'Registrar y Generar Boleta'}
+                      {guardando ? 'Registrando…' : 'Registrar Boleta'}
                     </button>
                   </div>
                 </div>
