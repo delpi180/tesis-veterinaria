@@ -160,7 +160,7 @@ export default function Clientes() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between static md:sticky md:top-0 md:z-10 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Clientes</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
@@ -174,7 +174,7 @@ export default function Clientes() {
         </button>
       </header>
 
-      <main className="flex-1 px-6 py-6 flex flex-col gap-5 max-w-5xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-5xl w-full mx-auto">
         <ClienteForm
           visible={showForm}
           onSuccess={handleSuccess}
@@ -235,49 +235,87 @@ export default function Clientes() {
           )}
 
           {!loading && clientesFiltrados.length > 0 && (
-            <div className="overflow-x-auto"><table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
-                  <th className="text-left px-5 py-3 font-semibold">DNI</th>
-                  <th className="text-left px-5 py-3 font-semibold">Nombre</th>
-                  <th className="text-left px-5 py-3 font-semibold">Teléfono</th>
-                  <th className="text-left px-5 py-3 font-semibold">Dirección</th>
-                  <th className="text-center px-5 py-3 font-semibold">Mascotas</th>
-                  <th className="px-5 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {clientesFiltrados.map((c, i) => (
-                  <tr
-                    key={c.id}
-                    className={`border-b border-slate-50 hover:bg-purple-50/40 transition cursor-pointer ${i % 2 === 0 ? '' : 'bg-slate-50/30'}`}
-                    onClick={() => navigate(`/clientes/${c.id}`)}
-                  >
-                    <td className="px-5 py-3.5">
-                      <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                        {c.dni || '—'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 font-medium text-slate-800">{c.nombre}</td>
-                    <td className="px-5 py-3.5 text-slate-500">{c.telefono || '—'}</td>
-                    <td className="px-5 py-3.5 text-slate-500">{c.direccion || '—'}</td>
-                    <td className="px-5 py-3.5 text-center">
-                      <span className="inline-block bg-slate-100 text-slate-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                        {c.pacientes?.length ?? 0}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={e => { e.stopPropagation(); navigate(`/clientes/${c.id}`) }}
-                        className="flex items-center gap-1 ml-auto text-purple-600 hover:text-purple-800 font-medium text-xs"
+            <>
+              {/* Vista Escritorio (Tabla) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
+                      <th className="text-left px-5 py-3 font-semibold">DNI</th>
+                      <th className="text-left px-5 py-3 font-semibold">Nombre</th>
+                      <th className="text-left px-5 py-3 font-semibold">Teléfono</th>
+                      <th className="text-left px-5 py-3 font-semibold">Dirección</th>
+                      <th className="text-center px-5 py-3 font-semibold">Mascotas</th>
+                      <th className="px-5 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientesFiltrados.map((c, i) => (
+                      <tr
+                        key={c.id}
+                        className={`border-b border-slate-50 hover:bg-purple-50/40 transition cursor-pointer ${i % 2 === 0 ? '' : 'bg-slate-50/30'}`}
+                        onClick={() => navigate(`/clientes/${c.id}`)}
                       >
-                        Ver detalle <ChevronRightIcon />
-                      </button>
-                    </td>
-                  </tr>
+                        <td className="px-5 py-3.5">
+                          <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                            {c.dni || '—'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 font-medium text-slate-800">{c.nombre}</td>
+                        <td className="px-5 py-3.5 text-slate-500">{c.telefono || '—'}</td>
+                        <td className="px-5 py-3.5 text-slate-500">{c.direccion || '—'}</td>
+                        <td className="px-5 py-3.5 text-center">
+                          <span className="inline-block bg-slate-100 text-slate-600 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                            {c.pacientes?.length ?? 0}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <button
+                            onClick={e => { e.stopPropagation(); navigate(`/clientes/${c.id}`) }}
+                            className="flex items-center gap-1 ml-auto text-purple-600 hover:text-purple-800 font-medium text-xs"
+                          >
+                            Ver detalle <ChevronRightIcon />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Vista Móvil (Tarjetas) */}
+              <div className="block md:hidden divide-y divide-slate-100">
+                {clientesFiltrados.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => navigate(`/clientes/${c.id}`)}
+                    className="p-4 hover:bg-slate-50 transition cursor-pointer flex flex-col gap-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                        DNI: {c.dni || '—'}
+                      </span>
+                      <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
+                        {c.pacientes?.length ?? 0} {c.pacientes?.length === 1 ? 'mascota' : 'mascotas'}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-sm">{c.nombre}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+                      <div>
+                        <span className="font-semibold text-slate-400 block mb-0.5">Teléfono</span>
+                        <span className="text-slate-700 truncate block">{c.telefono || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-400 block mb-0.5">Dirección</span>
+                        <span className="text-slate-700 truncate block">{c.direccion || '—'}</span>
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table></div>
+              </div>
+            </>
           )}
 
           {/* Paginación */}

@@ -447,7 +447,7 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
           <Stethoscope className="w-4 h-4" /> Atender / Iniciar consulta
         </button>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button onClick={() => navigate(`/pacientes/${paciente.id}/historial`, { state: { paciente, cliente } })}
             className="flex items-center justify-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition">
             <FileText className="w-4 h-4 text-purple-600" /> Historia clínica
@@ -458,7 +458,7 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button onClick={() => onAgendar(paciente)}
             className="flex items-center justify-center gap-2 px-3 py-2 border border-purple-200 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-50 transition">
             <Calendar className="w-4 h-4" /> Agendar cita
@@ -613,7 +613,7 @@ export default function DetalleCliente() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center gap-4 sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center gap-4 static md:sticky md:top-0 md:z-10 flex-wrap">
         <button onClick={() => navigate('/clientes')}
           className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-700 transition font-medium">
           <ChevronLeft className="w-4 h-4" /> Clientes
@@ -627,7 +627,7 @@ export default function DetalleCliente() {
         )}
       </header>
 
-      <main className="flex-1 px-6 py-6 flex flex-col gap-5 max-w-6xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-6xl w-full mx-auto">
         {/* Tarjeta del cliente */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm px-6 py-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -657,7 +657,7 @@ export default function DetalleCliente() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
           {/* Lista de mascotas */}
-          <section className="lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <section className={`lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden ${selectedId ? 'hidden lg:block' : 'block'}`}>
             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2 flex-wrap">
               <PawPrint className="w-4 h-4 text-purple-500" />
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Mascotas</h2>
@@ -721,7 +721,15 @@ export default function DetalleCliente() {
           </section>
 
           {/* Panel de perfil */}
-          <aside className="lg:col-span-5 lg:sticky lg:top-24">
+          <aside className={`lg:col-span-5 lg:sticky lg:top-24 ${selectedId ? 'block' : 'hidden lg:block'}`}>
+            {selectedId && (
+              <button
+                onClick={() => setSelectedId(null)}
+                className="lg:hidden mb-4 flex items-center gap-1 text-sm font-semibold text-purple-700 hover:text-purple-900"
+              >
+                <ChevronLeft className="w-4 h-4" /> Volver a la lista de mascotas
+              </button>
+            )}
             {seleccionado ? (
               <PanelMascota
                 key={seleccionado.id}

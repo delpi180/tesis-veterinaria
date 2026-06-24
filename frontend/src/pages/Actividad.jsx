@@ -80,7 +80,7 @@ export default function Actividad() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Bitácora de actividad</h1>
           <p className="text-xs text-slate-400 mt-0.5">
@@ -104,7 +104,7 @@ export default function Actividad() {
         </div>
       </header>
 
-      <main className="flex-1 px-6 py-6 max-w-4xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 max-w-4xl w-full mx-auto">
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg mb-4">{error}</div>
         )}

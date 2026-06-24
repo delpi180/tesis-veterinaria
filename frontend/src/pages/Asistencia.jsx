@@ -131,7 +131,7 @@ export default function Asistencia() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10 flex items-center justify-between gap-3">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Control de Asistencia</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
@@ -142,7 +142,7 @@ export default function Asistencia() {
         </button>
       </header>
 
-      <main className="flex-1 px-6 py-6 flex flex-col gap-6 max-w-5xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-6 max-w-5xl w-full mx-auto">
 
         {/* ── Marcación rápida del día ──────────────────────────────── */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

@@ -742,13 +742,13 @@ export default function Mediciones() {
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
 
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10">
         <h1 className="text-xl font-bold text-slate-800">Mediciones</h1>
         <p className="text-xs text-slate-400 mt-0.5 capitalize">{displayDate}</p>
       </header>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-slate-200 px-6 flex gap-1 sticky top-[73px] z-10">
+      <div className="bg-white border-b border-slate-200 px-4 md:px-6 flex flex-wrap gap-1 static md:sticky md:top-[73px] md:z-10">
         {TABS.map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -766,7 +766,7 @@ export default function Mediciones() {
         ))}
       </div>
 
-      <main className="flex-1 px-6 py-8 max-w-5xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-6 py-4 md:py-8 max-w-5xl w-full mx-auto">
 
         {/* ── Pestaña: Responder Encuestas ──────────────────────────────── */}
         {tabActiva === 'encuestas' && (

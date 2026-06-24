@@ -266,30 +266,28 @@ function TratamientoList({ items, onChange }) {
     <div className="space-y-2">
       {items.map((item, i) => (
         <div key={i} className="p-2.5 bg-slate-50 border border-slate-200 rounded-md">
-          <div className="grid grid-cols-5 gap-2">
-            <Field label="Medicamento" cls="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
+            <Field label="Medicamento" cls="col-span-1 sm:col-span-2">
               <TIn value={item.medicamento} onChange={e => update(i,"medicamento",e.target.value)} placeholder="Metronidazol" />
             </Field>
-            <Field label="Dosis">
+            <Field label="Dosis" cls="col-span-1 sm:col-span-1">
               <TIn value={item.dosis} onChange={e => update(i,"dosis",e.target.value)} placeholder="15 mg/kg" />
             </Field>
-            <Field label="Vía">
+            <Field label="Vía" cls="col-span-1 sm:col-span-1">
               <TIn value={item.via} onChange={e => update(i,"via",e.target.value)} placeholder="Oral" />
             </Field>
-            <div className="flex items-end gap-1.5">
-              <Field label="Frecuencia" cls="flex-1">
-                <TIn value={item.frecuencia} onChange={e => update(i,"frecuencia",e.target.value)} placeholder="c/12h" />
+            <Field label="Frecuencia" cls="col-span-1 sm:col-span-1">
+              <TIn value={item.frecuencia} onChange={e => update(i,"frecuencia",e.target.value)} placeholder="c/12h" />
+            </Field>
+            <div className="flex items-end gap-1.5 col-span-1 sm:col-span-1">
+              <Field label="Duración" cls="flex-1">
+                <TIn value={item.duracion} onChange={e => update(i,"duracion",e.target.value)} placeholder="5 días" />
               </Field>
               <button type="button" onClick={() => remove(i)}
                 className="mb-0.5 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
                 <Trash2 size={13} />
               </button>
             </div>
-          </div>
-          <div className="mt-2 w-1/5">
-            <Field label="Duración">
-              <TIn value={item.duracion} onChange={e => update(i,"duracion",e.target.value)} placeholder="5 días" />
-            </Field>
           </div>
         </div>
       ))}
@@ -308,7 +306,7 @@ function VacunaList({ items, onChange }) {
   return (
     <div className="space-y-2">
       {items.map((item, i) => (
-        <div key={i} className="grid grid-cols-3 gap-2 items-end p-2.5 bg-slate-50 border border-slate-200 rounded-md">
+        <div key={i} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end p-2.5 bg-slate-50 border border-slate-200 rounded-md">
           <Field label="Vacuna">
             <TIn value={item.vacuna} onChange={e => update(i,"vacuna",e.target.value)} placeholder="Antirrábica" />
           </Field>
@@ -728,7 +726,7 @@ export default function HistoriasClinicas() {
 
           {/* S1 — Anamnesis */}
           <AccordionSection num="1" title="Anamnesis" isOpen={open.s1} onToggle={() => toggle("s1")}>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Field label="Tipo de consulta" hl={highlights.tipo_consulta}>
                 <Sel value={form.tipo_consulta} onChange={setF("tipo_consulta")} options={OPT.tipo_consulta} hl={highlights.tipo_consulta} />
               </Field>
@@ -746,7 +744,7 @@ export default function HistoriasClinicas() {
             <Field label="Detalle de la enfermedad actual" hl={highlights.detalle}>
               <TAr value={form.detalle} onChange={setF("detalle")} rows={3} hl={highlights.detalle} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Tipo de alimentación" hl={highlights.alimentacion_tipo}>
                 <TIn value={form.alimentacion_tipo} onChange={setF("alimentacion_tipo")} placeholder="Balanceado / BARF / mixto" hl={highlights.alimentacion_tipo} />
               </Field>
@@ -763,7 +761,7 @@ export default function HistoriasClinicas() {
 
           {/* S2 — EOG */}
           <AccordionSection num="2" title="Examen objetivo general (EOG)" isOpen={open.s2} onToggle={() => toggle("s2")}>
-            <div className="grid grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
                 ["temperatura_c",           "Temperatura (°C)", "38.5"],
                 ["peso_kg",                 "Peso (kg)",        "5.0" ],
@@ -776,7 +774,7 @@ export default function HistoriasClinicas() {
                 </Field>
               ))}
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {[
                 ["mucosas",         "Mucosas",         OPT.mucosas        ],
                 ["tllc",            "TLLC",            OPT.tllc           ],
@@ -796,13 +794,13 @@ export default function HistoriasClinicas() {
 
           {/* S3 — EOP */}
           <AccordionSection num="3" title="Examen objetivo particular (EOP)" isOpen={open.s3} onToggle={() => toggle("s3")}>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
               {SISTEMAS_EOP.map(s => (
-                <div key={s} className="grid grid-cols-5 gap-2 items-end">
-                  <Field label={SISTEMA_LABELS[s]} cls="col-span-2">
+                <div key={s} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end border-b border-slate-100 sm:border-0 pb-2 sm:pb-0">
+                  <Field label={SISTEMA_LABELS[s]} cls="col-span-1 sm:col-span-2">
                     <Sel value={form.examen_particular[s].estado} onChange={setEop(s,"estado")} options={OPT.sistema_estado} />
                   </Field>
-                  <Field label="Detalle" cls="col-span-3">
+                  <Field label="Detalle" cls="col-span-1 sm:col-span-3">
                     <TIn value={form.examen_particular[s].detalle} onChange={setEop(s,"detalle")} placeholder="Observaciones" />
                   </Field>
                 </div>
@@ -844,7 +842,7 @@ export default function HistoriasClinicas() {
                 placeholder="Vacuna aplicada hoy: antirrábica 1 ml SC. Dieta blanda 3 días…"
                 hl={highlights.indicaciones} />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Field label="Pronóstico" hl={highlights.pronostico}>
                 <Sel value={form.pronostico} onChange={setF("pronostico")} options={OPT.pronostico} hl={highlights.pronostico} />
               </Field>

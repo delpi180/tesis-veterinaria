@@ -27,7 +27,7 @@ const Spinner = () => (
 function Card({ title, Icon, count, children }) {
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-      <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+      <div className="px-4 md:px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
         <Icon className="w-4 h-4 text-purple-500" />
         <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{title}</h2>
         {count != null && (
@@ -78,7 +78,7 @@ export default function MiPanel() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10 flex items-center justify-between gap-3">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Mi panel — {nombre}</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{hoy}</p>
@@ -89,7 +89,7 @@ export default function MiPanel() {
         </button>
       </header>
 
-      <main className="flex-1 px-6 py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
+      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
         {loading ? (
           <div className="flex items-center justify-center py-20 gap-3 text-slate-400"><Spinner /> <span className="text-sm">Cargando…</span></div>
         ) : error ? (
@@ -97,12 +97,12 @@ export default function MiPanel() {
         ) : (
           <>
             {/* Asistencia de hoy + horario */}
-            <section className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex flex-wrap items-center gap-x-8 gap-y-3">
-              <div className="flex items-center gap-2">
+            <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:px-5 md:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-y-3 gap-x-4">
+              <div className="flex items-center gap-2 shrink-0">
                 <Clock className="w-5 h-5 text-purple-500" />
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Mi asistencia de hoy</span>
               </div>
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex items-center gap-2 text-sm shrink-0">
                 {data.asistencia_hoy.marcado ? (
                   <>
                     <span className="inline-flex items-center gap-1 text-emerald-700"><LogIn className="w-4 h-4" />{fmtHora(data.asistencia_hoy.hora_ingreso)}</span>
@@ -115,10 +115,10 @@ export default function MiPanel() {
                   <span className="text-slate-400">Aún sin marcar ingreso hoy</span>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span className="font-semibold text-slate-600">Horario:</span>
                 <span>{data.asistencia_hoy.hora_entrada_perfil ? `Ingreso ${data.asistencia_hoy.hora_entrada_perfil}` : 'Sin hora asignada'}</span>
-                <span className="flex items-center gap-1">
+                <span className="flex flex-wrap items-center gap-1">
                   {DIAS.map(([code, lbl]) => {
                     const activo = (data.asistencia_hoy.dias_laborales || '').split(',').includes(code)
                     return (
@@ -133,11 +133,11 @@ export default function MiPanel() {
               {/* Mis turnos próximos */}
               <Card title="Mis próximos turnos" Icon={Calendar} count={data.mis_turnos.length}>
                 {data.mis_turnos.length === 0 ? (
-                  <p className="text-xs text-slate-400 px-5 py-10 text-center">No tienes turnos asignados próximamente.</p>
+                  <p className="text-xs text-slate-400 px-4 md:px-5 py-10 text-center">No tienes turnos asignados próximamente.</p>
                 ) : (
                   <div className="divide-y divide-slate-50">
                     {data.mis_turnos.map(t => (
-                      <div key={t.id} className="px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
+                      <div key={t.id} className="px-4 md:px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
                         <div className="text-center shrink-0 w-16">
                           <p className="text-sm font-bold text-purple-700">{fmtHora(t.fecha_hora)}</p>
                           <p className="text-[10px] text-slate-400">{fmtFecha(t.fecha_hora)}</p>
@@ -162,12 +162,12 @@ export default function MiPanel() {
               {/* Seguimiento de mis pacientes */}
               <Card title="Controles / vacunas próximas" Icon={Syringe} count={data.seguimiento.length}>
                 {data.seguimiento.length === 0 ? (
-                  <p className="text-xs text-slate-400 px-5 py-10 text-center">Sin controles próximos de tus pacientes.</p>
+                  <p className="text-xs text-slate-400 px-4 md:px-5 py-10 text-center">Sin controles próximos de tus pacientes.</p>
                 ) : (
                   <div className="divide-y divide-slate-50">
                     {data.seguimiento.map(s => (
                       <button key={s.paciente_id} onClick={() => irACliente(s.cliente_id)}
-                        className="w-full text-left px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
+                        className="w-full text-left px-4 md:px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
                           <PawPrint className="w-4 h-4" />
                         </div>
@@ -186,12 +186,12 @@ export default function MiPanel() {
             {/* Resumen de mis historias */}
             <Card title="Mis historias registradas" Icon={FileText} count={data.resumen_historias.total}>
               {data.resumen_historias.recientes.length === 0 ? (
-                <p className="text-xs text-slate-400 px-5 py-10 text-center">Aún no has registrado historias clínicas.</p>
+                <p className="text-xs text-slate-400 px-4 md:px-5 py-10 text-center">Aún no has registrado historias clínicas.</p>
               ) : (
                 <div className="divide-y divide-slate-50">
                   {data.resumen_historias.recientes.map(h => (
                     <button key={h.id} onClick={() => irACliente(h.cliente_id)}
-                      className="w-full text-left px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
+                      className="w-full text-left px-4 md:px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
                       <ClipboardList className="w-4 h-4 text-slate-300 shrink-0" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-slate-800 truncate">{h.paciente} · {h.especie}</p>

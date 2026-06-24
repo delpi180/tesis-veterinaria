@@ -326,7 +326,7 @@ export default function Turnos() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Turnos y Agenda</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{displayDate}</p>
@@ -348,7 +348,7 @@ export default function Turnos() {
         </div>
       </header>
 
-      <main className="flex-1 px-6 py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
+      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
 
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">
@@ -553,90 +553,182 @@ export default function Turnos() {
           ) : citasProximas.length === 0 ? (
             <p className="text-xs text-slate-400 px-5 py-8 text-center">No hay turnos próximos registrados</p>
           ) : (
-            <div className="overflow-x-auto"><table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
-                  <th className="text-left px-5 py-3 font-semibold">Fecha</th>
-                  <th className="text-left px-5 py-3 font-semibold">Hora</th>
-                  <th className="text-left px-5 py-3 font-semibold">Paciente</th>
-                  <th className="text-left px-5 py-3 font-semibold">Motivo</th>
-                  <th className="text-left px-5 py-3 font-semibold">Propietario</th>
-                  <th className="text-left px-5 py-3 font-semibold">Doctor</th>
-                  <th className="text-left px-5 py-3 font-semibold">Estado</th>
-                  <th className="text-center px-5 py-3 font-semibold">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {citasProximas.map((cita, i) => {
-                  const info = pacienteMap[cita.paciente_id] ?? { nombre: '(sin nombre)', especie: '-', propietario: '-' }
+            <>
+              {/* Vista Escritorio (Tabla) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
+                      <th className="text-left px-5 py-3 font-semibold">Fecha</th>
+                      <th className="text-left px-5 py-3 font-semibold">Hora</th>
+                      <th className="text-left px-5 py-3 font-semibold">Paciente</th>
+                      <th className="text-left px-5 py-3 font-semibold">Motivo</th>
+                      <th className="text-left px-5 py-3 font-semibold">Propietario</th>
+                      <th className="text-left px-5 py-3 font-semibold">Doctor</th>
+                      <th className="text-left px-5 py-3 font-semibold">Estado</th>
+                      <th className="text-center px-5 py-3 font-semibold">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {citasProximas.map((cita, i) => {
+                      const info = pacienteMap[cita.paciente_id] ?? { nombre: '(sin nombre)', especie: '-', propietario: '-' }
+                      return (
+                        <tr
+                          key={cita.id}
+                          className={`border-b border-slate-50 hover:bg-slate-50/60 transition ${i % 2 ? 'bg-slate-50/30' : ''}`}
+                        >
+                          <td className="px-5 py-3 font-medium text-slate-700">{formatFecha(cita.fecha_hora)}</td>
+                          <td className="px-5 py-3 text-slate-600">{formatHora(cita.fecha_hora)}</td>
+                          <td className="px-5 py-3">
+                            <button
+                              type="button"
+                              disabled={!info.clienteId}
+                              onClick={() => info.clienteId && navigate(`/clientes/${info.clienteId}`)}
+                              className="font-semibold text-slate-800 hover:text-purple-700 transition disabled:hover:text-slate-800"
+                            >
+                              {info.nombre}
+                            </button>
+                          </td>
+                          <td className="px-5 py-3 text-slate-600">{cita.motivo ?? '—'}</td>
+                          <td className="px-5 py-3 text-slate-500">{info.propietario}</td>
+                          <td className="px-5 py-3 text-slate-600">
+                            {cita.veterinario_nombre
+                              ? <span className="inline-flex items-center gap-1 text-purple-700"><Stethoscope className="w-3 h-3" />{cita.veterinario_nombre}</span>
+                              : <span className="text-slate-300">—</span>}
+                          </td>
+                          <td className="px-5 py-3">
+                            <select
+                              value={cita.estado}
+                              onChange={e => cambiarEstado(cita, e.target.value)}
+                              className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                            >
+                              {ESTADOS_CITA.map(s => <option key={s} value={s}>{estadoLabel(s)}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => abrirEditar(cita)}
+                                title="Editar turno"
+                                className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => eliminarCita(cita)}
+                                title="Eliminar turno"
+                                className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-300 transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                              {info.telefono && (
+                                <a
+                                  href={waRecordatorio(info.telefono, info.propietario, info.nombre, cita)}
+                                  target="_blank" rel="noopener noreferrer"
+                                  title="Recordatorio por WhatsApp"
+                                  className="flex items-center justify-center w-7 h-7 rounded-lg bg-green-600 hover:bg-green-500 text-white transition"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Vista Móvil (Tarjetas) */}
+              <div className="block md:hidden divide-y divide-slate-100">
+                {citasProximas.map((cita) => {
+                  const info = pacienteMap[cita.paciente_id] ?? { nombre: '(sin nombre)', especie: '-', propietario: '-', telefono: '' }
+                  const { pill } = estadoStyle(cita.estado)
                   return (
-                    <tr
-                      key={cita.id}
-                      className={`border-b border-slate-50 hover:bg-slate-50/60 transition ${i % 2 ? 'bg-slate-50/30' : ''}`}
-                    >
-                      <td className="px-5 py-3 font-medium text-slate-700">{formatFecha(cita.fecha_hora)}</td>
-                      <td className="px-5 py-3 text-slate-600">{formatHora(cita.fecha_hora)}</td>
-                      <td className="px-5 py-3">
-                        <button
-                          type="button"
-                          disabled={!info.clienteId}
-                          onClick={() => info.clienteId && navigate(`/clientes/${info.clienteId}`)}
-                          className="font-semibold text-slate-800 hover:text-purple-700 transition disabled:hover:text-slate-800"
-                        >
-                          {info.nombre}
-                        </button>
-                      </td>
-                      <td className="px-5 py-3 text-slate-600">{cita.motivo ?? '—'}</td>
-                      <td className="px-5 py-3 text-slate-500">{info.propietario}</td>
-                      <td className="px-5 py-3 text-slate-600">
-                        {cita.veterinario_nombre
-                          ? <span className="inline-flex items-center gap-1 text-purple-700"><Stethoscope className="w-3 h-3" />{cita.veterinario_nombre}</span>
-                          : <span className="text-slate-300">—</span>}
-                      </td>
-                      <td className="px-5 py-3">
-                        <select
-                          value={cita.estado}
-                          onChange={e => cambiarEstado(cita, e.target.value)}
-                          className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
-                        >
-                          {ESTADOS_CITA.map(s => <option key={s} value={s}>{estadoLabel(s)}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center justify-center gap-1.5">
+                    <div key={cita.id} className="p-4 flex flex-col gap-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                          {formatFecha(cita.fecha_hora)} a las {formatHora(cita.fecha_hora)}
+                        </span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${pill}`}>
+                          {estadoLabel(cita.estado)}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="font-semibold text-slate-400 block mb-0.5">Paciente</span>
+                          <button
+                            type="button"
+                            disabled={!info.clienteId}
+                            onClick={() => info.clienteId && navigate(`/clientes/${info.clienteId}`)}
+                            className="font-bold text-slate-800 hover:text-purple-700 text-left transition disabled:hover:text-slate-800"
+                          >
+                            {info.nombre} ({info.especie})
+                          </button>
+                        </div>
+                        <div>
+                          <span className="font-semibold text-slate-400 block mb-0.5">Propietario</span>
+                          <span className="text-slate-700 block truncate">{info.propietario}</span>
+                        </div>
+                      </div>
+                      <div className="text-xs">
+                        <span className="font-semibold text-slate-400 block mb-0.5">Motivo</span>
+                        <p className="text-slate-700 font-medium">{cita.motivo ?? '—'}</p>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-50">
+                        <div className="text-xs text-slate-600">
+                          {cita.veterinario_nombre ? (
+                            <span className="inline-flex items-center gap-1 text-purple-700">
+                              <Stethoscope className="w-3.5 h-3.5" /> {cita.veterinario_nombre}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">Sin doctor</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <select
+                            value={cita.estado}
+                            onChange={e => cambiarEstado(cita, e.target.value)}
+                            className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                          >
+                            {ESTADOS_CITA.map(s => <option key={s} value={s}>{estadoLabel(s)}</option>)}
+                          </select>
                           <button
                             type="button"
                             onClick={() => abrirEditar(cita)}
                             title="Editar turno"
-                            className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition"
+                            className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
                             onClick={() => eliminarCita(cita)}
                             title="Eliminar turno"
-                            className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-300 transition"
+                            className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-300 transition"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                           {info.telefono && (
                             <a
                               href={waRecordatorio(info.telefono, info.propietario, info.nombre, cita)}
                               target="_blank" rel="noopener noreferrer"
-                              title="Recordatorio por WhatsApp"
-                              className="flex items-center justify-center w-7 h-7 rounded-lg bg-green-600 hover:bg-green-500 text-white transition"
+                              title="WhatsApp"
+                              className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-600 hover:bg-green-500 text-white transition"
                             >
-                              <MessageCircle className="w-3.5 h-3.5" />
+                              <MessageCircle className="w-4 h-4" />
                             </a>
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   )
                 })}
-              </tbody>
-            </table></div>
+              </div>
+            </>
           )}
         </section>
 

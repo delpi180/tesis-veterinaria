@@ -441,9 +441,9 @@ export default function HistorialPaciente() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-8 py-4 flex items-center gap-3 sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center gap-3 static md:sticky md:top-0 md:z-10 flex-wrap">
         <button onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-700 transition font-medium">
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-700 transition font-medium shrink-0">
           <ChevronLeft className="w-4 h-4" /> Volver
         </button>
         <span className="text-slate-300">/</span>
@@ -459,7 +459,7 @@ export default function HistorialPaciente() {
             </p>
           )}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
           <button
             onClick={() => generarPDF(paciente, cliente, ordenadas)}
             disabled={ordenadas.length === 0}
@@ -476,7 +476,7 @@ export default function HistorialPaciente() {
         </div>
       </header>
 
-      <main className="flex-1 px-6 py-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
 
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">⚠ {error}</div>
