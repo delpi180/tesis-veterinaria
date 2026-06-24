@@ -146,7 +146,7 @@ Evaluador 1───N RespuestaTAM
 `id`, `dni` (8 dígitos, validado), `nombre`, `telefono`, `direccion`. → relación 1:N con `Paciente`.
 
 #### `Paciente` — mascota
-`id`, `nombre`, `especie`, `raza`, `edad`, `cliente_id` (FK). Ficha ampliada: `sexo`, `esterilizado`, `fecha_nacimiento`, `microchip`, `color`, `alergias`, `condiciones_cronicas`, `foto_url` (Base64).
+`id`, `nombre`, `especie`, `raza`, `edad`, `cliente_id` (FK). Ficha ampliada: `sexo`, `esterilizado`, `fecha_nacimiento`, `microchip`, `color`, `alergias`, `condiciones_cronicas`.
 
 #### `HistoriaClinica` — consulta clínica (entidad central)
 Organizada por bloques del examen clínico veterinario:

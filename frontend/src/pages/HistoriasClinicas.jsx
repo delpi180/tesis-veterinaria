@@ -4,10 +4,9 @@ import {
   ChevronDown, Plus, Trash2, Download, Save, Check,
   ArrowLeft, Mic, StopCircle, AlertTriangle, Loader2, FileText,
 } from "lucide-react";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import { generarPDF } from "../utils/pdfGenerator";
 import { api, authHeaders } from "../services/api";
-import { useAudioRecorder } from "../hooks/useAudioRecorder";
+import VoiceTextProcessor from "../components/VoiceTextProcessor";
 
 // ── Catálogos ────────────────────────────────────────────────────────────────
 
@@ -437,124 +436,7 @@ function HistoriaCard({ h, onEdit }) {
   );
 }
 
-// ── PDF ──────────────────────────────────────────────────────────────────────
-
-const _PDF_W = 210, _PDF_M = 14, _PDF_MORADO = [88, 28, 135];
-
-function _seccionPDF(doc, title, rows) {
-  const body = rows.filter(([, v]) => v !== null && v !== undefined && v !== "");
-  if (!body.length) return;
-  autoTable(doc, {
-    startY: doc.lastAutoTable ? doc.lastAutoTable.finalY + 3 : 30,
-    head: [[{ content: title, colSpan: 2 }]],
-    body,
-    theme: "grid",
-    headStyles: { fillColor: _PDF_MORADO, fontSize: 9, halign: "left", textColor: 255 },
-    columnStyles: {
-      0: { cellWidth: 42, fontStyle: "bold", textColor: [90, 90, 90] },
-      1: { cellWidth: _PDF_W - 2 * _PDF_M - 42 },
-    },
-    styles: { fontSize: 9, cellPadding: 2, valign: "top", overflow: "linebreak" },
-    margin: { left: _PDF_M, right: _PDF_M },
-  });
-}
-
-function _seccionesClinicasPDF(doc, h) {
-  _seccionPDF(doc, "Anamnesis", [
-    ["Motivo", h.motivo_consulta],
-    ["Tiempo de evolución", h.tiempo_evolucion],
-    ["Tipo de consulta", getLabel("tipo_consulta", h.tipo_consulta)],
-    ["Derivado por", h.derivado_por],
-    ["Alimentación", [h.alimentacion_tipo, h.alimentacion_cantidad_gr ? `${h.alimentacion_cantidad_gr} g` : null].filter(Boolean).join(" · ")],
-    ["Detalle", h.detalle],
-    ["Antecedentes", h.antecedentes],
-  ]);
-  _seccionPDF(doc, "Examen objetivo general (EOG)", [
-    ["Peso", h.peso_kg ? `${h.peso_kg} kg` : null],
-    ["Temperatura", h.temperatura_c ? `${h.temperatura_c} °C` : null],
-    ["Frec. cardiaca", h.frecuencia_cardiaca ? `${h.frecuencia_cardiaca} lpm` : null],
-    ["Frec. respiratoria", h.frecuencia_respiratoria ? `${h.frecuencia_respiratoria} rpm` : null],
-    ["Condición corporal", h.condicion_corporal ? `${h.condicion_corporal}/9` : null],
-    ["Mucosas", getLabel("mucosas", h.mucosas)],
-    ["TLLC", getLabel("tllc", h.tllc)],
-    ["Sensorio", getLabel("estado_sensorio", h.estado_sensorio)],
-    ["Hidratación", getLabel("hidratacion", h.hidratacion)],
-    ["Pulso", getLabel("pulso", h.pulso)],
-    ["Linfonódulos", h.linfonodulos],
-  ]);
-  const eop = SISTEMAS_EOP.map(s => {
-    const val = (h.examen_particular || {})[s];
-    if (!val) return null;
-    const texto = typeof val === "string"
-      ? val
-      : [val.estado ? getLabel("sistema_estado", val.estado) : null, val.detalle].filter(Boolean).join(" — ");
-    return texto ? [SISTEMA_LABELS[s], texto] : null;
-  }).filter(Boolean);
-  _seccionPDF(doc, "Examen objetivo particular (EOP)", eop);
-  _seccionPDF(doc, "Diagnóstico", [
-    ["Presuntivo", h.diagnostico_presuntivo],
-    ["Diferenciales", h.diagnosticos_diferenciales],
-    ["Definitivo", h.diagnostico_definitivo],
-  ]);
-  const tto = (h.tratamiento_items || []).filter(t => t.medicamento)
-    .map(t => `• ${[t.medicamento, t.dosis, t.via, t.frecuencia, t.duracion].filter(Boolean).join(" · ")}`).join("\n");
-  const vac = (h.vacunas_items || []).filter(v => v.vacuna)
-    .map(v => `• ${[v.vacuna, v.lote, v.proxima_dosis ? `próx. ${v.proxima_dosis}` : null].filter(Boolean).join(" · ")}`).join("\n");
-  _seccionPDF(doc, "Plan / Tratamiento", [
-    ["Exámenes solicitados", h.examenes_solicitados],
-    ["Tratamiento", tto],
-    ["Vacunas", vac],
-    ["Indicaciones", h.indicaciones],
-    ["Pronóstico", getLabel("pronostico", h.pronostico)],
-    ["Próxima cita", h.proxima_cita ? new Date(h.proxima_cita).toLocaleDateString("es-PE") : null],
-  ]);
-}
-
-// PDF de la historia clínica COMPLETA (todas las consultas, todos los campos)
-function generarPDF(paciente, historias) {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  doc.setFillColor(..._PDF_MORADO);
-  doc.rect(0, 0, _PDF_W, 24, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(15); doc.setFont(undefined, "bold");
-  doc.text("Veterinaria Los Pinos", _PDF_M, 11);
-  doc.setFontSize(9); doc.setFont(undefined, "normal");
-  doc.text("Historia Clínica Completa", _PDF_M, 18);
-  doc.text(`${(historias || []).length} consulta(s)`, _PDF_W - _PDF_M, 18, { align: "right" });
-
-  const cliente = paciente?.cliente;
-  const edad = paciente?.edad != null ? `${paciente.edad} año${paciente.edad !== 1 ? "s" : ""}` : "";
-  _seccionPDF(doc, "Datos del paciente", [
-    ["Nombre", paciente?.nombre],
-    ["Especie / Raza", [paciente?.especie, paciente?.raza].filter(Boolean).join(" / ")],
-    ["Sexo / Edad", [paciente?.sexo, edad].filter(Boolean).join(" · ")],
-  ]);
-  _seccionPDF(doc, "Datos del propietario", [
-    ["Nombre", cliente?.nombre],
-    ["DNI", cliente?.dni],
-    ["Teléfono", cliente?.telefono],
-    ["Dirección", cliente?.direccion],
-  ]);
-
-  const orden = [...(historias || [])].sort(
-    (a, b) => new Date(a.fecha || a.creado_en) - new Date(b.fecha || b.creado_en));
-
-  orden.forEach((h, i) => {
-    const fecha = new Date(h.fecha || h.creado_en).toLocaleString("es-PE", {
-      day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-    });
-    autoTable(doc, {
-      startY: (doc.lastAutoTable ? doc.lastAutoTable.finalY : 26) + 6,
-      body: [[`Consulta ${i + 1} — ${fecha}` + (h.tipo_consulta ? ` · ${getLabel("tipo_consulta", h.tipo_consulta)}` : "")]],
-      theme: "plain",
-      styles: { fontSize: 11, fontStyle: "bold", textColor: _PDF_MORADO, cellPadding: { top: 2, bottom: 1, left: 0 } },
-      margin: { left: _PDF_M, right: _PDF_M },
-    });
-    _seccionesClinicasPDF(doc, h);
-  });
-
-  doc.save(`HC_${paciente?.nombre ?? "paciente"}.pdf`);
-}
+// PDF generation logic has been externalized to pdfGenerator.js
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -577,7 +459,20 @@ export default function HistoriasClinicas() {
   const [error,     setError]     = useState(null);
 
   // ── Formulario
-  const [form,       setForm]       = useState(FORM_VACIO);
+  const [form,       setForm]       = useState(() => {
+    const savedDraft = localStorage.getItem(`draft_historia_${id}`);
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed && typeof parsed === "object") {
+          return parsed;
+        }
+      } catch (e) {
+        console.error("No se pudo cargar el borrador:", e);
+      }
+    }
+    return FORM_VACIO;
+  });
   const [editandoId, setEditandoId] = useState(null);
   const [guardando,  setGuardando]  = useState(false);
   const [guardadoOk, setGuardadoOk] = useState(false);
@@ -585,25 +480,16 @@ export default function HistoriasClinicas() {
   const [open, setOpen] = useState({ s1: true, s2: true, s3: false, s4: false, s5: false });
 
   // ── IA / voz
-  const [aiState,       setAiState]       = useState(null); // null|"recording"|"transcribing"|"processing"|"done"|"error"
   const [transcripcionIA, setTranscripcionIA] = useState("");
   const [datosIA,       setDatosIA]       = useState(null);
   const [inferenciasBrut, setInferenciasBrut] = useState({});
   const [highlights,    setHighlights]    = useState({});
-  const [aiError,       setAiError]       = useState(null);
-  const [modoTexto,     setModoTexto]     = useState(false);
-  const [textoManual,   setTextoManual]   = useState("");
-
-  const { isRecording, seconds, micError, start, stop } = useAudioRecorder();
 
   // ── Métrica de tiempo: cuándo empezó el registro y si se usó IA
   const inicioRegistro = useRef(Date.now());
   const usoIA = useRef(false);
 
-  // Propaga errores de micrófono al estado de IA
-  useEffect(() => {
-    if (micError) { setAiError(micError); setAiState("error"); }
-  }, [micError]);
+
 
   // ── Carga inicial
   useEffect(() => {
@@ -616,6 +502,28 @@ export default function HistoriasClinicas() {
       .catch(() => setError("No se pudo cargar el paciente."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // ── Autoguardado del borrador en localStorage
+  useEffect(() => {
+    const isFormEmpty = (f) => {
+      return Object.keys(f).every(key => {
+        if (key === "examen_particular") {
+          if (!f[key]) return true;
+          return Object.values(f[key]).every(sys => !sys.estado && !sys.detalle);
+        }
+        if (Array.isArray(f[key])) {
+          return f[key].length === 0;
+        }
+        return !f[key];
+      });
+    };
+
+    if (isFormEmpty(form)) {
+      localStorage.removeItem(`draft_historia_${id}`);
+    } else {
+      localStorage.setItem(`draft_historia_${id}`, JSON.stringify(form));
+    }
+  }, [form, id]);
 
   // ── Setters que limpian su resaltado al editar
   const setF = f => e => {
@@ -639,8 +547,6 @@ export default function HistoriasClinicas() {
     setTranscripcionIA("");
     setDatosIA(null);
     setInferenciasBrut({});
-    setAiState(null);
-    setAiError(null);
     setOpen({ s1: true, s2: true, s3: false, s4: false, s5: false });
     // Reinicia la medición de tiempo para el siguiente registro
     inicioRegistro.current = Date.now();
@@ -651,7 +557,6 @@ export default function HistoriasClinicas() {
     setForm(formFromHistoria(h));
     setEditandoId(h.id);
     setHighlights({});
-    setAiState(null);
     setOpen({ s1: true, s2: true, s3: true, s4: true, s5: true });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -721,65 +626,7 @@ export default function HistoriasClinicas() {
       });
   };
 
-  // ── Flujo de grabación
-  const handleGrabar = async () => {
-    if (isRecording) {
-      // Detener y procesar
-      setAiState("transcribing");
-      setAiError(null);
-      try {
-        const blob = await stop();
-        if (!blob) throw new Error("No se capturó audio.");
-
-        // 1. Transcribir con Deepgram
-        const fd = new FormData();
-        fd.append("audio", blob, "consulta.webm");
-        const r1 = await fetch(`${BASE_URL}/api/transcribe`, { method: "POST", body: fd, headers: authHeaders() });
-        if (!r1.ok) {
-          const b = await r1.json().catch(() => ({}));
-          throw new Error(b?.detail ?? `Error al transcribir (HTTP ${r1.status})`);
-        }
-        const { transcripcion } = await r1.json();
-        setTranscripcionIA(transcripcion);
-
-        // 2. Extraer con GPT
-        setAiState("processing");
-        const { datos, inferencias, alertas_rango } = await api.post("/api/procesar-historia", { texto: transcripcion });
-        setDatosIA(datos);
-        setInferenciasBrut(inferencias);
-        applyIA(datos, inferencias, alertas_rango);
-        setAiState("done");
-      } catch (e) {
-        setAiError(e.message);
-        setAiState("error");
-      }
-    } else {
-      // Iniciar grabación
-      setAiState("recording");
-      setAiError(null);
-      setTranscripcionIA("");
-      setDatosIA(null);
-      await start();
-    }
-  };
-
-  // ── Procesado desde texto libre
-  const handleProcesarTexto = async () => {
-    if (!textoManual.trim()) return;
-    setAiState("processing");
-    setAiError(null);
-    try {
-      const { datos, inferencias, transcripcion, alertas_rango } = await api.post("/api/procesar-historia", { texto: textoManual });
-      setTranscripcionIA(transcripcion);
-      setDatosIA(datos);
-      setInferenciasBrut(inferencias);
-      applyIA(datos, inferencias, alertas_rango);
-      setAiState("done");
-    } catch (e) {
-      setAiError(e.message);
-      setAiState("error");
-    }
-  };
+  // Lógica de IA delegada a VoiceTextProcessor
 
   // ── Guardar
   const handleSave = async () => {
@@ -846,100 +693,15 @@ export default function HistoriasClinicas() {
       <div className="max-w-4xl mx-auto px-4 py-5 space-y-5">
 
         {/* ── Panel IA / Voz ──────────────────────────────────────────────── */}
-        <div className="border border-slate-200 rounded-md bg-white overflow-hidden">
-
-          {/* Tabs: Voz | Texto */}
-          <div className="flex border-b border-slate-100">
-            <button onClick={() => setModoTexto(false)}
-              className={`px-4 py-2 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-colors ${
-                !modoTexto ? "border-purple-600 text-purple-700" : "border-transparent text-slate-500 hover:text-slate-700"
-              }`}>
-              <Mic size={13} /> Dictado por voz
-            </button>
-            <button onClick={() => setModoTexto(true)}
-              className={`px-4 py-2 text-xs font-semibold flex items-center gap-1.5 border-b-2 transition-colors ${
-                modoTexto ? "border-purple-600 text-purple-700" : "border-transparent text-slate-500 hover:text-slate-700"
-              }`}>
-              <FileText size={13} /> Texto libre
-            </button>
-          </div>
-
-          <div className="px-4 py-3 space-y-2">
-            {!modoTexto ? (
-              /* MODO VOZ */
-              <div className="space-y-2">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <button onClick={handleGrabar}
-                    disabled={aiState === "transcribing" || aiState === "processing"}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors disabled:opacity-50 ${
-                      isRecording
-                        ? "bg-red-600 hover:bg-red-700 text-white"
-                        : "bg-purple-700 hover:bg-purple-800 text-white"
-                    }`}>
-                    {isRecording
-                      ? <><StopCircle size={15} className="animate-pulse" /> Detener ({fmtSec(seconds)})</>
-                      : <><Mic size={15} /> Grabar consulta</>}
-                  </button>
-
-                  {aiState === "transcribing" && (
-                    <span className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <Loader2 size={13} className="animate-spin" /> Transcribiendo…
-                    </span>
-                  )}
-                  {aiState === "processing" && (
-                    <span className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <Loader2 size={13} className="animate-spin" /> Procesando con IA…
-                    </span>
-                  )}
-                  {aiState === "done" && (
-                    <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-                      <Check size={13} /> Formulario autocompletado
-                    </span>
-                  )}
-                </div>
-
-                {transcripcionIA && (
-                  <div>
-                    <p className={lCls}>Transcripción recibida</p>
-                    <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-md px-3 py-2 max-h-20 overflow-y-auto">
-                      {transcripcionIA}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              /* MODO TEXTO */
-              <div className="space-y-2">
-                <Field label="Texto de la consulta (pegar o escribir)">
-                  <TAr value={textoManual} onChange={e => setTextoManual(e.target.value)} rows={4}
-                    placeholder="Pegue la transcripción o escriba el resumen de la consulta para que la IA extraiga los campos…" />
-                </Field>
-                <div className="flex items-center gap-3">
-                  <button onClick={handleProcesarTexto}
-                    disabled={!textoManual.trim() || aiState === "processing"}
-                    className="flex items-center gap-2 px-4 py-1.5 bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-md text-sm font-semibold transition-colors">
-                    {aiState === "processing"
-                      ? <><Loader2 size={13} className="animate-spin" /> Procesando…</>
-                      : <><FileText size={13} /> Procesar con IA</>}
-                  </button>
-                  {aiState === "done" && (
-                    <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-                      <Check size={13} /> Formulario autocompletado
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Error IA */}
-            {aiError && (
-              <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                <AlertTriangle size={13} className="shrink-0 mt-px" />
-                <span>{aiError}. Podés continuar completando el formulario en modo manual.</span>
-              </div>
-            )}
-          </div>
-        </div>
+        <VoiceTextProcessor
+          onResult={({ datos, inferencias, alertas_rango, transcripcion }) => {
+            usoIA.current = true;
+            setTranscripcionIA(transcripcion);
+            setDatosIA(datos);
+            setInferenciasBrut(inferencias);
+            applyIA(datos, inferencias, alertas_rango);
+          }}
+        />
 
         {/* Badge de inferidos pendientes */}
         {numInferidos > 0 && (

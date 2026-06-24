@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
@@ -716,7 +716,14 @@ class AsistenciaOut(BaseModel):
             sh, sm = (int(x) for x in self.hora_entrada_perfil.split(":"))
         except (ValueError, AttributeError):
             return None
-        diff = (self.hora_ingreso.hour * 60 + self.hora_ingreso.minute) - (sh * 60 + sm)
+        
+        PERU_TZ = timezone(timedelta(hours=-5))
+        local_dt = self.hora_ingreso
+        if local_dt.tzinfo is None:
+            local_dt = local_dt.replace(tzinfo=timezone.utc)
+        local_dt = local_dt.astimezone(PERU_TZ)
+        
+        diff = (local_dt.hour * 60 + local_dt.minute) - (sh * 60 + sm)
         return diff if diff > 0 else 0
 
     model_config = ConfigDict(from_attributes=True)

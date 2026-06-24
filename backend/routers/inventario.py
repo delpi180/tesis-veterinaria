@@ -90,11 +90,13 @@ async def interpretar_audio(audio: UploadFile = File(...), db: Session = Depends
     if not data:
         raise HTTPException(status_code=400, detail="El audio está vacío.")
     try:
-        texto = transcribe_audio(data, filename=audio.filename or "inv.webm")
-        items = interpretar_inventario(texto)
+        import asyncio
+        texto = await asyncio.to_thread(transcribe_audio, data, filename=audio.filename or "inv.webm")
+        items = await asyncio.to_thread(interpretar_inventario, texto)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return _armar_preview(items, db)
+
 
 
 @router.post("/aplicar")

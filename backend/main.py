@@ -12,6 +12,7 @@ from routers import (
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
     busqueda, inventario, asistencia, mi_panel, actividad,
 )
+from core import ratelimit
 from core.config import settings
 from core.security import verificar_token, hash_password
 from services.transcription import transcribe_audio
@@ -22,6 +23,14 @@ app = FastAPI(title="Veterinaria Los Pinos API")
 
 # Rutas accesibles sin token
 RUTAS_PUBLICAS = {"/api/auth/login", "/api/health"}
+
+
+def _clave_cliente(request: Request) -> str:
+    """IP del cliente para el rate-limit (respeta el proxy de Render/Vercel)."""
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "desconocido"
 
 
 def _es_ruta_clinica(path: str) -> bool:
@@ -100,6 +109,8 @@ async def auth_middleware(request: Request, call_next):
     ):
         header = request.headers.get("Authorization", "")
         token = header.removeprefix("Bearer ").strip()
+        if not token:
+            token = request.query_params.get("token", "").strip()
         sesion = verificar_token(token) if token else None
         if not sesion:
             return JSONResponse(
@@ -167,11 +178,16 @@ app.include_router(actividad.router)
 
 
 @app.on_event("startup")
-def startup():
+async def startup():
     # El esquema lo gestiona Alembic (ver prestart.py / startCommand en
     # render.yaml). No usamos create_all para evitar que la BD quede sin
     # control de migraciones.
     _seed_admin()
+
+    from routers.citas import poll_sse_events
+    import asyncio
+    asyncio.create_task(poll_sse_events())
+
 
 
 def _seed_admin():
@@ -231,11 +247,19 @@ def health_check():
 
 
 @app.post("/api/transcribe", response_model=TranscribeResponse)
-async def transcribe_endpoint(audio: UploadFile = File(...)):
+async def transcribe_endpoint(request: Request, audio: UploadFile = File(...)):
     """
     Recibe un archivo de audio (wav, mp3, m4a, webm…) y devuelve la
     transcripción en texto plano usando Deepgram Nova-3.
     """
+    clave = _clave_cliente(request)
+    if not ratelimit.permitido(f"ia_{clave}", maximo=15, ventana=300):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas peticiones de IA. Espera unos minutos.",
+        )
+    ratelimit.registrar_fallo(f"ia_{clave}")
+
     allowed = {".wav", ".mp3", ".mp4", ".m4a", ".webm", ".ogg", ".flac"}
     import os
     ext = os.path.splitext(audio.filename or "")[-1].lower()
@@ -251,15 +275,17 @@ async def transcribe_endpoint(audio: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="El archivo de audio está vacío.")
 
     try:
-        texto = transcribe_audio(audio_bytes, filename=audio.filename or "audio.wav")
+        import asyncio
+        texto = await asyncio.to_thread(transcribe_audio, audio_bytes, filename=audio.filename or "audio.wav")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en transcripción: {str(e)}")
 
     return TranscribeResponse(transcripcion=texto)
 
 
+
 @app.post("/api/procesar-historia", response_model=ProcessHistoriaResponse)
-def procesar_historia_endpoint(body: ProcessHistoriaRequest):
+def procesar_historia_endpoint(body: ProcessHistoriaRequest, request: Request):
     """
     Recibe la transcripción de una consulta veterinaria y devuelve los campos
     de la historia clínica estructurados por GPT-4o-mini.
@@ -269,6 +295,14 @@ def procesar_historia_endpoint(body: ProcessHistoriaRequest):
     NOTA: el frontend aún llama a /api/process-soap (nombre viejo).
     Actualizar la ruta en HistoriasClinicas.jsx en la fase de rediseño de frontend.
     """
+    clave = _clave_cliente(request)
+    if not ratelimit.permitido(f"ia_{clave}", maximo=15, ventana=300):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas peticiones de IA. Espera unos minutos.",
+        )
+    ratelimit.registrar_fallo(f"ia_{clave}")
+
     if not body.texto.strip():
         raise HTTPException(status_code=400, detail="El campo 'texto' no puede estar vacío.")
 
@@ -377,12 +411,20 @@ class ExactitudRequest(BaseModel):
 
 
 @app.post("/api/comparar-exactitud")
-def comparar_exactitud(body: ExactitudRequest):
+def comparar_exactitud(body: ExactitudRequest, request: Request):
     """
     Compara la extracción de la IA contra una historia de referencia
     (gold-standard) y reporta precisión, recall y F1 por campo.
     Body: { "texto": "...", "referencia": { campo: valor, ... } }
     """
+    clave = _clave_cliente(request)
+    if not ratelimit.permitido(f"ia_{clave}", maximo=15, ventana=300):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas peticiones de IA. Espera unos minutos.",
+        )
+    ratelimit.registrar_fallo(f"ia_{clave}")
+
     texto = body.texto
     referencia = body.referencia or {}
 
@@ -433,11 +475,19 @@ def comparar_exactitud(body: ExactitudRequest):
 
 
 @app.post("/api/comparar-extraccion")
-def comparar_extraccion(body: ComparativaRequest):
+def comparar_extraccion(body: ComparativaRequest, request: Request):
     """
     Compara el método LÉXICO (soap_processor) contra el método IA (GPT) sobre el
     mismo texto: campos completados y tiempo de procesamiento. Para evaluación de tesis.
     """
+    clave = _clave_cliente(request)
+    if not ratelimit.permitido(f"ia_{clave}", maximo=15, ventana=300):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas peticiones de IA. Espera unos minutos.",
+        )
+    ratelimit.registrar_fallo(f"ia_{clave}")
+
     import time as _time
     if not body.texto.strip():
         raise HTTPException(status_code=400, detail="El campo 'texto' no puede estar vacío.")

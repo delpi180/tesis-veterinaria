@@ -102,11 +102,19 @@ export default function Turnos() {
   }
   useEffect(() => { cargar() }, [])
 
-  // Auto-actualización cada 20 s (no mientras el modal está abierto)
+  // Sincronización en tiempo real vía Server-Sent Events (SSE)
   useEffect(() => {
-    const t = setInterval(() => { if (!modalAbierto) cargar(true) }, 20000)
-    return () => clearInterval(t)
-  }, [modalAbierto])
+    const token = localStorage.getItem('token') || '';
+    const es = new EventSource(`/api/citas/stream?token=${encodeURIComponent(token)}`);
+    es.onmessage = (e) => {
+      if (e.data === 'citas_updated') {
+        if (!modalAbierto) cargar(true);
+      }
+    };
+    return () => {
+      es.close();
+    };
+  }, [modalAbierto]);
 
   const refrescar = async () => { setRefrescando(true); await cargar(true); setRefrescando(false) }
 

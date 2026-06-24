@@ -55,11 +55,19 @@ export default function MiPanel() {
   }
   useEffect(() => { cargar() }, [])
 
-  // Auto-actualización cada 20 s (silenciosa)
+  // Sincronización en tiempo real vía Server-Sent Events (SSE)
   useEffect(() => {
-    const t = setInterval(() => cargar(true), 20000)
-    return () => clearInterval(t)
-  }, [])
+    const token = localStorage.getItem('token') || '';
+    const es = new EventSource(`/api/citas/stream?token=${encodeURIComponent(token)}`);
+    es.onmessage = (e) => {
+      if (e.data === 'citas_updated') {
+        cargar(true);
+      }
+    };
+    return () => {
+      es.close();
+    };
+  }, []);
 
   const refrescar = async () => { setRefrescando(true); await cargar(true); setRefrescando(false) }
 

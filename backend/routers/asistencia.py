@@ -136,7 +136,12 @@ def resumen_asistencia(
         if r.hora_ingreso and r.hora_entrada_perfil:
             try:
                 sh, sm = (int(x) for x in r.hora_entrada_perfil.split(":"))
-                if (r.hora_ingreso.hour * 60 + r.hora_ingreso.minute) - (sh * 60 + sm) > 0:
+                local_dt = r.hora_ingreso
+                if local_dt.tzinfo is None:
+                    local_dt = local_dt.replace(tzinfo=timezone.utc)
+                local_dt = local_dt.astimezone(PERU_TZ)
+                
+                if (local_dt.hour * 60 + local_dt.minute) - (sh * 60 + sm) > 0:
                     a["tardanzas"] += 1
             except (ValueError, AttributeError):
                 pass

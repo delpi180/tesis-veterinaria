@@ -55,7 +55,6 @@ class Paciente(Base):
     color               = Column(String(60))
     alergias            = Column(Text)          # alertas clínicas destacadas
     condiciones_cronicas = Column(Text)
-    foto_url            = Column(Text, nullable=True)  # Base64 data URI de la foto
 
     cliente  = relationship("Cliente", back_populates="pacientes")
     historias = relationship(
@@ -351,3 +350,20 @@ class VentaItem(Base):
     venta    = relationship("Venta", back_populates="items")
     producto = relationship("Producto")
     servicio = relationship("Servicio")
+
+
+class RateLimitHit(Base):
+    __tablename__ = "rate_limit_hits"
+
+    id        = Column(Integer, primary_key=True)
+    key       = Column(String(255), nullable=False, index=True)
+    timestamp = Column(Float, nullable=False, index=True)
+
+
+class SseEvent(Base):
+    __tablename__ = "sse_events"
+
+    id        = Column(Integer, primary_key=True)
+    message   = Column(String(100), nullable=False)
+    timestamp = Column(Float, nullable=False, index=True)
+
