@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Stethoscope, Pencil, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Stethoscope, Pencil, RefreshCw, Trash2 } from 'lucide-react'
 import { api, esVeterinario } from '../services/api'
 import { estadoStyle, estadoLabel, ESTADOS_CITA, waRecordatorio } from '../utils/citas'
 
@@ -146,6 +146,17 @@ export default function Turnos() {
     try {
       await api.put(`/api/citas/${cita.id}`, { estado: nuevoEstado })
       setCitas(prev => prev.map(c => c.id === cita.id ? { ...c, estado: nuevoEstado } : c))
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  // Elimina un turno (creado por error o duplicado). Confirma antes.
+  const eliminarCita = async (cita) => {
+    if (!window.confirm('¿Eliminar este turno? Esta acción no se puede deshacer.\n\n(Si el turno solo terminó, mejor cámbialo a "Atendida" para conservar el registro.)')) return
+    try {
+      await api.del(`/api/citas/${cita.id}`)
+      setCitas(prev => prev.filter(c => c.id !== cita.id))
     } catch (err) {
       alert(err.message)
     }
@@ -486,6 +497,14 @@ export default function Turnos() {
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => eliminarCita(cita)}
+                          title="Eliminar turno"
+                          className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-300 transition shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                         {info.telefono && (
                           <a
                             href={waRecordatorio(info.telefono, info.propietario, info.nombre, cita)}
@@ -584,6 +603,14 @@ export default function Turnos() {
                             className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition"
                           >
                             <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => eliminarCita(cita)}
+                            title="Eliminar turno"
+                            className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-300 transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                           {info.telefono && (
                             <a
