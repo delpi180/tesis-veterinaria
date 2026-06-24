@@ -116,12 +116,22 @@ export default function Clientes() {
   const [showForm,    setShowForm]    = useState(false)
   const [searchTerm,  setSearchTerm]  = useState('')
 
-  const cargar = async (q = '') => {
+  const PAGE = 25
+  const [pagina, setPagina] = useState(1)
+  const [total,  setTotal]  = useState(0)
+
+  const cargar = async (q, pag) => {
     setLoading(true); setError(null)
     try {
-      const url = q.trim() ? `/api/clientes/?q=${encodeURIComponent(q.trim())}` : '/api/clientes/'
-      const data = await api.get(url)
+      const p = new URLSearchParams({ skip: String((pag - 1) * PAGE), limit: String(PAGE) })
+      if (q.trim()) p.set('q', q.trim())
+      const qStr = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''
+      const [data, cont] = await Promise.all([
+        api.get(`/api/clientes/?${p.toString()}`),
+        api.get(`/api/clientes/contar${qStr}`),
+      ])
       setClientes(Array.isArray(data) ? data : [])
+      setTotal(cont?.total ?? 0)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -129,19 +139,19 @@ export default function Clientes() {
     }
   }
 
-  // Carga inicial + búsqueda en el servidor (con debounce al escribir)
+  // Búsqueda en el servidor con debounce; al cambiar el texto vuelve a página 1
   useEffect(() => {
-    const t = setTimeout(() => cargar(searchTerm), searchTerm ? 350 : 0)
+    const t = setTimeout(() => { setPagina(1); cargar(searchTerm, 1) }, searchTerm ? 350 : 0)
     return () => clearTimeout(t)
   }, [searchTerm])
 
-  const handleSuccess = (nuevo) => {
-    setShowForm(false)
-    setTimeout(() => setClientes(prev => [nuevo, ...prev]), 100)
-  }
+  const irPagina = (nueva) => { setPagina(nueva); cargar(searchTerm, nueva) }
+
+  const handleSuccess = () => { setShowForm(false); irPagina(1) }
 
   const term = searchTerm.trim()
-  const clientesFiltrados = clientes   // el servidor ya filtra
+  const clientesFiltrados = clientes   // el servidor ya filtra/pagina
+  const totalPaginas = Math.max(1, Math.ceil(total / PAGE))
 
   const today = new Date().toLocaleDateString('es-MX', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -180,8 +190,7 @@ export default function Clientes() {
               Propietarios registrados
             </h2>
             <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
-              {clientesFiltrados.length}
-              {term ? ` de ${clientes.length}` : ''}
+              {total}{term ? ' encontrados' : ''}
             </span>
 
             {/* Buscador */}
@@ -269,6 +278,31 @@ export default function Clientes() {
                 ))}
               </tbody>
             </table></div>
+          )}
+
+          {/* Paginación */}
+          {!loading && !error && total > PAGE && (
+            <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-xs text-slate-500">
+                Página {pagina} de {totalPaginas} · {total} clientes
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => irPagina(pagina - 1)}
+                  disabled={pagina <= 1}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← Anterior
+                </button>
+                <button
+                  onClick={() => irPagina(pagina + 1)}
+                  disabled={pagina >= totalPaginas}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Siguiente →
+                </button>
+              </div>
+            </div>
           )}
         </section>
       </main>

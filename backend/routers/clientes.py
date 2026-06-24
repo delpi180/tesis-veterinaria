@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
@@ -42,6 +42,16 @@ def listar_clientes(
         like = f"%{q.strip()}%"
         query = query.filter(or_(Cliente.nombre.ilike(like), Cliente.dni.ilike(like)))
     return query.order_by(Cliente.nombre).offset(skip).limit(limit).all()
+
+
+@router.get("/contar")
+def contar_clientes(q: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    """Total de clientes (con filtro opcional), para la paginación."""
+    query = db.query(func.count(Cliente.id))
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(or_(Cliente.nombre.ilike(like), Cliente.dni.ilike(like)))
+    return {"total": query.scalar()}
 
 
 @router.get("/{cliente_id}", response_model=ClienteOut)
