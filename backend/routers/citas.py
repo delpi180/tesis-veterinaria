@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import Cita, Paciente
@@ -30,7 +30,10 @@ def listar_citas(
     veterinario_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Cita)
+    q = db.query(Cita).options(
+        joinedload(Cita.paciente).joinedload(Paciente.cliente),
+        joinedload(Cita.veterinario),
+    )
     if paciente_id is not None:
         q = q.filter(Cita.paciente_id == paciente_id)
     if estado is not None:

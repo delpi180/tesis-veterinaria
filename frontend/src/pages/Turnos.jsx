@@ -65,6 +65,12 @@ export default function Turnos() {
   const [filtroDoctor, setFiltroDoctor] = useState('')   // filtrar agenda por doctor
   const [refrescando,  setRefrescando]  = useState(false)
 
+  // Buscador de mascota para el turno (evita el desplegable de 3000+)
+  const [pacBusq,       setPacBusq]       = useState('')
+  const [pacResultados, setPacResultados] = useState([])
+  const [pacBuscando,   setPacBuscando]   = useState(false)
+  const [pacSelLabel,   setPacSelLabel]   = useState('')
+
   const todayDay   = now.getDate()
   const todayMonth = now.getMonth()
   const todayYear  = now.getFullYear()
@@ -74,19 +80,18 @@ export default function Turnos() {
     if (!silencioso) setLoading(true)
     setError(null)
     return Promise.all([
-      api.get('/api/clientes/'),
       api.get('/api/citas/'),
       api.get('/api/usuarios/doctores'),
     ])
-      .then(([clientes, citasData, doctoresData]) => {
+      .then(([citasData, doctoresData]) => {
+        // La info del paciente/dueño viene embebida en cada cita (no cargamos
+        // los 2000+ clientes). Se arma el mapa solo con los pacientes que tienen turno.
         const map = {}
-        clientes.forEach(c => {
-          c.pacientes.forEach(p => {
-            map[p.id] = {
-              nombre: p.nombre, especie: p.especie,
-              propietario: c.nombre, clienteId: c.id, telefono: c.telefono,
-            }
-          })
+        citasData.forEach(c => {
+          if (c.paciente_id) map[c.paciente_id] = {
+            nombre: c.paciente_nombre, especie: c.paciente_especie,
+            propietario: c.propietario, clienteId: c.cliente_id, telefono: c.telefono,
+          }
         })
         setPacienteMap(map)
         setCitas(citasData)
@@ -104,6 +109,36 @@ export default function Turnos() {
   }, [modalAbierto])
 
   const refrescar = async () => { setRefrescando(true); await cargar(true); setRefrescando(false) }
+
+  // Búsqueda de mascota por nombre o DNI/nombre del dueño (en el servidor, con debounce)
+  useEffect(() => {
+    if (!modalAbierto) return
+    const q = pacBusq.trim()
+    if (!q) { setPacResultados([]); return }
+    setPacBuscando(true)
+    const t = setTimeout(() => {
+      api.get(`/api/clientes/?q=${encodeURIComponent(q)}&limit=12`)
+        .then(clientes => {
+          const ops = []
+          ;(Array.isArray(clientes) ? clientes : []).forEach(c => {
+            (c.pacientes || []).forEach(p => {
+              ops.push({ id: p.id, label: `${p.nombre} (${p.especie}) — ${c.nombre}${c.dni ? ' · ' + c.dni : ''}` })
+            })
+          })
+          setPacResultados(ops)
+        })
+        .catch(() => setPacResultados([]))
+        .finally(() => setPacBuscando(false))
+    }, 350)
+    return () => clearTimeout(t)
+  }, [pacBusq, modalAbierto])
+
+  const elegirPaciente = (op) => {
+    setForm(f => ({ ...f, pacienteId: String(op.id) }))
+    setPacSelLabel(op.label)
+    setPacBusq(''); setPacResultados([])
+  }
+  const limpiarPaciente = () => { setForm(f => ({ ...f, pacienteId: '' })); setPacSelLabel('') }
 
   // Cambia el estado de una cita (confirmar / atender / cancelar) — alineado con la agenda
   const cambiarEstado = async (cita, nuevoEstado) => {
@@ -175,6 +210,7 @@ export default function Turnos() {
     const dd  = String(dia).padStart(2, '0')
     setEditId(null)
     setForm({ ...FORM_INICIAL, fecha: `${viewYear}-${mm}-${dd}` })
+    setPacSelLabel(''); setPacBusq(''); setPacResultados([])
     setErrorModal(null)
     setModalAbierto(true)
   }
@@ -192,6 +228,8 @@ export default function Turnos() {
       notas:         cita.notas ?? '',
       veterinarioId: cita.veterinario_id ? String(cita.veterinario_id) : '',
     })
+    setPacSelLabel(`${cita.paciente_nombre ?? 'Mascota'}${cita.propietario ? ' — ' + cita.propietario : ''}`)
+    setPacBusq(''); setPacResultados([])
     setErrorModal(null)
     setModalAbierto(true)
   }
@@ -200,6 +238,7 @@ export default function Turnos() {
     setModalAbierto(false)
     setEditId(null)
     setForm(FORM_INICIAL)
+    setPacSelLabel(''); setPacBusq(''); setPacResultados([])
     setErrorModal(null)
   }
 
@@ -260,11 +299,6 @@ export default function Turnos() {
     })
     return choca ? 'Este doctor ya tiene un turno a esa hora.' : null
   })()
-
-  const opcionesPacientes = Object.entries(pacienteMap)
-    .sort(([, a], [, b]) =>
-      a.propietario.localeCompare(b.propietario) || a.nombre.localeCompare(b.nombre)
-    )
 
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -594,24 +628,48 @@ export default function Turnos() {
             <form onSubmit={handleGuardar}>
               <div className="px-5 py-4 flex flex-col gap-4">
 
-                {/* Paciente */}
+                {/* Paciente — buscador (mascota o nombre/DNI del dueño) */}
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>
                     Paciente <span className="text-rose-500">*</span>
                   </label>
-                  <select
-                    className={inputCls}
-                    value={form.pacienteId}
-                    disabled={!!editId}
-                    onChange={e => setForm(f => ({ ...f, pacienteId: e.target.value }))}
-                  >
-                    <option value="">— Seleccionar mascota —</option>
-                    {opcionesPacientes.map(([id, info]) => (
-                      <option key={id} value={id}>
-                        {info.nombre} ({info.especie}) — {info.propietario}
-                      </option>
-                    ))}
-                  </select>
+                  {form.pacienteId ? (
+                    <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+                      <PawPrint className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span className="text-sm text-slate-800 flex-1 min-w-0 truncate">{pacSelLabel}</span>
+                      {!editId && (
+                        <button type="button" onClick={limpiarPaciente}
+                          className="text-xs text-purple-600 hover:text-purple-800 font-semibold shrink-0">Cambiar</button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={pacBusq}
+                        onChange={e => setPacBusq(e.target.value)}
+                        placeholder="Buscar por mascota, dueño o DNI…"
+                        className={inputCls}
+                        autoComplete="off"
+                      />
+                      {pacBusq.trim() && (
+                        <div className="absolute z-10 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg">
+                          {pacBuscando ? (
+                            <p className="text-xs text-slate-400 px-3 py-2">Buscando…</p>
+                          ) : pacResultados.length === 0 ? (
+                            <p className="text-xs text-slate-400 px-3 py-2">Sin coincidencias.</p>
+                          ) : (
+                            pacResultados.map(op => (
+                              <button key={op.id} type="button" onClick={() => elegirPaciente(op)}
+                                className="block w-full text-left text-sm px-3 py-2 hover:bg-purple-50 transition">
+                                {op.label}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Fecha y Hora */}

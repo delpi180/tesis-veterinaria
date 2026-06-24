@@ -261,6 +261,11 @@ class CitaResponse(CitaBase):
     creado_en:          datetime
     veterinario_id:     Optional[int] = None
     veterinario_nombre: Optional[str] = None
+    paciente_nombre:    Optional[str] = None
+    paciente_especie:   Optional[str] = None
+    cliente_id:         Optional[int] = None
+    propietario:        Optional[str] = None
+    telefono:           Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

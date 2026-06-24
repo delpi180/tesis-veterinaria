@@ -157,6 +157,27 @@ class Cita(Base):
     def veterinario_nombre(self):
         return self.veterinario.nombre if self.veterinario else None
 
+    # Info embebida del paciente/dueño (evita que el front cargue todos los clientes)
+    @property
+    def paciente_nombre(self):
+        return self.paciente.nombre if self.paciente else None
+
+    @property
+    def paciente_especie(self):
+        return self.paciente.especie if self.paciente else None
+
+    @property
+    def cliente_id(self):
+        return self.paciente.cliente_id if self.paciente else None
+
+    @property
+    def propietario(self):
+        return self.paciente.cliente.nombre if self.paciente and self.paciente.cliente else None
+
+    @property
+    def telefono(self):
+        return self.paciente.cliente.telefono if self.paciente and self.paciente.cliente else None
+
 
 class Actividad(Base):
     """Bitácora de auditoría: registra cada acción que modifica datos."""
