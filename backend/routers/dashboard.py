@@ -6,7 +6,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Asistencia, Cita, Cliente, HistoriaClinica, Paciente, Producto, Venta
+from models import (
+    Asistencia, Cita, Cliente, HistoriaClinica, Paciente, Producto, Venta,
+    VentaItem, Usuario,
+)
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
@@ -266,4 +269,65 @@ def cierre_caja(
             }
             for v in ventas
         ],
+    }
+
+
+@router.get("/reportes")
+def reportes(
+    desde: Optional[date] = Query(None, description="Fecha inicio YYYY-MM-DD"),
+    hasta: Optional[date] = Query(None, description="Fecha fin YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """Reportes para la administradora: top productos/servicios y atenciones por doctor."""
+    hoy = date.today()
+    d_desde = desde or hoy.replace(day=1)
+    d_hasta = hasta or hoy
+    ini, _ = _rango_local(d_desde)
+    _, fin = _rango_local(d_hasta)
+
+    def _top(filtro_col):
+        rows = (
+            db.query(
+                VentaItem.descripcion,
+                func.coalesce(func.sum(VentaItem.cantidad), 0),
+                func.coalesce(func.sum(VentaItem.cantidad * VentaItem.precio_unitario), 0),
+            )
+            .join(Venta, VentaItem.venta_id == Venta.id)
+            .filter(Venta.fecha >= ini, Venta.fecha < fin, filtro_col.isnot(None))
+            .group_by(VentaItem.descripcion)
+            .order_by(func.sum(VentaItem.cantidad).desc())
+            .limit(15)
+            .all()
+        )
+        return [{"nombre": n or "—", "cantidad": int(c), "monto": float(m)} for n, c, m in rows]
+
+    top_productos = _top(VentaItem.producto_id)
+    top_servicios = _top(VentaItem.servicio_id)
+
+    doc_rows = (
+        db.query(Usuario.nombre, func.count(HistoriaClinica.id))
+        .join(HistoriaClinica, HistoriaClinica.veterinario_id == Usuario.id)
+        .filter(HistoriaClinica.fecha >= ini, HistoriaClinica.fecha < fin)
+        .group_by(Usuario.nombre)
+        .order_by(func.count(HistoriaClinica.id).desc())
+        .all()
+    )
+    atenciones_por_doctor = [{"doctor": n, "atenciones": int(c)} for n, c in doc_rows]
+
+    total_ventas = (
+        db.query(func.count(Venta.id)).filter(Venta.fecha >= ini, Venta.fecha < fin).scalar()
+    )
+    ingreso_total = (
+        db.query(func.coalesce(func.sum(Venta.total), 0))
+        .filter(Venta.fecha >= ini, Venta.fecha < fin).scalar()
+    )
+
+    return {
+        "desde": d_desde.isoformat(),
+        "hasta": d_hasta.isoformat(),
+        "total_ventas": int(total_ventas),
+        "ingreso_total": float(ingreso_total),
+        "top_productos": top_productos,
+        "top_servicios": top_servicios,
+        "atenciones_por_doctor": atenciones_por_doctor,
     }

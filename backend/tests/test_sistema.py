@@ -387,3 +387,12 @@ def test_servicios_aplicar(client, admin):
         db = SessionLocal()
         db.execute(text("DELETE FROM servicios WHERE nombre IN ('QA Consulta','QA Cirugia','QA Malo')"))
         db.commit(); db.close()
+
+
+def test_reportes(client, admin):
+    """El endpoint de reportes responde con la estructura esperada."""
+    r = client.get("/api/dashboard/reportes", headers=admin)
+    assert r.status_code == 200
+    d = r.json()
+    for clave in ("total_ventas", "ingreso_total", "top_productos", "top_servicios", "atenciones_por_doctor"):
+        assert clave in d
