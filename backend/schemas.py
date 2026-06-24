@@ -446,6 +446,42 @@ class ServicioOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Servicios por voz/texto (IA)
+# ---------------------------------------------------------------------------
+
+class ServicioInterpretarReq(BaseModel):
+    texto: str
+
+
+class ServInItemPreview(BaseModel):
+    nombre:          str
+    descripcion:     Optional[str]   = None
+    precio:          Optional[float] = None
+    precio_variable: bool            = False
+    accion:          str                       # 'nuevo' | 'actualizar'
+    servicio_id:     Optional[int]   = None
+
+
+class ServInItemAplicar(BaseModel):
+    nombre:          str
+    descripcion:     Optional[str]   = None
+    precio:          Optional[float] = Field(None, gt=0)
+    precio_variable: bool            = False
+    accion:          Literal['nuevo', 'actualizar']
+    servicio_id:     Optional[int]   = None
+
+    @model_validator(mode='after')
+    def _precio_segun_tipo(self):
+        if not self.precio_variable and (self.precio is None or self.precio <= 0):
+            raise ValueError(f"'{self.nombre}': un servicio de precio fijo requiere precio mayor a 0")
+        return self
+
+
+class ServiciosAplicarReq(BaseModel):
+    items: list[ServInItemAplicar] = Field(min_length=1)
+
+
+# ---------------------------------------------------------------------------
 # Ventas
 # ---------------------------------------------------------------------------
 

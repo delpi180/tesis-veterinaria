@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: vet
+          POSTGRES_PASSWORD: vet
+          POSTGRES_DB: vet_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg://vet:vet@localhost:5432/vet_test
+      AUTH_SECRET: ci-secret-no-real
+      AUTH_PASSWORD: ci-password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Aplicar migraciones
+        working-directory: backend
+        run: python -m alembic upgrade head
+
+      - name: Ejecutar tests
+        working-directory: backend
+        run: python -m pytest -q

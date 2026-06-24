@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Stethoscope, Search, Pencil, Trash2, X, Tag, Coins } from 'lucide-react'
-import { api } from '../services/api'
+import { Stethoscope, Search, Pencil, Trash2, X, Tag, Coins, Sparkles, Mic, StopCircle } from 'lucide-react'
+import { api, authHeaders } from '../services/api'
+import { useToast } from '../components/Toast'
+import { useAudioRecorder } from '../hooks/useAudioRecorder'
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? ''
+const EJEMPLO_SERV = 'consulta general 50 soles, baño y corte 40, vacunación 35, cirugía precio variable'
 
 const FORM_INICIAL = {
   nombre:          '',
@@ -22,6 +27,167 @@ const Spinner = () => (
   </svg>
 )
 
+function ServiciosIAModal({ onClose, onAplicado }) {
+  const toast = useToast()
+  const [texto, setTexto]   = useState('')
+  const [items, setItems]   = useState(null)   // null = aún no interpretado
+  const [cargando, setCargando]   = useState(false)
+  const [aplicando, setAplicando] = useState(false)
+  const { isRecording, seconds, micError, start, stop } = useAudioRecorder()
+
+  const interpretarTexto = async () => {
+    if (!texto.trim()) { toast.error('Escribe o dicta los servicios.'); return }
+    setCargando(true)
+    try {
+      setItems(await api.post('/api/servicios/interpretar', { texto }))
+    } catch (e) { toast.error(e.message) } finally { setCargando(false) }
+  }
+
+  const grabar = async () => {
+    if (isRecording) {
+      setCargando(true)
+      try {
+        const blob = await stop()
+        if (!blob) throw new Error('No se capturó audio.')
+        const fd = new FormData()
+        fd.append('audio', blob, 'servicios.webm')
+        const res = await fetch(`${BASE_URL}/api/servicios/interpretar-audio`, {
+          method: 'POST', body: fd, headers: authHeaders(),
+        })
+        if (!res.ok) {
+          const b = await res.json().catch(() => ({}))
+          throw new Error(b?.detail ?? `Error (HTTP ${res.status})`)
+        }
+        setItems(await res.json())
+      } catch (e) { toast.error(e.message) } finally { setCargando(false) }
+    } else {
+      await start()
+    }
+  }
+
+  const setItem = (i, campo, valor) => setItems(its => its.map((it, idx) => idx === i ? { ...it, [campo]: valor } : it))
+  const quitar  = (i) => setItems(its => its.filter((_, idx) => idx !== i))
+
+  const aplicar = async () => {
+    const faltaPrecio = items.find(it => !it.precio_variable && !(Number(it.precio) > 0))
+    if (faltaPrecio) { toast.error(`"${faltaPrecio.nombre}" necesita precio o marcarlo como variable.`); return }
+    setAplicando(true)
+    try {
+      const r = await api.post('/api/servicios/aplicar', {
+        items: items.map(it => ({
+          nombre: it.nombre,
+          descripcion: it.descripcion || null,
+          precio: it.precio_variable ? null : Number(it.precio),
+          precio_variable: !!it.precio_variable,
+          accion: it.accion,
+          servicio_id: it.servicio_id || null,
+        })),
+      })
+      toast.success(`Servicios: ${r.creados.length} nuevo(s), ${r.actualizados.length} actualizado(s).`)
+      onAplicado()
+    } catch (e) { toast.error(e.message) } finally { setAplicando(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] flex flex-col">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-500" /> Agregar servicios por voz/texto
+          </p>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 flex flex-col gap-3 overflow-y-auto">
+          <p className="text-xs text-slate-500">
+            Dicta o escribe los servicios y sus precios. La IA arma la lista; tú la revisas y confirmas.
+          </p>
+          <textarea
+            rows={3} value={texto} onChange={e => setTexto(e.target.value)}
+            placeholder={`Ej: ${EJEMPLO_SERV}`}
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white resize-none"
+          />
+          <div className="flex items-center gap-2">
+            <button onClick={grabar} disabled={cargando}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg transition disabled:opacity-50 ${isRecording ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}>
+              {isRecording ? <><StopCircle className="w-4 h-4" /> Detener ({seconds}s)</> : <><Mic className="w-4 h-4" /> Dictar</>}
+            </button>
+            <button onClick={interpretarTexto} disabled={cargando || isRecording}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
+              <Sparkles className="w-4 h-4" /> {cargando ? 'Interpretando…' : 'Interpretar'}
+            </button>
+            {micError && <span className="text-xs text-rose-600">{micError}</span>}
+          </div>
+
+          {items && (
+            items.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-lg">
+                No se detectaron servicios. Reformula el texto.
+              </p>
+            ) : (
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="overflow-x-auto"><table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 bg-slate-50">
+                      <th className="text-left px-3 py-2 font-semibold">Servicio</th>
+                      <th className="text-right px-3 py-2 font-semibold">Precio</th>
+                      <th className="text-center px-3 py-2 font-semibold">Variable</th>
+                      <th className="text-center px-3 py-2 font-semibold">Acción</th>
+                      <th className="px-2 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((it, i) => (
+                      <tr key={i} className="border-b border-slate-50">
+                        <td className="px-3 py-2">
+                          <input value={it.nombre} onChange={e => setItem(i, 'nombre', e.target.value)}
+                            className="w-full text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300" />
+                          {it.descripcion && <span className="text-xs text-slate-400">{it.descripcion}</span>}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <input type="number" min="0" step="0.01" value={it.precio ?? ''} disabled={it.precio_variable}
+                            onChange={e => setItem(i, 'precio', e.target.value)}
+                            className="w-24 text-sm text-right border border-slate-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300 disabled:bg-slate-100 disabled:text-slate-300" />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <input type="checkbox" checked={!!it.precio_variable}
+                            onChange={e => setItem(i, 'precio_variable', e.target.checked)}
+                            className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-300" />
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${it.accion === 'nuevo' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
+                            {it.accion === 'nuevo' ? 'Nuevo' : 'Actualizar'}
+                          </span>
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <button onClick={() => quitar(i)} className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table></div>
+              </div>
+            )
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-slate-100 flex gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">Cancelar</button>
+          <button onClick={aplicar} disabled={!items || items.length === 0 || aplicando}
+            className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+            {aplicando ? 'Guardando…' : 'Confirmar y guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Servicios() {
   const [servicios, setServicios] = useState([])
   const [loading,   setLoading]   = useState(true)
@@ -34,6 +200,7 @@ export default function Servicios() {
   const [form,         setForm]         = useState(FORM_INICIAL)
   const [guardando,    setGuardando]    = useState(false)
   const [errorModal,   setErrorModal]   = useState(null)
+  const [voiceIA,      setVoiceIA]      = useState(false)
 
   const cargar = async () => {
     setLoading(true); setError(null)
@@ -140,12 +307,20 @@ export default function Servicios() {
           <h1 className="text-xl font-bold text-slate-800">Servicios</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
         </div>
-        <button
-          onClick={abrirNuevo}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
-        >
-          + Nuevo Servicio
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setVoiceIA(true)}
+            className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 hover:bg-purple-50 text-sm font-semibold rounded-lg transition"
+          >
+            <Sparkles className="w-4 h-4" /> Por voz/texto
+          </button>
+          <button
+            onClick={abrirNuevo}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
+          >
+            + Nuevo Servicio
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 px-6 py-6 flex flex-col gap-5 max-w-5xl w-full mx-auto">
@@ -273,6 +448,13 @@ export default function Servicios() {
       </main>
 
       {/* ── Modal crear/editar servicio ──────────────────────────────────────── */}
+      {voiceIA && (
+        <ServiciosIAModal
+          onClose={() => setVoiceIA(false)}
+          onAplicado={() => { setVoiceIA(false); cargar() }}
+        />
+      )}
+
       {modalAbierto && (
         <div
           className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"

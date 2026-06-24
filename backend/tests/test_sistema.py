@@ -362,3 +362,28 @@ def test_doctor_persiste_y_se_comparte(client, admin, doctor):
         db = SessionLocal()
         db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
         db.commit(); db.close()
+
+
+# ── Catálogo de servicios por voz (parte sin IA: aplicar) ────────────────────
+
+def test_servicios_aplicar(client, admin):
+    """El guardado de servicios (nuevo + variable) funciona y persiste."""
+    r = client.post("/api/servicios/aplicar", json={"items": [
+        {"nombre": "QA Consulta", "precio": 50, "precio_variable": False, "accion": "nuevo"},
+        {"nombre": "QA Cirugia", "precio": None, "precio_variable": True, "accion": "nuevo"},
+    ]}, headers=admin)
+    assert r.status_code == 200
+    assert r.json()["creados"] == ["QA Consulta", "QA Cirugia"]
+    try:
+        servs = client.get("/api/servicios/?solo_activos=false", headers=admin).json()
+        nombres = {s["nombre"] for s in servs}
+        assert {"QA Consulta", "QA Cirugia"} <= nombres
+        # un servicio de precio fijo sin precio debe ser rechazado (422)
+        bad = client.post("/api/servicios/aplicar", json={"items": [
+            {"nombre": "QA Malo", "precio": None, "precio_variable": False, "accion": "nuevo"},
+        ]}, headers=admin)
+        assert bad.status_code == 422
+    finally:
+        db = SessionLocal()
+        db.execute(text("DELETE FROM servicios WHERE nombre IN ('QA Consulta','QA Cirugia','QA Malo')"))
+        db.commit(); db.close()

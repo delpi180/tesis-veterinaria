@@ -126,4 +126,61 @@ La aplicación web estará disponible en: **http://localhost:5173**
 *(Nota: Vite está configurado para hacer proxy de `/api` directamente al puerto 8000 del backend, por lo que no es necesario configurar CORS en entorno de desarrollo local).*
 
 ---
+
+## 🔧 Operación y producción
+
+### Migraciones (Alembic)
+El esquema se evoluciona **siempre con migraciones** (nunca `create_all` en producción).
+```bash
+cd backend
+python -m alembic revision --autogenerate -m "descripcion del cambio"   # generar
+python -m alembic upgrade head                                          # aplicar
+```
+
+### Tests y CI
+```bash
+cd backend
+python -m pytest -q
+```
+También corren automáticamente en **GitHub Actions** en cada push (`.github/workflows/ci.yml`).
+
+### Respaldos (backups)
+La base de datos es la fuente de verdad. **Respáldala periódicamente.**
+```bash
+# Crear respaldo
+cd backend
+venv/Scripts/python.exe scripts/backup_db.py        # -> backend/backups/backup_*.dump
+
+# Restaurar respaldo (reemplaza el contenido de la BD destino)
+pg_restore --clean --no-owner -d "<DATABASE_URL>" backend/backups/backup_XXXX.dump
+```
+Recomendado: programar el script (Programador de tareas / cron), guardar los `.dump`
+en un lugar externo y, si el proveedor lo ofrece, activar backups automáticos / PITR.
+
+### Variables de entorno (producción)
+| Variable | Notas |
+|---|---|
+| `DATABASE_URL` | Postgres (con respaldos en producción) |
+| `OPENAI_API_KEY`, `DEEPGRAM_API_KEY` | Claves de IA |
+| `AUTH_PASSWORD` | **Cámbiala** (la de por defecto es pública) |
+| `AUTH_SECRET` | Cadena larga aleatoria |
+| `CORS_ORIGINS` | Dominio del frontend (Vercel) — CSV |
+| `VITE_API_URL` (frontend) | URL real del backend |
+
+### Checklist de despliegue
+- [ ] `AUTH_PASSWORD` y `AUTH_SECRET` fuertes y únicos.
+- [ ] `CORS_ORIGINS` = dominio real del frontend.
+- [ ] Base de datos con respaldos activos.
+- [ ] `VITE_API_URL` apuntando al backend correcto.
+- [ ] `GET /api/health` → 200 tras el deploy.
+
+### Seguridad
+- Contraseñas con **PBKDF2-SHA256**; sesión con **tokens firmados (HMAC-SHA256)**.
+- **Rate-limit** en el login (anti fuerza bruta), configurable por entorno.
+- **CORS** restringible al dominio del frontend en producción.
+- `prestart.py` aplica migraciones **sin borrar datos** (no usa `drop_all`).
+
+> Arquitectura, modelo de datos e historias de usuario detalladas en [`DOCUMENTACION.md`](./DOCUMENTACION.md).
+
+---
 **Autor:** Mendoza, 2026

@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     auth_secret: str = "vet-los-pinos-secreto-dev"
     auth_token_horas: int = 12
 
+    # CORS: "*" en dev; en prod poner el dominio de Vercel (CSV) vía variable.
+    cors_origins: str = "*"
+
+    # Rate-limit del login (anti fuerza bruta)
+    login_max_intentos: int = 8     # intentos fallidos permitidos
+    login_ventana_seg:  int = 300   # ventana de tiempo (5 min)
+
     model_config = {
         "env_file": str(Path(__file__).resolve().parents[1] / ".env"),
         "env_file_encoding": "utf-8",

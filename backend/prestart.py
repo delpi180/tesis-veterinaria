@@ -1,16 +1,18 @@
 """
 Inicialización previa al arranque (usada por Render antes de levantar uvicorn).
 
-Reconcilia el estado de Alembic con la base de datos real para evitar el error
-"relation already exists" cuando la BD fue creada en su día por
-Base.metadata.create_all() sin control de migraciones:
+Reconcilia el estado de Alembic con la base de datos real, SIN destruir datos:
 
 - Si la BD ya está gestionada por Alembic (existe la tabla alembic_version),
   se aplica el flujo normal: upgrade head.
 - Si la BD tiene tablas pero NO está bajo control de Alembic (esquema legado
-  creado por create_all), se reconstruye limpio para que coincida 100% con el
-  código y queda registrado en Alembic.
+  creado por create_all), se ponen al día las tablas faltantes (create_all es
+  idempotente: NUNCA borra) y se marca el esquema como actual (stamp head).
+  Nota: si hubiera columnas faltantes por drift, se resuelven con una migración
+  manual; jamás se borra la base automáticamente.
 - Si la BD está vacía, se aplican todas las migraciones desde cero.
+
+IMPORTANTE: este script nunca ejecuta drop_all ni borra datos en producción.
 """
 from alembic import command
 from alembic.config import Config
@@ -29,17 +31,19 @@ def main() -> None:
         print("[prestart] BD gestionada por Alembic -> upgrade head")
         command.upgrade(cfg, "head")
     elif tablas:
+        # Esquema legado sin control de Alembic: NO se borra. Se agregan tablas
+        # faltantes (idempotente) y se marca como actual.
         print(
             "[prestart] Esquema legado sin control de Alembic "
-            f"({len(tablas)} tablas) -> reconstruyendo limpio"
+            f"({len(tablas)} tablas) -> create_all idempotente + stamp head"
         )
-        Base.metadata.drop_all(bind=engine)
-        command.upgrade(cfg, "head")
+        Base.metadata.create_all(bind=engine)
+        command.stamp(cfg, "head")
     else:
         print("[prestart] BD vacía -> upgrade head")
         command.upgrade(cfg, "head")
 
-    print("[prestart] Esquema sincronizado correctamente.")
+    print("[prestart] Esquema sincronizado correctamente (sin pérdida de datos).")
 
 
 if __name__ == "__main__":

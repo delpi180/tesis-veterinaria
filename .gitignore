@@ -23,3 +23,6 @@ __pycache__/
 # Builds
 dist/
 build/
+
+# Respaldos de base de datos (no versionar dumps)
+backend/backups/

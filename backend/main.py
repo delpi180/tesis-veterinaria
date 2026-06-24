@@ -135,9 +135,12 @@ async def auth_middleware(request: Request, call_next):
     return response
 
 
+# CORS: "*" en dev; en prod se restringe al/los dominio(s) de settings.cors_origins
+_cors = settings.cors_origins.strip()
+_origins = ["*"] if _cors == "*" else [o.strip() for o in _cors.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
