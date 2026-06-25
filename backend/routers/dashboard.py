@@ -66,6 +66,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
             "especie": c.paciente.especie if c.paciente else None,
             "cliente_id": c.paciente.cliente_id if c.paciente else None,
             "propietario": c.paciente.cliente.nombre if c.paciente and c.paciente.cliente else None,
+            "telefono": c.paciente.cliente.telefono if c.paciente and c.paciente.cliente else None,
             "veterinario": c.veterinario.nombre if c.veterinario else None,
         }
         for c in citas_hoy

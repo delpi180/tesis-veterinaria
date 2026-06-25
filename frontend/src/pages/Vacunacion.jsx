@@ -25,8 +25,9 @@ const FILTROS = [
 
 const waLink = (tel, propietario, paciente, vacuna) => {
   const num = (tel || '').replace(/\D/g, '')
+  const intl = num.length === 9 ? `51${num}` : num
   const msg = `Hola ${propietario || ''}, le recordamos que ${paciente || 'su mascota'} tiene pendiente la vacuna *${vacuna}* en Veterinaria Los Pinos. ¡Le esperamos!`
-  return `https://wa.me/${num}?text=${encodeURIComponent(msg)}`
+  return `https://wa.me/${intl}?text=${encodeURIComponent(msg)}`
 }
 
 const Spinner = () => (
