@@ -331,3 +331,56 @@ def reportes(
         "top_servicios": top_servicios,
         "atenciones_por_doctor": atenciones_por_doctor,
     }
+
+
+@router.get("/vacunas")
+def vacunas(db: Session = Depends(get_db)):
+    """Consolidado de vacunación por paciente: última de cada vacuna, con su
+    próxima dosis y estado (vencida / próxima / programada)."""
+    hoy = date.today()
+    pronto = hoy + timedelta(days=30)
+    historias = (
+        db.query(HistoriaClinica)
+        .options(joinedload(HistoriaClinica.paciente).joinedload(Paciente.cliente))
+        .filter(HistoriaClinica.vacunas_items.isnot(None))
+        .order_by(HistoriaClinica.fecha.desc())
+        .all()
+    )
+    out: list[dict] = []
+    vistos: set[tuple[int, str]] = set()
+    for h in historias:
+        for item in (h.vacunas_items or []):
+            nombre = (item.get("vacuna") or "").strip()
+            if not nombre:
+                continue
+            clave = (h.paciente_id, nombre.lower())
+            if clave in vistos:
+                continue
+            vistos.add(clave)
+            prox = item.get("proxima_dosis")
+            fprox = _parse_fecha_libre(prox)
+            estado = None
+            if fprox:
+                if fprox < hoy:
+                    estado = "vencida"
+                elif fprox <= pronto:
+                    estado = "proxima"
+                else:
+                    estado = "programada"
+            pac = h.paciente
+            out.append({
+                "paciente_id": h.paciente_id,
+                "paciente": pac.nombre if pac else None,
+                "especie": pac.especie if pac else None,
+                "cliente_id": pac.cliente_id if pac else None,
+                "propietario": pac.cliente.nombre if pac and pac.cliente else None,
+                "telefono": pac.cliente.telefono if pac and pac.cliente else None,
+                "vacuna": nombre,
+                "fecha_aplicada": h.fecha.isoformat() if h.fecha else None,
+                "proxima_dosis": prox,
+                "fecha_proxima": fprox.isoformat() if fprox else None,
+                "estado": estado,
+            })
+    orden = {"vencida": 0, "proxima": 1, "programada": 2, None: 3}
+    out.sort(key=lambda v: (orden.get(v["estado"], 3), v["fecha_proxima"] or "9999-99-99"))
+    return out

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, Activity, LogOut, Wallet, UserCog,
-  Clock, ClipboardList, History, PieChart, ConciergeBell, Menu, X,
+  Clock, ClipboardList, History, PieChart, ConciergeBell, Syringe, Menu, X,
 } from 'lucide-react'
 import { getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
 import GlobalSearch from './GlobalSearch'
@@ -27,6 +27,7 @@ const SECCION_ADMIN = [
   { label: 'Servicios',         to: '/servicios',  Icon: Stethoscope },
   { label: 'Ventas',            to: '/ventas',     Icon: BarChart2 },
   { label: 'Caja',              to: '/caja',       Icon: Wallet },
+  { label: 'Vacunación',        to: '/vacunacion', Icon: Syringe,  admin: true },
   { label: 'Reportes',          to: '/reportes',   Icon: PieChart, admin: true },
   { label: 'Asistencia',        to: '/asistencia', Icon: Clock,    admin: true },
   { label: 'Actividad',         to: '/actividad',  Icon: History,  admin: true },

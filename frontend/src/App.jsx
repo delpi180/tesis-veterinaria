@@ -18,6 +18,7 @@ import Asistencia from './pages/Asistencia'
 import Actividad from './pages/Actividad'
 import Reportes from './pages/Reportes'
 import PanelRecepcion from './pages/PanelRecepcion'
+import Vacunacion from './pages/Vacunacion'
 import Mediciones from './pages/Mediciones'
 import { getToken, esVeterinario, esAdmin } from './services/api'
 import './App.css'
@@ -56,6 +57,7 @@ function AppProtegida() {
           <Route path="/actividad"              element={<SoloAdmin><Actividad /></SoloAdmin>} />
           <Route path="/reportes"               element={<SoloAdmin><Reportes /></SoloAdmin>} />
           <Route path="/recepcion"              element={<SoloAdmin><PanelRecepcion /></SoloAdmin>} />
+          <Route path="/vacunacion"             element={<SoloAdmin><Vacunacion /></SoloAdmin>} />
           <Route path="/usuarios"               element={<SoloAdmin><Usuarios /></SoloAdmin>} />
           <Route path="/mediciones"             element={<Mediciones />} />
           <Route path="*"                       element={<Navigate to="/" replace />} />
