@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingCart, Package, CreditCard,
-  Receipt, Plus, Minus, Trash2, X, FileText, Search, Stethoscope, Tag,
+  Receipt, Plus, Minus, Trash2, X, FileText, Search, Stethoscope, Tag, Download,
 } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api } from '../services/api'
+import { exportarCSV } from '../utils/exportUtils'
 
 const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -327,6 +328,24 @@ export default function Ventas() {
 
   const clienteMap = Object.fromEntries(clientes.map(c => [c.id, c]))
 
+  // Exporta a CSV (Excel) las ventas actualmente cargadas (respeta el rango de fechas).
+  const exportarVentas = () => {
+    if (ventas.length === 0) return
+    exportarCSV(
+      'Ventas',
+      ['Boleta', 'Fecha', 'Hora', 'Cliente', 'Detalle', 'Subtotal', 'Descuento %', 'Total', 'Método'],
+      ventas.map(v => [
+        nroBoleta(v.id), fmtFecha(v.fecha), fmtHora(v.fecha),
+        clienteMap[v.cliente_id]?.nombre ?? `Cliente #${v.cliente_id}`,
+        v.items.map(it => `${it.descripcion} x${it.cantidad}`).join(' | '),
+        Number(v.subtotal ?? v.total).toFixed(2),
+        Number(v.descuento_pct ?? 0).toFixed(0),
+        Number(v.total).toFixed(2),
+        metodoLabel(v.metodo_pago),
+      ]),
+    )
+  }
+
   // ── KPIs del mes actual ─────────────────────────────────────────────────────
   const ahora = new Date()
   const ventasMes = ventas.filter(v => mismoMes(v.fecha, ahora))
@@ -560,6 +579,13 @@ export default function Ventas() {
                 className="flex items-center gap-1 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg px-2.5 py-1 hover:bg-purple-50 transition disabled:opacity-40"
               >
                 <FileText className="w-3.5 h-3.5" /> Reporte PDF
+              </button>
+              <button
+                onClick={exportarVentas}
+                disabled={ventas.length === 0}
+                className="flex items-center gap-1 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg px-2.5 py-1 hover:bg-slate-50 transition disabled:opacity-40"
+              >
+                <Download className="w-3.5 h-3.5" /> Excel
               </button>
             </div>
           </div>

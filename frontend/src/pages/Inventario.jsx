@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Package, AlertTriangle, Coins, Search, Pencil, Trash2, X, Filter, History, ArrowDownUp, Sparkles, Mic, StopCircle, Plus } from 'lucide-react'
+import { Package, AlertTriangle, Coins, Search, Pencil, Trash2, X, Filter, History, ArrowDownUp, Sparkles, Mic, StopCircle, Plus, Download } from 'lucide-react'
 import { api, authHeaders } from '../services/api'
 import { useToast } from '../components/Toast'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
+import { exportarCSV } from '../utils/exportUtils'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
@@ -390,6 +391,21 @@ export default function Inventario() {
   const hayFiltros = term || fCategoria || fEstado
   const limpiarFiltros = () => { setBusqueda(''); setFCategoria(''); setFEstado('') }
 
+  const exportar = () => {
+    if (filtrados.length === 0) { toast.error('No hay productos para exportar.'); return }
+    exportarCSV(
+      'Inventario',
+      ['Código', 'Producto', 'Categoría', 'Proveedor', 'Stock', 'Stock mínimo', 'Precio', 'Valor', 'Estado'],
+      filtrados.map(p => [
+        p.codigo ?? '', p.nombre, CAT_LABEL[p.categoria] ?? p.categoria ?? '',
+        p.proveedor ?? '', p.stock, p.stock_minimo,
+        Number(p.precio).toFixed(2), Number(p.valor_stock ?? p.stock * Number(p.precio)).toFixed(2),
+        !p.activo ? 'Inactivo' : p.stock_bajo ? 'Bajo stock' : 'En stock',
+      ]),
+    )
+    toast.success(`${filtrados.length} producto(s) exportado(s).`)
+  }
+
   // ── KPIs (datos reales) ────────────────────────────────────────────────────
   const totalProductos = productos.length
   const bajoStock      = productos.filter(p => p.activo && p.stock_bajo).length
@@ -485,6 +501,12 @@ export default function Inventario() {
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={exportar}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-lg transition"
+          >
+            <Download className="w-4 h-4" /> Excel
+          </button>
           <button
             onClick={() => setEntradaIA(true)}
             className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 hover:bg-purple-50 text-sm font-semibold rounded-lg transition"

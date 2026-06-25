@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search } from 'lucide-react'
+import { Search, Download } from 'lucide-react'
 import { api } from '../services/api'
+import { exportarCSV } from '../utils/exportUtils'
+import { useToast } from '../components/Toast'
 
 // ── Iconos ────────────────────────────────────────────────────────────────
 const PlusIcon = () => (
@@ -110,11 +112,13 @@ function ClienteForm({ onSuccess, onCancel, visible }) {
 // ── Vista principal ────────────────────────────────────────────────────────
 export default function Clientes() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [clientes,    setClientes]    = useState([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
   const [showForm,    setShowForm]    = useState(false)
   const [searchTerm,  setSearchTerm]  = useState('')
+  const [exportando,  setExportando]  = useState(false)
 
   const PAGE = 25
   const [pagina, setPagina] = useState(1)
@@ -147,6 +151,37 @@ export default function Clientes() {
 
   const irPagina = (nueva) => { setPagina(nueva); cargar(searchTerm, nueva) }
 
+  // Exporta TODOS los clientes que coinciden con la búsqueda (no solo la página actual),
+  // trayéndolos en lotes porque el endpoint limita a 1000 por petición.
+  const exportar = async () => {
+    setExportando(true)
+    try {
+      const q = searchTerm.trim()
+      const LOTE = 1000
+      let skip = 0, todos = []
+      while (true) {
+        const p = new URLSearchParams({ skip: String(skip), limit: String(LOTE) })
+        if (q) p.set('q', q)
+        const lote = await api.get(`/api/clientes/?${p.toString()}`)
+        if (!Array.isArray(lote) || lote.length === 0) break
+        todos = todos.concat(lote)
+        if (lote.length < LOTE) break
+        skip += LOTE
+      }
+      if (todos.length === 0) { toast.error('No hay clientes para exportar.'); return }
+      exportarCSV(
+        'Clientes',
+        ['DNI', 'Nombre', 'Teléfono', 'Dirección', 'Mascotas'],
+        todos.map(c => [c.dni ?? '', c.nombre, c.telefono ?? '', c.direccion ?? '', c.pacientes?.length ?? 0]),
+      )
+      toast.success(`${todos.length} cliente(s) exportado(s).`)
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setExportando(false)
+    }
+  }
+
   const handleSuccess = () => { setShowForm(false); irPagina(1) }
 
   const term = searchTerm.trim()
@@ -165,13 +200,22 @@ export default function Clientes() {
           <h1 className="text-xl font-bold text-slate-800">Clientes</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
         </div>
-        <button
-          onClick={() => setShowForm(v => !v)}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
-        >
-          <PlusIcon />
-          Nuevo Cliente
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportar}
+            disabled={exportando}
+            className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-lg transition disabled:opacity-50"
+          >
+            <Download className="w-4 h-4" /> {exportando ? 'Exportando…' : 'Excel'}
+          </button>
+          <button
+            onClick={() => setShowForm(v => !v)}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
+          >
+            <PlusIcon />
+            Nuevo Cliente
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-5xl w-full mx-auto">
