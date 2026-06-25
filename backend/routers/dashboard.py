@@ -89,6 +89,26 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         for a in presentes_rows
     ]
 
+    # ── Todas las asistencias de hoy (para la tabla de marcación del dashboard) ──
+    asistencias_hoy_rows = (
+        db.query(Asistencia)
+        .options(joinedload(Asistencia.usuario))
+        .filter(Asistencia.fecha == hoy)
+        .order_by(Asistencia.hora_ingreso)
+        .all()
+    )
+    asistencias_hoy = [
+        {
+            "id": a.id,
+            "usuario_id": a.usuario_id,
+            "nombre": a.usuario.nombre if a.usuario else None,
+            "hora_ingreso": a.hora_ingreso.isoformat() if a.hora_ingreso else None,
+            "hora_salida": a.hora_salida.isoformat() if a.hora_salida else None,
+            "tardanza_min": a.tardanza_min,
+        }
+        for a in asistencias_hoy_rows
+    ]
+
     # ── Consultas por día de la semana actual ─────────────────────────────────
     lunes = hoy - timedelta(days=hoy.weekday())
     sem_ini, _ = _rango_local(lunes)
@@ -224,6 +244,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         "especies_distribucion": especies_distribucion,
         "ingresos_semana": ingresos_semana,
         "metodos_pago": metodos_pago,
+        "asistencias_hoy": asistencias_hoy,
     }
 
 

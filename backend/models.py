@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import Column, Boolean, Date, Float, Integer, Numeric, String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -215,6 +215,26 @@ class Asistencia(Base):
     @property
     def hora_entrada_perfil(self):
         return self.usuario.hora_entrada if self.usuario else None
+
+    @property
+    def tardanza_min(self):
+        """Minutos de tardanza respecto al horario pactado (0 = a tiempo)."""
+        if not (self.hora_ingreso and self.hora_entrada_perfil):
+            return None
+        try:
+            sh, sm = (int(x) for x in self.hora_entrada_perfil.split(":"))
+        except (ValueError, AttributeError):
+            return None
+        
+        PERU_TZ = timezone(timedelta(hours=-5))
+        local_dt = self.hora_ingreso
+        if local_dt.tzinfo is None:
+            local_dt = local_dt.replace(tzinfo=timezone.utc)
+        local_dt = local_dt.astimezone(PERU_TZ)
+        
+        diff = (local_dt.hour * 60 + local_dt.minute) - (sh * 60 + sm)
+        return diff if diff > 0 else 0
+
 
 
 class Evaluador(Base):

@@ -13,6 +13,14 @@ function hoyStr() {
   return `${d.getFullYear()}-${mm}-${dd}`
 }
 
+function haceUnaSemanaStr() {
+  const d = new Date()
+  d.setDate(d.getDate() - 7)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
 function fmtHora(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
@@ -41,7 +49,7 @@ export default function Asistencia() {
   const [loading,  setLoading]  = useState(true)
   const [refrescando, setRefrescando] = useState(false)
 
-  const [filtros, setFiltros] = useState({ usuarioId: '', desde: hoyStr(), hasta: hoyStr() })
+  const [filtros, setFiltros] = useState({ usuarioId: '', desde: haceUnaSemanaStr(), hasta: hoyStr() })
 
   const cargarDoctores = async () => {
     const data = await api.get('/api/usuarios/doctores')

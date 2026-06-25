@@ -60,6 +60,7 @@ export default function PanelRecepcion() {
   const stockBajo  = data?.stock_bajo ?? []
   const cajaTotal  = caja?.total ?? 0
   const cajaVentas = caja?.num_ventas ?? 0
+  const asistenciasHoy = data?.asistencias_hoy ?? []
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
@@ -189,6 +190,54 @@ export default function PanelRecepcion() {
                               className="flex items-center justify-center w-7 h-7 rounded-lg bg-green-600 hover:bg-green-500 text-white transition">
                               <MessageCircle className="w-3.5 h-3.5" />
                             </a>
+                          )}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+
+            {/* Asistencias del día */}
+            <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-emerald-500" />
+                  <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Asistencia de hoy</h2>
+                  <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">{asistenciasHoy.length}</span>
+                </div>
+                <button onClick={() => navigate('/asistencia')} className="text-xs text-purple-600 hover:text-purple-800 font-semibold">Ver historial completo →</button>
+              </div>
+
+              {asistenciasHoy.length === 0 ? (
+                <p className="text-sm text-slate-400 px-5 py-8 text-center">Sin ingresos registrados hoy.</p>
+              ) : (
+                <ul className="divide-y divide-slate-50">
+                  {asistenciasHoy.map(a => {
+                    const enTurno = !a.hora_salida
+                    return (
+                      <li key={a.id} className="px-5 py-3 flex items-center justify-between text-sm gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-slate-800 truncate">{a.nombre}</p>
+                          <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <span>Ingreso: <strong>{fmtHora(a.hora_ingreso)}</strong></span>
+                            {a.tardanza_min > 0 && (
+                              <span className="text-rose-600 bg-rose-50 px-1 py-0.5 rounded font-medium text-[10px] border border-rose-100">
+                                +{a.tardanza_min} min tardanza
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {enTurno ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full animate-pulse">
+                              En Turno
+                            </span>
+                          ) : (
+                            <span className="text-xs font-medium text-slate-500">
+                              Salida: <strong>{fmtHora(a.hora_salida)}</strong>
+                            </span>
                           )}
                         </div>
                       </li>
