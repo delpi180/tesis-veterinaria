@@ -562,6 +562,18 @@ export default function HistoriasClinicas() {
   // ── Volcar datos de IA al formulario
   const applyIA = (datos, inferencias, alertasRango = {}) => {
     usoIA.current = true;   // este registro se asistió con IA (voz o texto)
+    const nombresSimilares = (a, b) => {
+      if (!a || !b) return false;
+      const normalize = (s) => String(s).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, "");
+      const na = normalize(a);
+      const nb = normalize(b);
+      if (na === nb) return true;
+      if (na.length > 4 && nb.length > 4) {
+        if (na.includes(nb) || nb.includes(na)) return true;
+      }
+      return false;
+    };
+
     setForm(prev => {
       const next = { ...prev };
       const SKIP = ["examen_particular", "tratamiento_items", "vacunas_items"];
@@ -577,28 +589,74 @@ export default function HistoriasClinicas() {
           next[k] = String(val);
         }
       }
-      // EOP
-      const ep = eopVacio();
+      // EOP (Examen objetivo particular por sistemas) - Mezcla inteligente en lugar de sobreescribir todo
+      const ep = next.examen_particular
+        ? Object.fromEntries(
+            Object.entries(next.examen_particular).map(([s, val]) => [s, { ...val }])
+          )
+        : eopVacio();
       if (datos.examen_particular && typeof datos.examen_particular === "object") {
         for (const s of SISTEMAS_EOP) {
           const val = datos.examen_particular[s];
           if (!val) continue;
           ep[s] = typeof val === "string"
-            ? { estado: "", detalle: val }
-            : { estado: val.estado || "", detalle: val.detalle || "" };
+            ? { estado: ep[s]?.estado || "", detalle: val }
+            : { estado: val.estado || ep[s]?.estado || "", detalle: val.detalle || ep[s]?.detalle || "" };
         }
       }
       next.examen_particular = ep;
-      // Listas — reemplaza (no acumula)
-      if (Array.isArray(datos.tratamiento_items) && datos.tratamiento_items.length > 0)
-        next.tratamiento_items = datos.tratamiento_items.map(i => ({
-          medicamento: i.medicamento||"", dosis: i.dosis||"",
-          via: i.via||"", frecuencia: i.frecuencia||"", duracion: i.duracion||"",
-        }));
-      if (Array.isArray(datos.vacunas_items) && datos.vacunas_items.length > 0)
-        next.vacunas_items = datos.vacunas_items.map(i => ({
-          vacuna: i.vacuna||"", lote: i.lote||"", proxima_dosis: i.proxima_dosis||"",
-        }));
+
+      // Listas — Mezcla inteligente en lugar de sobreescribir todo
+      if (Array.isArray(datos.tratamiento_items) && datos.tratamiento_items.length > 0) {
+        const existingTx = (prev.tratamiento_items || []).filter(i => i.medicamento?.trim());
+        const mergedTx = [...existingTx];
+
+        datos.tratamiento_items.forEach(incoming => {
+          const matchedIdx = mergedTx.findIndex(item => nombresSimilares(item.medicamento, incoming.medicamento));
+          if (matchedIdx > -1) {
+            const matchedItem = { ...mergedTx[matchedIdx] };
+            if (incoming.medicamento) matchedItem.medicamento = incoming.medicamento;
+            if (incoming.dosis) matchedItem.dosis = incoming.dosis;
+            if (incoming.via) matchedItem.via = incoming.via;
+            if (incoming.frecuencia) matchedItem.frecuencia = incoming.frecuencia;
+            if (incoming.duracion) matchedItem.duracion = incoming.duracion;
+            mergedTx[matchedIdx] = matchedItem;
+          } else {
+            mergedTx.push({
+              medicamento: incoming.medicamento || "",
+              dosis: incoming.dosis || "",
+              via: incoming.via || "",
+              frecuencia: incoming.frecuencia || "",
+              duracion: incoming.duracion || "",
+            });
+          }
+        });
+        next.tratamiento_items = mergedTx;
+      }
+
+      if (Array.isArray(datos.vacunas_items) && datos.vacunas_items.length > 0) {
+        const existingVx = (prev.vacunas_items || []).filter(i => i.vacuna?.trim());
+        const mergedVx = [...existingVx];
+
+        datos.vacunas_items.forEach(incoming => {
+          const matchedIdx = mergedVx.findIndex(item => nombresSimilares(item.vacuna, incoming.vacuna));
+          if (matchedIdx > -1) {
+            const matchedItem = { ...mergedVx[matchedIdx] };
+            if (incoming.vacuna) matchedItem.vacuna = incoming.vacuna;
+            if (incoming.lote) matchedItem.lote = incoming.lote;
+            if (incoming.proxima_dosis) matchedItem.proxima_dosis = incoming.proxima_dosis;
+            mergedVx[matchedIdx] = matchedItem;
+          } else {
+            mergedVx.push({
+              vacuna: incoming.vacuna || "",
+              lote: incoming.lote || "",
+              proxima_dosis: incoming.proxima_dosis || "",
+            });
+          }
+        });
+        next.vacunas_items = mergedVx;
+      }
+
       return next;
     });
 
