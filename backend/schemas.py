@@ -506,9 +506,10 @@ class VentaItemCreate(BaseModel):
 
 
 class VentaCreate(BaseModel):
-    cliente_id:  int
-    metodo_pago: Literal['efectivo', 'tarjeta', 'yape', 'plin'] = 'efectivo'
-    items:       list[VentaItemCreate] = Field(min_length=1)
+    cliente_id:    int
+    metodo_pago:   Literal['efectivo', 'tarjeta', 'yape', 'plin'] = 'efectivo'
+    descuento_pct: float = Field(0, ge=0, le=100)   # % de descuento sobre el subtotal
+    items:         list[VentaItemCreate] = Field(min_length=1)
 
 
 class VentaItemOut(BaseModel):
@@ -546,12 +547,23 @@ class VentaItemOut(BaseModel):
 
 
 class VentaOut(BaseModel):
-    id:          int
-    cliente_id:  int
-    fecha:       datetime
-    total:       float
-    metodo_pago: Optional[str] = None
-    items:       list[VentaItemOut] = []
+    id:            int
+    cliente_id:    int
+    fecha:         datetime
+    total:         float                      # total final (con descuento)
+    descuento_pct: float = 0
+    metodo_pago:   Optional[str] = None
+    items:         list[VentaItemOut] = []
+
+    @computed_field
+    @property
+    def subtotal(self) -> float:
+        return round(sum(it.subtotal for it in self.items), 2)
+
+    @computed_field
+    @property
+    def descuento_monto(self) -> float:
+        return round(self.subtotal * (self.descuento_pct or 0) / 100, 2)
 
     model_config = ConfigDict(from_attributes=True)
 

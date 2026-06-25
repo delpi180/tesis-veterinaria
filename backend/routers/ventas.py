@@ -90,11 +90,14 @@ def crear_venta(payload: VentaCreate, db: Session = Depends(get_db)):
 
     # ── FASE 2: crear venta + items + descontar stock, todo o nada ───────────
     try:
-        total = sum(l["precio_unitario"] * l["cantidad"] for l in lineas)
+        subtotal = sum(l["precio_unitario"] * l["cantidad"] for l in lineas)
+        pct = max(0.0, min(100.0, float(payload.descuento_pct or 0)))
+        total = round(subtotal * (1 - pct / 100), 2)
 
         venta = Venta(
             cliente_id=payload.cliente_id,
             total=total,
+            descuento_pct=pct,
             metodo_pago=payload.metodo_pago,
         )
         db.add(venta)

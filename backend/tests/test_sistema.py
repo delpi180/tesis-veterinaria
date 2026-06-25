@@ -418,3 +418,30 @@ def test_turno_creado_por_doctor_se_autoasigna(client, doctor, admin):
         db = SessionLocal()
         db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
         db.commit(); db.close()
+
+
+def test_venta_con_descuento(client, admin):
+    """El descuento porcentual se aplica al total y se refleja en la respuesta."""
+    cli = client.post("/api/clientes/", json={"nombre": "QA Desc", "dni": "11223344"}, headers=admin).json()
+    prod = client.post("/api/productos/", json={"nombre": "QA DescProd", "categoria": "comida", "precio": 100, "stock": 10}, headers=admin).json()
+    venta = None
+    try:
+        r = client.post("/api/ventas/", json={
+            "cliente_id": cli["id"], "metodo_pago": "efectivo", "descuento_pct": 10,
+            "items": [{"producto_id": prod["id"], "cantidad": 2}],   # subtotal 200
+        }, headers=admin)
+        assert r.status_code == 201
+        venta = r.json()
+        assert venta["descuento_pct"] == 10
+        assert venta["subtotal"] == 200.0
+        assert venta["descuento_monto"] == 20.0
+        assert venta["total"] == 180.0
+    finally:
+        db = SessionLocal()
+        db.execute(text("DELETE FROM movimientos_inventario WHERE producto_id=:p"), {"p": prod["id"]})
+        if venta:
+            db.execute(text("DELETE FROM venta_items WHERE venta_id=:v"), {"v": venta["id"]})
+            db.execute(text("DELETE FROM ventas WHERE id=:v"), {"v": venta["id"]})
+        db.execute(text("DELETE FROM productos WHERE id=:p"), {"p": prod["id"]})
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()

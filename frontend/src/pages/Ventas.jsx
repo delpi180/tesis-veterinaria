@@ -168,7 +168,15 @@ function generarBoleta(venta, cliente) {
     margin: { left: 14, right: 14 },
   })
 
-  const finY = doc.lastAutoTable.finalY + 4
+  let finY = doc.lastAutoTable.finalY + 4
+  if (Number(venta.descuento_pct) > 0) {
+    doc.setTextColor(90, 90, 90); doc.setFontSize(9); doc.setFont(undefined, 'normal')
+    doc.text('Subtotal:', W - 80, finY + 4)
+    doc.text(fmtMoneda(venta.subtotal ?? venta.total), W - 18, finY + 4, { align: 'right' })
+    doc.text(`Descuento (${venta.descuento_pct}%):`, W - 80, finY + 9)
+    doc.text('- ' + fmtMoneda(venta.descuento_monto ?? 0), W - 18, finY + 9, { align: 'right' })
+    finY += 11
+  }
   doc.setFillColor(243, 240, 250)
   doc.roundedRect(W - 84, finY, 70, 12, 2, 2, 'F')
   doc.setTextColor(...morado)
@@ -202,6 +210,7 @@ export default function Ventas() {
   const [cliSelLabel,   setCliSelLabel]   = useState('')
   const [selectedClientObj, setSelectedClientObj] = useState(null)
   const [metodoPago,   setMetodoPago]   = useState('efectivo')
+  const [descuentoPct, setDescuentoPct] = useState('')
   const [carrito,      setCarrito]      = useState([])  // [{ tipo, id, nombre, precio, cantidad, precio_variable, stock }]
   const [tab,          setTab]          = useState('producto')  // 'producto' | 'servicio'
   const [catBusqueda,  setCatBusqueda]  = useState('')
@@ -353,7 +362,7 @@ export default function Ventas() {
   // ── Carrito (POS) ──────────────────────────────────────────────────────────
   const abrirModal = () => {
     setClienteId(''); setCliSelLabel(''); setCliBusq(''); setCliResultados([]); setSelectedClientObj(null)
-    setMetodoPago('efectivo'); setCarrito([]); setTab('producto')
+    setMetodoPago('efectivo'); setDescuentoPct(''); setCarrito([]); setTab('producto')
     setCatBusqueda(''); setCatCategoria(''); setErrorModal(null); setPosVista('catalogo')
     setModalAbierto(true)
   }
@@ -401,7 +410,10 @@ export default function Ventas() {
     l.key === key ? { ...l, precio: valor } : l))
   const quitarLinea = (key) => setCarrito(c => c.filter(l => l.key !== key))
 
-  const totalCarrito = carrito.reduce((s, l) => s + (Number(l.precio) || 0) * l.cantidad, 0)
+  const totalCarrito = carrito.reduce((s, l) => s + (Number(l.precio) || 0) * l.cantidad, 0)  // subtotal
+  const descPct       = Math.max(0, Math.min(100, Number(descuentoPct) || 0))
+  const descuentoMonto = totalCarrito * descPct / 100
+  const totalFinal     = totalCarrito - descuentoMonto
 
   // Catálogo filtrado para el panel izquierdo
   const term = catBusqueda.trim().toLowerCase()
@@ -423,8 +435,9 @@ export default function Ventas() {
     setGuardando(true); setErrorModal(null)
     try {
       const venta = await api.post('/api/ventas/', {
-        cliente_id:  parseInt(clienteId, 10),
-        metodo_pago: metodoPago,
+        cliente_id:    parseInt(clienteId, 10),
+        metodo_pago:   metodoPago,
+        descuento_pct: descPct,
         items: carrito.map(l => l.tipo === 'producto'
           ? { producto_id: l.id, cantidad: l.cantidad }
           : { servicio_id: l.id, cantidad: l.cantidad, ...(l.precio_variable ? { precio: Number(l.precio) } : {}) }
@@ -793,7 +806,7 @@ export default function Ventas() {
                     <button type="button" onClick={() => setPosVista('carrito')}
                       className="w-full py-2.5 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition shadow">
                       <ShoppingCart className="w-4 h-4" />
-                      Ver carrito ({carrito.length}) — {fmtMoneda(totalCarrito)}
+                      Ver carrito ({carrito.length}) — {fmtMoneda(totalFinal)}
                     </button>
                   </div>
                 )}
@@ -893,9 +906,31 @@ export default function Ventas() {
                       ))}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-slate-500">Total</span>
-                    <span className="text-xl font-bold text-slate-800">{fmtMoneda(totalCarrito)}</span>
+                  {/* Descuento */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500">Descuento (%)</span>
+                    <input
+                      type="number" min="0" max="100" step="0.5"
+                      value={descuentoPct}
+                      onChange={e => setDescuentoPct(e.target.value)}
+                      placeholder="0"
+                      className="w-20 text-sm text-right border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                    />
+                  </div>
+                  {/* Resumen */}
+                  <div className="space-y-0.5 mb-3 text-sm">
+                    <div className="flex items-center justify-between text-slate-500">
+                      <span>Subtotal</span><span>{fmtMoneda(totalCarrito)}</span>
+                    </div>
+                    {descPct > 0 && (
+                      <div className="flex items-center justify-between text-rose-600">
+                        <span>Descuento ({descPct}%)</span><span>− {fmtMoneda(descuentoMonto)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                      <span className="font-semibold text-slate-700">Total</span>
+                      <span className="text-xl font-bold text-slate-800">{fmtMoneda(totalFinal)}</span>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button type="button" onClick={cerrarModal}

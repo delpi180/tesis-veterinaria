@@ -311,11 +311,12 @@ class Servicio(Base):
 class Venta(Base):
     __tablename__ = "ventas"
 
-    id          = Column(Integer, primary_key=True)
-    cliente_id  = Column(Integer, ForeignKey("clientes.id"), nullable=False)
-    fecha       = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    total       = Column(Numeric(10, 2), nullable=False)
-    metodo_pago = Column(String(20), default="efectivo")  # efectivo | tarjeta | yape | plin
+    id            = Column(Integer, primary_key=True)
+    cliente_id    = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    fecha         = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    total         = Column(Numeric(10, 2), nullable=False)   # total FINAL (con descuento aplicado)
+    descuento_pct = Column(Numeric(5, 2), default=0)         # % de descuento aplicado a la venta
+    metodo_pago   = Column(String(20), default="efectivo")  # efectivo | tarjeta | yape | plin
 
     cliente = relationship("Cliente")
     items   = relationship("VentaItem", back_populates="venta", cascade="all, delete-orphan")
