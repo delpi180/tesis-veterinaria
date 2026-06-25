@@ -3,7 +3,7 @@
 Reservado a la administradora (recepcionista): registra cuándo entra y sale
 cada doctor. Permite consultar un reporte por doctor y rango de fechas.
 """
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -123,8 +123,8 @@ def marcar_salida(
 def listar_asistencia(
     request: Request,
     usuario_id: Optional[int] = Query(None),
-    desde: Optional[str] = Query(None, description="Fecha inicio YYYY-MM-DD"),
-    hasta: Optional[str] = Query(None, description="Fecha fin YYYY-MM-DD"),
+    desde: Optional[date] = Query(None, description="Fecha inicio YYYY-MM-DD"),
+    hasta: Optional[date] = Query(None, description="Fecha fin YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ):
     solo_admin(request)
@@ -142,8 +142,8 @@ def listar_asistencia(
 @router.get("/resumen")
 def resumen_asistencia(
     request: Request,
-    desde: Optional[str] = Query(None, description="Fecha inicio YYYY-MM-DD"),
-    hasta: Optional[str] = Query(None, description="Fecha fin YYYY-MM-DD"),
+    desde: Optional[date] = Query(None, description="Fecha inicio YYYY-MM-DD"),
+    hasta: Optional[date] = Query(None, description="Fecha fin YYYY-MM-DD"),
     db: Session = Depends(get_db),
 ):
     """Totales por doctor en el rango: días, horas trabajadas y tardanzas."""
