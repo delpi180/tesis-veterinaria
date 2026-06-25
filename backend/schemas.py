@@ -718,6 +718,7 @@ class AsistenciaOut(BaseModel):
             return round(segundos / 3600, 2) if segundos > 0 else 0.0
         return None
 
+
     @computed_field
     @property
     def tardanza_min(self) -> Optional[int]:

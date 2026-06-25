@@ -106,6 +106,7 @@ def mi_panel(db: Session = Depends(get_db), usuario: Usuario = Depends(usuario_a
     )
     asistencia_hoy = {
         "marcado": asis is not None,
+        "id": asis.id if asis else None,
         "hora_ingreso": asis.hora_ingreso if asis else None,
         "hora_salida": asis.hora_salida if asis else None,
         "hora_entrada_perfil": usuario.hora_entrada,

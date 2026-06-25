@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Asistencia, Usuario
 from schemas import AsistenciaIngresoReq, AsistenciaOut
-from core.deps import solo_admin
+from core.deps import solo_admin, usuario_actual
 
 router = APIRouter(prefix="/api/asistencia", tags=["Asistencia"])
 
@@ -26,8 +26,26 @@ def _ahora_local() -> datetime:
 
 
 @router.post("/ingreso", response_model=AsistenciaOut, status_code=status.HTTP_201_CREATED)
-def marcar_ingreso(payload: AsistenciaIngresoReq, request: Request, db: Session = Depends(get_db)):
-    solo_admin(request)
+def marcar_ingreso(
+    payload: AsistenciaIngresoReq,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    user_rol = getattr(request.state, "rol", None)
+    if user_rol == "recepcionista":
+        pass
+    elif user_rol == "veterinario":
+        if not usuario or usuario.id != payload.usuario_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No está autorizado para registrar la asistencia de otro usuario.",
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Rol no autorizado para registrar asistencia.",
+        )
 
     doctor = db.get(Usuario, payload.usuario_id)
     if not doctor:
@@ -67,14 +85,32 @@ def marcar_ingreso(payload: AsistenciaIngresoReq, request: Request, db: Session 
 
 
 @router.post("/{asistencia_id}/salida", response_model=AsistenciaOut)
-def marcar_salida(asistencia_id: int, request: Request, db: Session = Depends(get_db)):
-    solo_admin(request)
-
+def marcar_salida(
+    asistencia_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
     asistencia = db.get(Asistencia, asistencia_id)
     if not asistencia:
         raise HTTPException(status_code=404, detail="Marcación no encontrada")
     if asistencia.hora_salida is not None:
         raise HTTPException(status_code=409, detail="Esta marcación ya tiene salida registrada.")
+
+    user_rol = getattr(request.state, "rol", None)
+    if user_rol == "recepcionista":
+        pass
+    elif user_rol == "veterinario":
+        if not usuario or usuario.id != asistencia.usuario_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No está autorizado para registrar la salida de otro usuario.",
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Rol no autorizado para registrar asistencia.",
+        )
 
     asistencia.hora_salida = _ahora_local()
     db.commit()

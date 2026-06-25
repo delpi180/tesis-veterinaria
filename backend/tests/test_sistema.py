@@ -249,8 +249,9 @@ def test_resumen_solo_admin(client, doctor):
 
 def test_asistencia_solo_admin(client, doctor, admin):
     doc_id = _id_doctor(client, admin)
-    # un doctor NO puede registrar asistencia (es función de la administradora)
-    r = client.post("/api/asistencia/ingreso", json={"usuario_id": doc_id}, headers=doctor)
+    _limpiar_asistencia(doc_id)
+    # un doctor NO puede registrar asistencia para otros (da 403)
+    r = client.post("/api/asistencia/ingreso", json={"usuario_id": doc_id + 999}, headers=doctor)
     assert r.status_code == 403
     assert client.get("/api/asistencia/", headers=doctor).status_code == 403
 
@@ -445,3 +446,50 @@ def test_venta_con_descuento(client, admin):
         db.execute(text("DELETE FROM productos WHERE id=:p"), {"p": prod["id"]})
         db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
         db.commit(); db.close()
+
+
+def test_asistencia_doctor_autorizacion(client, doctor, admin):
+    """Verifica que un doctor pueda registrar su ingreso/salida y no el de otros."""
+    # 1. Obtener ID del doctor desde el login
+    me = client.get("/api/mi-panel/", headers=doctor).json()
+    my_id = me["doctor"]["id"]
+
+    # Asegurar que no hay marcación activa
+    db = SessionLocal()
+    db.execute(text("DELETE FROM asistencias WHERE usuario_id = :u"), {"u": my_id})
+    db.commit()
+
+    try:
+        # 2. Registrar ingreso para sí mismo (debe pasar con 201)
+        r = client.post("/api/asistencia/ingreso", json={"usuario_id": my_id}, headers=doctor)
+        assert r.status_code == 201
+        asis = r.json()
+        assert asis["usuario_id"] == my_id
+        assert asis["hora_ingreso"] is not None
+
+        # 3. Comprobar que en su panel se refleja el ID de asistencia de hoy
+        me_after = client.get("/api/mi-panel/", headers=doctor).json()
+        assert me_after["asistencia_hoy"]["marcado"] is True
+        assert me_after["asistencia_hoy"]["id"] == asis["id"]
+
+        # 4. Intentar marcar salida para otro doctor o con token ajeno (debe fallar con 403 si intentamos cruzar)
+        # Para probar la protección cruzada, creamos otro doctor temporal
+        db.execute(text("INSERT INTO usuarios (usuario, nombre, password_hash, rol, activo) "
+                        "VALUES ('qa_doc2', 'QA Doc2', 'hash', 'veterinario', true)"))
+        db.commit()
+        doc2_id = db.execute(text("SELECT id FROM usuarios WHERE usuario = 'qa_doc2'")).scalar()
+        
+        # Doctor intenta ingresar para doctor 2 -> 403
+        r_cross = client.post("/api/asistencia/ingreso", json={"usuario_id": doc2_id}, headers=doctor)
+        assert r_cross.status_code == 403
+
+        # 5. Registrar salida para sí mismo (debe pasar con 200)
+        r_out = client.post(f"/api/asistencia/{asis['id']}/salida", headers=doctor)
+        assert r_out.status_code == 200
+        asis_out = r_out.json()
+        assert asis_out["hora_salida"] is not None
+    finally:
+        db.execute(text("DELETE FROM asistencias WHERE usuario_id = :u"), {"u": my_id})
+        db.execute(text("DELETE FROM usuarios WHERE usuario = 'qa_doc2'"))
+        db.commit(); db.close()
+

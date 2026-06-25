@@ -4,6 +4,7 @@ import {
   Calendar, PawPrint, Syringe, FileText, Clock, LogIn, LogOut, ClipboardList, RefreshCw,
 } from 'lucide-react'
 import { api, getNombre } from '../services/api'
+import { useToast } from '../components/Toast'
 
 const DIAS = [
   ['lun', 'Lun'], ['mar', 'Mar'], ['mie', 'Mié'], ['jue', 'Jue'],
@@ -41,6 +42,7 @@ function Card({ title, Icon, count, children }) {
 
 export default function MiPanel() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refrescando, setRefrescando] = useState(false)
@@ -71,6 +73,30 @@ export default function MiPanel() {
 
   const refrescar = async () => { setRefrescando(true); await cargar(true); setRefrescando(false) }
 
+  const marcarIngreso = async () => {
+    try {
+      await api.post('/api/asistencia/ingreso', { usuario_id: data.doctor.id })
+      toast.success('Ingreso registrado con éxito.')
+      await cargar(true)
+    } catch (e) {
+      toast.error(e.message)
+    }
+  }
+
+  const marcarSalida = async () => {
+    if (!data.asistencia_hoy.id) {
+      toast.error('No se encontró la marcación activa.')
+      return
+    }
+    try {
+      await api.post(`/api/asistencia/${data.asistencia_hoy.id}/salida`)
+      toast.success('Salida registrada con éxito.')
+      await cargar(true)
+    } catch (e) {
+      toast.error(e.message)
+    }
+  }
+
   const nombre = getNombre() || 'Doctor'
   const hoy = new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
@@ -96,36 +122,101 @@ export default function MiPanel() {
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">{error}</div>
         ) : (
           <>
-            {/* Asistencia de hoy + horario */}
-            <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 md:px-5 md:py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-y-3 gap-x-4">
-              <div className="flex items-center gap-2 shrink-0">
-                <Clock className="w-5 h-5 text-purple-500" />
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Mi asistencia de hoy</span>
+            {/* Asistencia de hoy + horario rediseñada */}
+            <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100">
+              {/* Bloque izquierdo: Estado y Acciones de Marcación */}
+              <div className="flex-1 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                    data.asistencia_hoy.marcado && !data.asistencia_hoy.hora_salida
+                      ? 'bg-emerald-100 text-emerald-700 animate-pulse'
+                      : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mi asistencia de hoy</h3>
+                    <p className={`text-base font-bold mt-0.5 ${
+                      data.asistencia_hoy.marcado
+                        ? data.asistencia_hoy.hora_salida
+                          ? 'text-slate-600'
+                          : 'text-emerald-600'
+                        : 'text-amber-500'
+                    }`}>
+                      {data.asistencia_hoy.marcado
+                        ? data.asistencia_hoy.hora_salida
+                          ? 'Turno Finalizado'
+                          : 'En Turno (Trabajando)'
+                        : 'Aún sin marcar ingreso'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  {/* Si no ha marcado ingreso */}
+                  {!data.asistencia_hoy.marcado && (
+                    <button
+                      onClick={marcarIngreso}
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-sm transition shadow"
+                    >
+                      <LogIn className="w-4 h-4" /> Registrar Ingreso
+                    </button>
+                  )}
+                  {/* Si marcó ingreso y no ha marcado salida */}
+                  {data.asistencia_hoy.marcado && !data.asistencia_hoy.hora_salida && (
+                    <button
+                      onClick={marcarSalida}
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg text-sm transition shadow"
+                    >
+                      <LogOut className="w-4 h-4" /> Registrar Salida
+                    </button>
+                  )}
+                  {/* Si ya marcó entrada y salida */}
+                  {data.asistencia_hoy.marcado && data.asistencia_hoy.hora_salida && (
+                    <div className="w-full sm:w-auto text-xs text-slate-400 font-semibold bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center">
+                      Marcación del día completa
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm shrink-0">
-                {data.asistencia_hoy.marcado ? (
-                  <>
-                    <span className="inline-flex items-center gap-1 text-emerald-700"><LogIn className="w-4 h-4" />{fmtHora(data.asistencia_hoy.hora_ingreso)}</span>
-                    <span className="text-slate-300">·</span>
-                    <span className="inline-flex items-center gap-1 text-rose-700"><LogOut className="w-4 h-4" />
-                      {data.asistencia_hoy.hora_salida ? fmtHora(data.asistencia_hoy.hora_salida) : <span className="text-amber-500 font-medium">En turno</span>}
-                    </span>
-                  </>
-                ) : (
-                  <span className="text-slate-400">Aún sin marcar ingreso hoy</span>
+
+              {/* Bloque derecho: Horario y Marcaciones detalladas */}
+              <div className="w-full md:w-[380px] p-5 bg-slate-50/50 flex flex-col justify-center gap-3">
+                <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-2">
+                  <span className="font-semibold text-slate-400 uppercase tracking-wider">Horario Pactado</span>
+                  <span className="font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                    {data.asistencia_hoy.hora_entrada_perfil ? `${data.asistencia_hoy.hora_entrada_perfil} hrs` : 'No asignado'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-400 uppercase tracking-wider">Días Laborales</span>
+                  <div className="flex items-center gap-0.5">
+                    {DIAS.map(([code, lbl]) => {
+                      const activo = (data.asistencia_hoy.dias_laborales || '').split(',').includes(code)
+                      return (
+                        <span key={code} className={`px-1 rounded text-[9px] font-bold ${
+                          activo ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-300'
+                        }`}>{lbl}</span>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {data.asistencia_hoy.marcado && (
+                  <div className="flex items-center gap-4 text-xs font-semibold text-slate-500 bg-white border border-slate-100 rounded-lg px-3 py-2 mt-1">
+                    <div className="flex items-center gap-1">
+                      <LogIn className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Ingreso: <strong className="text-slate-700">{fmtHora(data.asistencia_hoy.hora_ingreso)}</strong></span>
+                    </div>
+                    {data.asistencia_hoy.hora_salida && (
+                      <div className="flex items-center gap-1 border-l border-slate-100 pl-3">
+                        <LogOut className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Salida: <strong className="text-slate-700">{fmtHora(data.asistencia_hoy.hora_salida)}</strong></span>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                <span className="font-semibold text-slate-600">Horario:</span>
-                <span>{data.asistencia_hoy.hora_entrada_perfil ? `Ingreso ${data.asistencia_hoy.hora_entrada_perfil}` : 'Sin hora asignada'}</span>
-                <span className="flex flex-wrap items-center gap-1">
-                  {DIAS.map(([code, lbl]) => {
-                    const activo = (data.asistencia_hoy.dias_laborales || '').split(',').includes(code)
-                    return (
-                      <span key={code} className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${activo ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-300'}`}>{lbl}</span>
-                    )
-                  })}
-                </span>
               </div>
             </section>
 
