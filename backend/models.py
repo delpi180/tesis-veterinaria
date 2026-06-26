@@ -193,6 +193,29 @@ class Actividad(Base):
     fecha   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
+def calcular_tardanza_min(hora_ingreso, hora_entrada_perfil):
+    """Minutos de tardanza respecto al horario pactado.
+
+    Devuelve 0 si llegó a tiempo y None si falta el ingreso o el horario.
+    Fuente única usada tanto por el modelo como por el schema AsistenciaOut.
+    """
+    if not (hora_ingreso and hora_entrada_perfil):
+        return None
+    try:
+        sh, sm = (int(x) for x in hora_entrada_perfil.split(":"))
+    except (ValueError, AttributeError):
+        return None
+
+    PERU_TZ = timezone(timedelta(hours=-5))
+    local_dt = hora_ingreso
+    if local_dt.tzinfo is None:
+        local_dt = local_dt.replace(tzinfo=timezone.utc)
+    local_dt = local_dt.astimezone(PERU_TZ)
+
+    diff = (local_dt.hour * 60 + local_dt.minute) - (sh * 60 + sm)
+    return diff if diff > 0 else 0
+
+
 class Asistencia(Base):
     """Marcaciones de ingreso/salida del personal (control de la recepcionista)."""
     __tablename__ = "asistencias"
@@ -219,21 +242,7 @@ class Asistencia(Base):
     @property
     def tardanza_min(self):
         """Minutos de tardanza respecto al horario pactado (0 = a tiempo)."""
-        if not (self.hora_ingreso and self.hora_entrada_perfil):
-            return None
-        try:
-            sh, sm = (int(x) for x in self.hora_entrada_perfil.split(":"))
-        except (ValueError, AttributeError):
-            return None
-        
-        PERU_TZ = timezone(timedelta(hours=-5))
-        local_dt = self.hora_ingreso
-        if local_dt.tzinfo is None:
-            local_dt = local_dt.replace(tzinfo=timezone.utc)
-        local_dt = local_dt.astimezone(PERU_TZ)
-        
-        diff = (local_dt.hour * 60 + local_dt.minute) - (sh * 60 + sm)
-        return diff if diff > 0 else 0
+        return calcular_tardanza_min(self.hora_ingreso, self.hora_entrada_perfil)
 
 
 

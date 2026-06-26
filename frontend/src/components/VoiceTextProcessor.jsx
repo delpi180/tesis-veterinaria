@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Mic, StopCircle, Loader2, Check, AlertTriangle, FileText, Keyboard } from "lucide-react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { api, authHeaders } from "../services/api";
@@ -11,14 +11,18 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
   const [transcripcionIA, setTranscripcionIA] = useState("");
   const [aiState, setAiState] = useState("idle"); // idle | recording | transcribing | processing | done | error
   const [aiError, setAiError] = useState(null);
+  const [avisoLimite, setAvisoLimite] = useState(false);
+  const limiteRef = useRef(false);   // evita que el auto-corte se dispare más de una vez
 
   const { isRecording, seconds, micError, start, stop } = useAudioRecorder();
 
-  // Límite de 5 minutos (300 segundos) para evitar caídas y time-outs en audios muy largos
+  // Límite de 5 minutos (300 segundos) para evitar caídas y time-outs en audios muy largos.
+  // El audio igual se procesa: solo informamos que se detuvo automáticamente (no es un error).
   useEffect(() => {
-    if (isRecording && seconds >= 300) {
+    if (isRecording && seconds >= 300 && !limiteRef.current) {
+      limiteRef.current = true;
+      setAvisoLimite(true);
       handleGrabar();
-      setAiError("La grabación excedió el límite de 5 minutos y se detuvo automáticamente para procesar el audio.");
     }
   }, [seconds, isRecording]);
 
@@ -67,6 +71,8 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
     } else {
       updateAiState("recording");
       setAiError(null);
+      setAvisoLimite(false);
+      limiteRef.current = false;
       setTranscripcionIA("");
       await start();
     }
@@ -228,6 +234,14 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Aviso: corte automático por límite de 5 min (el audio se procesa igual) */}
+      {avisoLimite && (
+        <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+          <AlertTriangle size={13} className="shrink-0 mt-px" />
+          <span>La grabación alcanzó el límite de 5 minutos y se detuvo automáticamente. Procesando el audio capturado…</span>
         </div>
       )}
 

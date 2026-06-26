@@ -1,6 +1,8 @@
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime
 from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
+
+from models import calcular_tardanza_min
 
 
 # ---------------------------------------------------------------------------
@@ -723,20 +725,6 @@ class AsistenciaOut(BaseModel):
     @property
     def tardanza_min(self) -> Optional[int]:
         """Minutos de tardanza respecto al horario pactado (0 = a tiempo)."""
-        if not (self.hora_ingreso and self.hora_entrada_perfil):
-            return None
-        try:
-            sh, sm = (int(x) for x in self.hora_entrada_perfil.split(":"))
-        except (ValueError, AttributeError):
-            return None
-        
-        PERU_TZ = timezone(timedelta(hours=-5))
-        local_dt = self.hora_ingreso
-        if local_dt.tzinfo is None:
-            local_dt = local_dt.replace(tzinfo=timezone.utc)
-        local_dt = local_dt.astimezone(PERU_TZ)
-        
-        diff = (local_dt.hour * 60 + local_dt.minute) - (sh * 60 + sm)
-        return diff if diff > 0 else 0
+        return calcular_tardanza_min(self.hora_ingreso, self.hora_entrada_perfil)
 
     model_config = ConfigDict(from_attributes=True)
