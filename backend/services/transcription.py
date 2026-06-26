@@ -38,7 +38,7 @@ def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav") -> str:
         )
 
     ext = os.path.splitext(filename)[-1].lower() or ".wav"
-    client = DeepgramClient(api_key=settings.deepgram_api_key)
+    client = DeepgramClient(api_key=settings.deepgram_api_key, timeout=300.0)
 
     base_kwargs = dict(
         request=audio_bytes,

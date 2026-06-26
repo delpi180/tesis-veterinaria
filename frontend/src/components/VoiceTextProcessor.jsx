@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Mic, StopCircle, Loader2, Check, AlertTriangle, FileText, Keyboard } from "lucide-react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { api, authHeaders } from "../services/api";
@@ -13,6 +13,14 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
   const [aiError, setAiError] = useState(null);
 
   const { isRecording, seconds, micError, start, stop } = useAudioRecorder();
+
+  // Límite de 5 minutos (300 segundos) para evitar caídas y time-outs en audios muy largos
+  useEffect(() => {
+    if (isRecording && seconds >= 300) {
+      handleGrabar();
+      setAiError("La grabación excedió el límite de 5 minutos y se detuvo automáticamente para procesar el audio.");
+    }
+  }, [seconds, isRecording]);
 
   const updateAiState = (state) => {
     setAiState(state);
