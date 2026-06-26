@@ -114,6 +114,49 @@ const NUM_FIELDS = [
   "frecuencia_respiratoria", "condicion_corporal", "alimentacion_cantidad_gr",
 ];
 
+// Plantillas de consulta: pre-rellenan los campos típicos de cada tipo de visita
+// para acelerar el registro. No tocan peso ni constantes (se miden por animal):
+// solo motivo, tipo, plan, vacunas/tratamiento sugerido e indicaciones.
+const PLANTILLAS = [
+  {
+    id: "vacunacion", label: "Vacunación",
+    campos: {
+      tipo_consulta: "vacunacion",
+      motivo_consulta: "Vacunación",
+      pronostico: "favorable",
+      indicaciones: "Reposo relativo por 24 h. Vigilar reacción local o decaimiento; ante cualquier signo, contactar a la clínica.",
+    },
+    vacunas_items: [{ ...VX_EMPTY }],
+  },
+  {
+    id: "control", label: "Control sano",
+    campos: {
+      tipo_consulta: "control",
+      motivo_consulta: "Control de salud / chequeo general",
+      pronostico: "favorable",
+      indicaciones: "Mantener alimentación balanceada y el plan de vacunación/desparasitación al día.",
+    },
+  },
+  {
+    id: "desparasitacion", label: "Desparasitación",
+    campos: {
+      tipo_consulta: "control",
+      motivo_consulta: "Desparasitación",
+      pronostico: "favorable",
+      indicaciones: "Repetir la desparasitación según peso y calendario indicado.",
+    },
+    tratamiento_items: [{ medicamento: "Antiparasitario", dosis: "", via: "Oral", frecuencia: "Dosis única", duracion: "" }],
+  },
+  {
+    id: "urgencia", label: "Emergencia",
+    campos: {
+      tipo_consulta: "urgencia",
+      motivo_consulta: "Atención de urgencia",
+      pronostico: "reservado",
+    },
+  },
+];
+
 // ── Payload / hidratación de formulario ──────────────────────────────────────
 
 function buildPayload(form) {
@@ -564,6 +607,24 @@ export default function HistoriasClinicas() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Aplica una plantilla: rellena solo los campos vacíos (no pisa lo ya escrito)
+  // y agrega filas sugeridas de tratamiento/vacunas si aún no hay ninguna.
+  const aplicarPlantilla = (tpl) => {
+    setForm(prev => {
+      const next = { ...prev };
+      for (const [k, v] of Object.entries(tpl.campos || {})) {
+        const actual = next[k];
+        if (!actual || (typeof actual === "string" && !actual.trim())) next[k] = v;
+      }
+      if (tpl.tratamiento_items && !(prev.tratamiento_items || []).some(i => i.medicamento?.trim()))
+        next.tratamiento_items = tpl.tratamiento_items.map(i => ({ ...i }));
+      if (tpl.vacunas_items && !(prev.vacunas_items || []).some(i => i.vacuna?.trim()))
+        next.vacunas_items = tpl.vacunas_items.map(i => ({ ...i }));
+      return next;
+    });
+    setOpen(o => ({ ...o, s1: true, s5: true }));
+  };
+
   const handleDelete = async h => {
     const fecha = new Date(h.fecha || h.creado_en).toLocaleDateString("es-PE", {
       day: "2-digit", month: "short", year: "numeric",
@@ -800,6 +861,24 @@ export default function HistoriasClinicas() {
               </button>
             )}
           </div>
+
+          {/* Plantillas rápidas (solo en consulta nueva) */}
+          {!editandoId && (
+            <div className="flex flex-wrap items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              <span className="text-xs font-semibold text-slate-500">Plantillas:</span>
+              {PLANTILLAS.map(tpl => (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => aplicarPlantilla(tpl)}
+                  className="text-xs font-semibold px-3 py-1 rounded-full border border-purple-200 text-purple-700 bg-white hover:bg-purple-50 transition"
+                >
+                  {tpl.label}
+                </button>
+              ))}
+              <span className="text-[11px] text-slate-400">Rellenan los campos vacíos; no borran lo que ya escribiste.</span>
+            </div>
+          )}
 
           {/* S1 — Anamnesis */}
           <AccordionSection num="1" title="Anamnesis" isOpen={open.s1} onToggle={() => toggle("s1")}>
