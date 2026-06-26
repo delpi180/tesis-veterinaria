@@ -70,6 +70,16 @@ const getLabel = (field, value) => {
   return OPT[field]?.find(o => o.v === value)?.l ?? value;
 };
 
+const toLocalDatetimeString = (v) => {
+  if (!v) return "";
+  const sVal = String(v);
+  if (sVal.length === 10) return sVal + "T00:00";
+  const d = new Date(sVal);
+  if (isNaN(d.getTime())) return sVal;
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 // Campo → sección del acordeón (para auto-abrir con inferidos)
 const FIELD_TO_SECTION = {
   motivo_consulta: "s1", tiempo_evolucion: "s1", derivado_por: "s1",
@@ -167,7 +177,13 @@ function buildPayload(form) {
       out[k] = null;
     } else if (NUM_FIELDS.includes(k)) {
       const n = Number(v);
-      out[k] = isNaN(n) ? null : n;
+      if (isNaN(n)) {
+        out[k] = null;
+      } else {
+        // Redondear campos que deben ser enteros estrictos
+        const isFloat = ["temperatura_c", "peso_kg"].includes(k);
+        out[k] = isFloat ? n : Math.round(n);
+      }
     } else if (k === "proxima_cita") {
       // Interpreta como hora LOCAL y la envía como instante UTC correcto (evita el corrimiento de 5h)
       out[k] = v ? new Date(v + ":00").toISOString() : null;
@@ -199,7 +215,7 @@ function formFromHistoria(h) {
     if (["examen_particular", "tratamiento_items", "vacunas_items"].includes(k)) continue;
     const v = h[k];
     if (v !== null && v !== undefined)
-      f[k] = k === "proxima_cita" ? (v ? v.slice(0, 16) : "") : String(v);
+      f[k] = k === "proxima_cita" ? toLocalDatetimeString(v) : String(v);
   }
   const ep = eopVacio();
   if (h.examen_particular && typeof h.examen_particular === "object") {
@@ -269,8 +285,8 @@ function Field({ label, children, cls = "", hl }) {
 
 const TIn = ({ value, onChange, placeholder = "", hl }) =>
   <input type="text" value={value} onChange={onChange} placeholder={placeholder} className={hlInput(hl)} />;
-const NIn = ({ value, onChange, placeholder = "", hl }) =>
-  <input type="number" step="any" value={value} onChange={onChange} placeholder={placeholder} className={hlInput(hl)} />;
+const NIn = ({ value, onChange, placeholder = "", hl, step = "any" }) =>
+  <input type="number" step={step} value={value} onChange={onChange} placeholder={placeholder} className={hlInput(hl)} />;
 const TAr = ({ value, onChange, rows = 3, placeholder = "", hl }) =>
   <textarea value={value} onChange={onChange} rows={rows} placeholder={placeholder} className={`${hlInput(hl)} resize-y`} />;
 function Sel({ value, onChange, options, hl }) {
@@ -662,9 +678,7 @@ export default function HistoriasClinicas() {
         const val = datos[k];
         if (val === null || val === undefined) continue;
         if (k === "proxima_cita") {
-          // datetime-local necesita YYYY-MM-DDTHH:MM; GPT devuelve YYYY-MM-DD (sin hora)
-          const v = String(val);
-          next[k] = v.length === 10 ? v + "T00:00" : v.slice(0, 16);
+          next[k] = toLocalDatetimeString(val);
         } else {
           next[k] = String(val);
         }
@@ -905,7 +919,7 @@ export default function HistoriasClinicas() {
                 <TIn value={form.alimentacion_tipo} onChange={setF("alimentacion_tipo")} placeholder="Balanceado / BARF / mixto" hl={highlights.alimentacion_tipo} />
               </Field>
               <Field label="Cantidad diaria (g)" hl={highlights.alimentacion_cantidad_gr}>
-                <NIn value={form.alimentacion_cantidad_gr} onChange={setF("alimentacion_cantidad_gr")} placeholder="200" hl={highlights.alimentacion_cantidad_gr} />
+                <NIn value={form.alimentacion_cantidad_gr} onChange={setF("alimentacion_cantidad_gr")} placeholder="200" hl={highlights.alimentacion_cantidad_gr} step="1" />
               </Field>
             </div>
             <Field label="Antecedentes" hl={highlights.antecedentes}>
@@ -919,14 +933,14 @@ export default function HistoriasClinicas() {
           <AccordionSection num="2" title="Examen objetivo general (EOG)" isOpen={open.s2} onToggle={() => toggle("s2")}>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
-                ["temperatura_c",           "Temperatura (°C)", "38.5"],
-                ["peso_kg",                 "Peso (kg)",        "5.0" ],
-                ["frecuencia_cardiaca",     "FC (lpm)",         "100" ],
-                ["frecuencia_respiratoria", "FR (rpm)",         "22"  ],
-                ["condicion_corporal",      "CC (1–9)",         "5"   ],
-              ].map(([f, label, ph]) => (
+                ["temperatura_c",           "Temperatura (°C)", "38.5", "any"],
+                ["peso_kg",                 "Peso (kg)",        "5.0" , "any"],
+                ["frecuencia_cardiaca",     "FC (lpm)",         "100" , "1"  ],
+                ["frecuencia_respiratoria", "FR (rpm)",         "22"  , "1"  ],
+                ["condicion_corporal",      "CC (1–9)",         "5"   , "1"  ],
+              ].map(([f, label, ph, step]) => (
                 <Field key={f} label={label} hl={highlights[f]}>
-                  <NIn value={form[f]} onChange={setF(f)} placeholder={ph} hl={highlights[f]} />
+                  <NIn value={form[f]} onChange={setF(f)} placeholder={ph} hl={highlights[f]} step={step} />
                 </Field>
               ))}
             </div>
