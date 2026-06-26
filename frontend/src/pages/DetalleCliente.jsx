@@ -3,10 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, Plus, Search, Stethoscope, Calendar, Clock,
   MessageCircle, FileText, ClipboardList, X, PawPrint, ChevronRight, Phone,
-  Pencil, Trash2, ShoppingCart, AlertTriangle, Activity,
+  Pencil, Trash2, ShoppingCart, AlertTriangle, Activity, Paperclip,
 } from 'lucide-react'
 import { api } from '../services/api'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
+import DocumentosPaciente from '../components/DocumentosPaciente'
 
 const Spinner = ({ className = 'text-purple-400' }) => (
   <svg viewBox="0 0 24 24" fill="none" className={`w-5 h-5 animate-spin ${className}`}>
@@ -330,6 +331,7 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
   const [citas, setCitas]         = useState([])
   const [cargando, setCargando]   = useState(true)
   const [verAntecedentes, setVerAntecedentes] = useState(false)
+  const [verDocumentos, setVerDocumentos] = useState(false)
 
   const cargarDetalle = async () => {
     setCargando(true)
@@ -347,7 +349,7 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
     }
   }
 
-  useEffect(() => { setVerAntecedentes(false); cargarDetalle() }, [paciente.id])
+  useEffect(() => { setVerAntecedentes(false); setVerDocumentos(false); cargarDetalle() }, [paciente.id])
 
   const ahora = new Date()
   const proximaCita = [...citas]
@@ -457,6 +459,15 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
             <ClipboardList className="w-4 h-4 text-purple-600" /> Antecedentes
           </button>
         </div>
+
+        {/* Documentos complementarios (radiografías, análisis, etc.) */}
+        <button onClick={() => setVerDocumentos(v => !v)}
+          className={`w-full flex items-center justify-center gap-2 px-3 py-2 border text-sm font-medium rounded-lg transition ${
+            verDocumentos ? 'border-purple-300 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+          }`}>
+          <Paperclip className="w-4 h-4 text-purple-600" /> Documentos (radiografías, análisis…)
+        </button>
+        {verDocumentos && <DocumentosPaciente pacienteId={paciente.id} />}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button onClick={() => onAgendar(paciente)}
