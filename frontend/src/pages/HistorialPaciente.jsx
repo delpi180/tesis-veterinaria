@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp } from 'lucide-react'
+import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -8,6 +8,7 @@ import {
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api } from '../services/api'
+import { useToast } from '../components/Toast'
 
 // ── Catálogos de etiquetas (solo lectura) ───────────────────────────────────
 const SISTEMAS_EOP = [
@@ -66,7 +67,7 @@ function DSec({ title, show, children }) {
   )
 }
 
-function HistoriaCard({ h, paciente, cliente, defaultOpen }) {
+function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
   const [open, setOpen] = useState(defaultOpen)
   const txItems = Array.isArray(h.tratamiento_items) ? h.tratamiento_items : []
   const vxItems = Array.isArray(h.vacunas_items) ? h.vacunas_items : []
@@ -112,6 +113,24 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen }) {
         >
           <Download className="w-4 h-4" />
         </button>
+        {onEdit && (
+          <button
+            onClick={() => onEdit(h)}
+            title="Editar esta consulta"
+            className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-purple-800 transition shrink-0"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={() => onDelete(h)}
+            title="Eliminar esta consulta"
+            className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-rose-600 transition shrink-0"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {open && (
@@ -397,12 +416,33 @@ export default function HistorialPaciente() {
   const { pacienteId } = useParams()
   const navigate = useNavigate()
   const { state } = useLocation()
+  const toast = useToast()
 
   const [paciente, setPaciente]   = useState(state?.paciente ?? null)
   const [cliente, setCliente]     = useState(state?.cliente ?? null)
   const [historias, setHistorias] = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
+
+  const handleEdit = (h) => {
+    navigate(`/consultas/${pacienteId}`, {
+      state: { paciente, cliente, editarHistoriaId: h.id }
+    })
+  }
+
+  const handleDelete = async (h) => {
+    const fecha = new Date(h.fecha || h.creado_en).toLocaleDateString('es-PE', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    })
+    if (!window.confirm(`¿Eliminar la consulta del ${fecha}? Esta acción no se puede deshacer.`)) return
+    try {
+      await api.del(`/api/pacientes/${pacienteId}/historias/${h.id}`)
+      setHistorias(p => p.filter(x => x.id !== h.id))
+      toast.success('Consulta eliminada correctamente')
+    } catch (e) {
+      toast.error(e.message ?? 'No se pudo eliminar la consulta.')
+    }
+  }
 
   useEffect(() => {
     const cargar = async () => {
@@ -544,7 +584,15 @@ export default function HistorialPaciente() {
             </div>
           ) : (
             ordenadas.map((h, i) => (
-              <HistoriaCard key={h.id} h={h} paciente={paciente} cliente={cliente} defaultOpen={i === 0} />
+              <HistoriaCard
+                key={h.id}
+                h={h}
+                paciente={paciente}
+                cliente={cliente}
+                defaultOpen={i === 0}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
             ))
           )}
         </section>

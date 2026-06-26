@@ -623,6 +623,16 @@ export default function HistoriasClinicas() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Auto-editar si viene de otra pantalla con un editarHistoriaId específico
+  useEffect(() => {
+    if (navState?.editarHistoriaId && historias.length > 0) {
+      const h = historias.find(x => x.id === navState.editarHistoriaId);
+      if (h) {
+        handleEdit(h);
+      }
+    }
+  }, [historias, navState]);
+
   // Aplica una plantilla: rellena solo los campos vacíos (no pisa lo ya escrito)
   // y agrega filas sugeridas de tratamiento/vacunas si aún no hay ninguna.
   const aplicarPlantilla = (tpl) => {
