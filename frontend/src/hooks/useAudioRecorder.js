@@ -44,14 +44,34 @@ export function useAudioRecorder() {
     streamRef.current = stream
     chunksRef.current = []
 
-    const recorder = new MediaRecorder(stream)
+    // Grabamos en opus a bitrate bajo (~32 kbps): voz nítida pero archivos
+    // 5-10× más livianos. Así las consultas largas no generan subidas enormes
+    // que puedan tumbar el backend ni demorar la transcripción.
+    const mimePreferidos = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+    ]
+    const mime = mimePreferidos.find(
+      t => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported?.(t)
+    )
+    const opciones = { audioBitsPerSecond: 32000 }
+    if (mime) opciones.mimeType = mime
+
+    let recorder
+    try {
+      recorder = new MediaRecorder(stream, opciones)
+    } catch {
+      recorder = new MediaRecorder(stream)   // fallback a los valores por defecto
+    }
     recorderRef.current = recorder
 
+    const tipoBlob = recorder.mimeType || mime || 'audio/webm'
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data)
     }
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+      const blob = new Blob(chunksRef.current, { type: tipoBlob })
       resolveRef.current?.(blob)
       resolveRef.current = null
     }

@@ -18,6 +18,15 @@ def test_transcribe_endpoint_invalid_format(client, doctor):
     assert "Formato de audio no soportado" in r.json()["detail"]
 
 
+def test_transcribe_rechaza_audio_muy_grande(client, doctor):
+    # Un audio que supera el tope de 25 MB se rechaza con 413 (no tumba el proceso)
+    big = b"0" * (26 * 1024 * 1024)
+    files = {"audio": ("consulta.webm", io.BytesIO(big), "audio/webm")}
+    r = client.post("/api/transcribe", files=files, headers=doctor)
+    assert r.status_code == 413
+    assert "límite" in r.json()["detail"].lower()
+
+
 @patch("services.transcription.DeepgramClient")
 def test_transcribe_audio_timeout_passed(mock_deepgram_client):
     # Verificar que el timeout de 300.0 se pasa correctamente a DeepgramClient

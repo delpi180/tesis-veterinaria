@@ -274,6 +274,16 @@ async def transcribe_endpoint(request: Request, audio: UploadFile = File(...)):
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="El archivo de audio está vacío.")
 
+    # Tope de tamaño: evita que un audio enorme agote la memoria del proceso.
+    # Con opus a ~32 kbps, 25 MB equivalen a más de 1 h de grabación.
+    MAX_AUDIO_MB = 25
+    if len(audio_bytes) > MAX_AUDIO_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"El audio pesa {len(audio_bytes) / 1024 / 1024:.1f} MB y supera el "
+                   f"límite de {MAX_AUDIO_MB} MB. Graba la consulta en tramos más cortos.",
+        )
+
     try:
         import asyncio
         texto = await asyncio.to_thread(transcribe_audio, audio_bytes, filename=audio.filename or "audio.wav")
