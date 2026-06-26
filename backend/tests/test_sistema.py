@@ -5,6 +5,8 @@ Se ejecutan contra la base de datos configurada en .env. Limpian sus propios dat
     cd backend
     ./venv/Scripts/python.exe -m pytest tests/ -v
 """
+import io
+
 import pytest
 from sqlalchemy import text
 
@@ -207,6 +209,53 @@ def test_historia_editar_y_eliminar(client, admin, doctor):
 
         # eliminar una inexistente → 404
         assert client.delete(f"/api/pacientes/{pac['id']}/historias/999999", headers=doctor).status_code == 404
+    finally:
+        client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
+        db = SessionLocal()
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()
+
+
+def test_documentos_paciente_flujo(client, admin, doctor):
+    """Subir, listar, descargar y eliminar un documento complementario del paciente."""
+    cli = client.post("/api/clientes/", json={"nombre": "QA Dueño3", "dni": "55667700"}, headers=admin).json()
+    pac = client.post(f"/api/clientes/{cli['id']}/pacientes/",
+                      json={"nombre": "QA Rocky", "especie": "Canino"}, headers=admin).json()
+    try:
+        # subir una "radiografía" (png de juguete)
+        contenido = b"\x89PNG\r\n\x1a\n fake radiografia bytes"
+        r = client.post(
+            f"/api/pacientes/{pac['id']}/documentos/",
+            files={"archivo": ("rx_torax.png", io.BytesIO(contenido), "image/png")},
+            data={"categoria": "radiografia", "descripcion": "Tórax LL"},
+            headers=doctor,
+        )
+        assert r.status_code == 201
+        doc = r.json()
+        assert doc["categoria"] == "radiografia"
+        assert doc["tamano_bytes"] == len(contenido)
+        assert "contenido" not in doc          # los bytes no viajan en el metadato
+
+        # listar
+        lista = client.get(f"/api/pacientes/{pac['id']}/documentos/", headers=doctor).json()
+        assert any(d["id"] == doc["id"] for d in lista)
+
+        # descargar → mismos bytes
+        d = client.get(f"/api/pacientes/{pac['id']}/documentos/{doc['id']}/descargar", headers=doctor)
+        assert d.status_code == 200
+        assert d.content == contenido
+
+        # rechazo de extensión no permitida
+        r_bad = client.post(
+            f"/api/pacientes/{pac['id']}/documentos/",
+            files={"archivo": ("virus.exe", io.BytesIO(b"MZ"), "application/octet-stream")},
+            data={"categoria": "otro"}, headers=doctor,
+        )
+        assert r_bad.status_code == 400
+
+        # eliminar
+        assert client.delete(f"/api/pacientes/{pac['id']}/documentos/{doc['id']}", headers=doctor).status_code == 204
+        assert client.get(f"/api/pacientes/{pac['id']}/documentos/{doc['id']}/descargar", headers=doctor).status_code == 404
     finally:
         client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
         db = SessionLocal()

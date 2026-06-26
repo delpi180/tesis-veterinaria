@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import Column, Boolean, Date, Float, Integer, Numeric, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Boolean, Date, Float, Integer, LargeBinary, Numeric, String, Text, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from database import Base
@@ -67,6 +67,34 @@ class Paciente(Base):
         back_populates="paciente",
         cascade="all, delete-orphan",
     )
+    documentos = relationship(
+        "DocumentoPaciente",
+        back_populates="paciente",
+        cascade="all, delete-orphan",
+    )
+
+
+class DocumentoPaciente(Base):
+    """Archivos complementarios de la mascota: radiografías, análisis, recetas, etc.
+
+    El contenido se guarda como binario dentro de PostgreSQL (durable en Railway,
+    sin depender del filesystem efímero). Para no inflar las consultas de listado,
+    los bytes solo se leen en el endpoint de descarga.
+    """
+    __tablename__ = "documentos_paciente"
+
+    id          = Column(Integer, primary_key=True)
+    paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
+    nombre      = Column(String(255), nullable=False)   # nombre original del archivo
+    categoria   = Column(String(30), default="otro")    # radiografia | analisis | receta | otro
+    descripcion = Column(Text)
+    mime_type   = Column(String(120))
+    tamano_bytes = Column(Integer, nullable=False, default=0)
+    contenido   = Column(LargeBinary, nullable=False)
+    subido_por  = Column(String(50))                    # usuario que lo subió
+    creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    paciente = relationship("Paciente", back_populates="documentos")
 
 
 class HistoriaClinica(Base):

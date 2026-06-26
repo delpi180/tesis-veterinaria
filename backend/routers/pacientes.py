@@ -1,15 +1,18 @@
+import os
 from datetime import time
 
-import base64
-
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
+from fastapi import (
+    APIRouter, Depends, Form, HTTPException, Request, Response,
+    UploadFile, File, status,
+)
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Cita, Paciente, HistoriaClinica, Usuario
+from models import Cita, DocumentoPaciente, Paciente, HistoriaClinica, Usuario
 from schemas import (
     PacienteOut, PacienteUpdate,
     HistoriaClinicaCreate, HistoriaClinicaOut,
+    DocumentoOut,
 )
 from core.deps import usuario_actual
 
@@ -179,5 +182,111 @@ def eliminar_historia(
         raise HTTPException(status_code=404, detail="Historia clínica no encontrada")
     request.state.actividad_detalle = historia.paciente.nombre if historia.paciente else f"historia #{historia_id}"
     db.delete(historia)
+    db.commit()
+
+
+# ── Documentos complementarios (radiografías, análisis, recetas, etc.) ────────
+
+MAX_DOC_MB = 10
+CATEGORIAS_DOC = {"radiografia", "analisis", "receta", "otro"}
+EXTENSIONES_DOC = {
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff", ".heic",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".dcm",
+}
+
+
+@router.post(
+    "/{paciente_id}/documentos/",
+    response_model=DocumentoOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def subir_documento(
+    paciente_id: int,
+    request: Request,
+    archivo: UploadFile = File(...),
+    categoria: str = Form("otro"),
+    descripcion: str = Form(""),
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Sube un archivo complementario y lo guarda en la BD."""
+    paciente = db.get(Paciente, paciente_id)
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+
+    cat = categoria if categoria in CATEGORIAS_DOC else "otro"
+    ext = os.path.splitext(archivo.filename or "")[-1].lower()
+    if ext not in EXTENSIONES_DOC:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido: '{ext}'. "
+                   f"Acepta imágenes, PDF y documentos de oficina.",
+        )
+
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(status_code=400, detail="El archivo está vacío.")
+    if len(contenido) > MAX_DOC_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"El archivo pesa {len(contenido) / 1024 / 1024:.1f} MB y "
+                   f"supera el límite de {MAX_DOC_MB} MB.",
+        )
+
+    doc = DocumentoPaciente(
+        paciente_id=paciente_id,
+        nombre=archivo.filename or "documento",
+        categoria=cat,
+        descripcion=(descripcion or "").strip() or None,
+        mime_type=archivo.content_type,
+        tamano_bytes=len(contenido),
+        contenido=contenido,
+        subido_por=usuario.usuario if usuario else None,
+    )
+    db.add(doc)
+    request.state.actividad_detalle = f"{paciente.nombre} — {doc.nombre}"
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+@router.get("/{paciente_id}/documentos/", response_model=list[DocumentoOut])
+def listar_documentos(paciente_id: int, db: Session = Depends(get_db)):
+    return (
+        db.query(DocumentoPaciente)
+        .filter(DocumentoPaciente.paciente_id == paciente_id)
+        .order_by(DocumentoPaciente.creado_en.desc())
+        .all()
+    )
+
+
+@router.get("/{paciente_id}/documentos/{documento_id}/descargar")
+def descargar_documento(paciente_id: int, documento_id: int, db: Session = Depends(get_db)):
+    doc = db.get(DocumentoPaciente, documento_id)
+    if not doc or doc.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    return Response(
+        content=doc.contenido,
+        media_type=doc.mime_type or "application/octet-stream",
+        headers={"Content-Disposition": f'inline; filename="{doc.nombre}"'},
+    )
+
+
+@router.delete(
+    "/{paciente_id}/documentos/{documento_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def eliminar_documento(
+    paciente_id: int,
+    documento_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    doc = db.get(DocumentoPaciente, documento_id)
+    if not doc or doc.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    request.state.actividad_detalle = f"{doc.paciente.nombre if doc.paciente else paciente_id} — {doc.nombre}"
+    db.delete(doc)
     db.commit()
 

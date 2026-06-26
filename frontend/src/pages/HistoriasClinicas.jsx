@@ -7,6 +7,7 @@ import {
 import { generarPDF } from "../utils/pdfGenerator";
 import { api, authHeaders } from "../services/api";
 import VoiceTextProcessor from "../components/VoiceTextProcessor";
+import DocumentosPaciente from "../components/DocumentosPaciente";
 
 // ── Catálogos ────────────────────────────────────────────────────────────────
 
@@ -942,6 +943,9 @@ export default function HistoriasClinicas() {
               : <><Save size={15} /> {editandoId ? "Actualizar consulta" : "Guardar consulta"}</>}
           </button>
         </div>
+
+        {/* ── Documentos complementarios (radiografías, análisis, etc.) ──────── */}
+        {id && <DocumentosPaciente pacienteId={id} />}
 
         {/* ── Historial ────────────────────────────────────────────────────── */}
         <div className="space-y-2">

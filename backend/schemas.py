@@ -693,6 +693,25 @@ class DoctorOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Documentos complementarios de la mascota (radiografías, análisis, etc.)
+# ---------------------------------------------------------------------------
+
+class DocumentoOut(BaseModel):
+    """Metadatos del documento (sin los bytes; el contenido se baja aparte)."""
+    id:           int
+    paciente_id:  int
+    nombre:       str
+    categoria:    str
+    descripcion:  Optional[str] = None
+    mime_type:    Optional[str] = None
+    tamano_bytes: int
+    subido_por:   Optional[str] = None
+    creado_en:    datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
 # Asistencia (control de marcaciones de personal)
 # ---------------------------------------------------------------------------
 
