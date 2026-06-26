@@ -16,17 +16,17 @@ const PawIcon = () => (
 
 // `vet` => solo veterinario · `admin` => solo recepcionista (administradora)
 const SECCION_CLINICA = [
-  { label: 'Inicio',     to: '/',           Icon: LayoutDashboard },
+  { label: 'Inicio',     to: '/',           Icon: LayoutDashboard, admin: true },
   { label: 'Recepción',  to: '/recepcion',  Icon: ConciergeBell, admin: true },
   { label: 'Mi panel',   to: '/mi-panel',   Icon: ClipboardList, vet: true },
   { label: 'Clientes',   to: '/clientes',   Icon: Users },
   { label: 'Turnos',     to: '/turnos',     Icon: Calendar },
 ]
 const SECCION_ADMIN = [
-  { label: 'Inventario',        to: '/inventario', Icon: Package },
-  { label: 'Servicios',         to: '/servicios',  Icon: Stethoscope },
-  { label: 'Ventas',            to: '/ventas',     Icon: BarChart2 },
-  { label: 'Caja',              to: '/caja',       Icon: Wallet },
+  { label: 'Inventario',        to: '/inventario', Icon: Package,     admin: true },
+  { label: 'Servicios',         to: '/servicios',  Icon: Stethoscope, admin: true },
+  { label: 'Ventas',            to: '/ventas',     Icon: BarChart2,   admin: true },
+  { label: 'Caja',              to: '/caja',       Icon: Wallet,      admin: true },
   { label: 'Vacunación',        to: '/vacunacion', Icon: Syringe,  admin: true },
   { label: 'Reportes',          to: '/reportes',   Icon: PieChart, admin: true },
   { label: 'Asistencia',        to: '/asistencia', Icon: Clock,    admin: true },

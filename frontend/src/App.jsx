@@ -33,6 +33,12 @@ function SoloAdmin({ children }) {
   return esAdmin() ? children : <Navigate to="/" replace />
 }
 
+// Home: el panel de control (Inicio) es administrativo. El veterinario no lo ve;
+// se le envía a "Mi panel" (evita además un bucle de redirección sobre "/").
+function Home() {
+  return esVeterinario() ? <Navigate to="/mi-panel" replace /> : <Inicio />
+}
+
 function AppProtegida() {
   if (!getToken()) return <Navigate to="/login" replace />
   return (
@@ -41,7 +47,7 @@ function AppProtegida() {
       {/* min-w-0 evita que gráficos/tablas anchos rompan el centrado del contenido */}
       <div className="flex-1 min-w-0 flex flex-col pt-12 md:pt-0">
         <Routes>
-          <Route path="/"                       element={<Inicio />} />
+          <Route path="/"                       element={<Home />} />
           <Route path="/mi-panel"               element={<SoloVet><MiPanel /></SoloVet>} />
           <Route path="/clientes"               element={<Clientes />} />
           <Route path="/clientes/:id"           element={<DetalleCliente />} />
@@ -49,10 +55,10 @@ function AppProtegida() {
           <Route path="/consultas/:pacienteId"  element={<SoloVet><HistoriasClinicas /></SoloVet>} />
           <Route path="/pacientes/:pacienteId/historial" element={<SoloVet><HistorialPaciente /></SoloVet>} />
           <Route path="/turnos"                 element={<Turnos />} />
-          <Route path="/inventario"             element={<Inventario />} />
-          <Route path="/servicios"              element={<Servicios />} />
-          <Route path="/ventas"                 element={<Ventas />} />
-          <Route path="/caja"                   element={<Caja />} />
+          <Route path="/inventario"             element={<SoloAdmin><Inventario /></SoloAdmin>} />
+          <Route path="/servicios"              element={<SoloAdmin><Servicios /></SoloAdmin>} />
+          <Route path="/ventas"                 element={<SoloAdmin><Ventas /></SoloAdmin>} />
+          <Route path="/caja"                   element={<SoloAdmin><Caja /></SoloAdmin>} />
           <Route path="/asistencia"             element={<SoloAdmin><Asistencia /></SoloAdmin>} />
           <Route path="/actividad"              element={<SoloAdmin><Actividad /></SoloAdmin>} />
           <Route path="/reportes"               element={<SoloAdmin><Reportes /></SoloAdmin>} />

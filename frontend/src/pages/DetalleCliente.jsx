@@ -5,7 +5,7 @@ import {
   MessageCircle, FileText, ClipboardList, X, PawPrint, ChevronRight, Phone,
   Pencil, Trash2, ShoppingCart, AlertTriangle, Activity, Paperclip,
 } from 'lucide-react'
-import { api } from '../services/api'
+import { api, esAdmin } from '../services/api'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
 import DocumentosPaciente from '../components/DocumentosPaciente'
 
@@ -487,12 +487,15 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
           )}
         </div>
 
-        <button
-          onClick={() => navigate('/ventas', { state: { clienteId: cliente?.id, abrirVenta: true } })}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-amber-200 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition"
-        >
-          <ShoppingCart className="w-4 h-4" /> Cobrar venta (productos / servicios)
-        </button>
+        {/* Cobrar venta es función administrativa (recepcionista): oculto para veterinarios */}
+        {esAdmin() && (
+          <button
+            onClick={() => navigate('/ventas', { state: { clienteId: cliente?.id, abrirVenta: true } })}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 border border-amber-200 text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition"
+          >
+            <ShoppingCart className="w-4 h-4" /> Cobrar venta (productos / servicios)
+          </button>
+        )}
 
         {/* Antecedentes (desplegable) */}
         {verAntecedentes && (
