@@ -183,6 +183,37 @@ def test_historia_firma_del_doctor(client, admin, doctor):
         db.commit(); db.close()
 
 
+def test_historia_editar_y_eliminar(client, admin, doctor):
+    """Una consulta del historial se puede actualizar (PUT) y eliminar (DELETE)."""
+    cli = client.post("/api/clientes/", json={"nombre": "QA Dueño2", "dni": "55667799"}, headers=admin).json()
+    pac = client.post(f"/api/clientes/{cli['id']}/pacientes/",
+                      json={"nombre": "QA Michi", "especie": "Felino"}, headers=admin).json()
+    try:
+        # crear
+        h = client.post(f"/api/pacientes/{pac['id']}/historias/",
+                        json={"motivo_consulta": "Control"}, headers=doctor).json()
+
+        # editar
+        r_put = client.put(f"/api/pacientes/{pac['id']}/historias/{h['id']}",
+                           json={"motivo_consulta": "Control anual actualizado"}, headers=doctor)
+        assert r_put.status_code == 200
+        assert r_put.json()["motivo_consulta"] == "Control anual actualizado"
+
+        # eliminar
+        r_del = client.delete(f"/api/pacientes/{pac['id']}/historias/{h['id']}", headers=doctor)
+        assert r_del.status_code == 204
+        # ya no debe existir
+        assert client.get(f"/api/pacientes/{pac['id']}/historias/{h['id']}", headers=doctor).status_code == 404
+
+        # eliminar una inexistente → 404
+        assert client.delete(f"/api/pacientes/{pac['id']}/historias/999999", headers=doctor).status_code == 404
+    finally:
+        client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
+        db = SessionLocal()
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()
+
+
 # ── Control de asistencia (marcaciones) ──────────────────────────────────────
 
 def _id_doctor(client, admin, nombre="QA Doctor"):

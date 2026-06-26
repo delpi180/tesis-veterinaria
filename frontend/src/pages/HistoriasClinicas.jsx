@@ -353,7 +353,7 @@ function DSec({ title, show, children }) {
   );
 }
 
-function HistoriaCard({ h, onEdit }) {
+function HistoriaCard({ h, onEdit, onDelete }) {
   const fecha = new Date(h.fecha || h.creado_en).toLocaleString("es-PE", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
@@ -382,6 +382,10 @@ function HistoriaCard({ h, onEdit }) {
           <button onClick={() => onEdit(h)}
             className="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5 transition-colors">
             Editar
+          </button>
+          <button onClick={() => onDelete(h)}
+            className="text-xs bg-rose-500/80 hover:bg-rose-500 rounded px-2 py-0.5 transition-colors">
+            Eliminar
           </button>
         </div>
       </div>
@@ -557,6 +561,20 @@ export default function HistoriasClinicas() {
     setHighlights({});
     setOpen({ s1: true, s2: true, s3: true, s4: true, s5: true });
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDelete = async h => {
+    const fecha = new Date(h.fecha || h.creado_en).toLocaleDateString("es-PE", {
+      day: "2-digit", month: "short", year: "numeric",
+    });
+    if (!window.confirm(`¿Eliminar la consulta del ${fecha}? Esta acción no se puede deshacer.`)) return;
+    try {
+      await api.del(`/api/pacientes/${id}/historias/${h.id}`);
+      setHistorias(p => p.filter(x => x.id !== h.id));
+      if (editandoId === h.id) resetForm();   // si estábamos editándola, limpia el formulario
+    } catch (e) {
+      setErrForm(e?.message ?? "No se pudo eliminar la consulta.");
+    }
   };
 
   // ── Volcar datos de IA al formulario
@@ -930,7 +948,7 @@ export default function HistoriasClinicas() {
           <h2 className="text-sm font-semibold text-slate-700">Historial ({historias.length})</h2>
           {historias.length === 0
             ? <p className="text-sm text-slate-400 italic">Sin consultas registradas.</p>
-            : historias.map(h => <HistoriaCard key={h.id} h={h} onEdit={handleEdit} />)
+            : historias.map(h => <HistoriaCard key={h.id} h={h} onEdit={handleEdit} onDelete={handleDelete} />)
           }
         </div>
 

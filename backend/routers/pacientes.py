@@ -144,6 +144,7 @@ def actualizar_historia(
     paciente_id: int,
     historia_id: int,
     payload: HistoriaClinicaCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     historia = db.get(HistoriaClinica, historia_id)
@@ -155,7 +156,28 @@ def actualizar_historia(
     # Si la próxima cita cambió a un valor nuevo, agéndala en Turnos
     if historia.proxima_cita and historia.proxima_cita != cita_anterior:
         _generar_cita_proxima(db, historia)
+    request.state.actividad_detalle = historia.paciente.nombre if historia.paciente else f"historia #{historia_id}"
     db.commit()
     db.refresh(historia)
     return historia
+
+
+@router.delete(
+    "/{paciente_id}/historias/{historia_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def eliminar_historia(
+    paciente_id: int,
+    historia_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Elimina una consulta del historial clínico del paciente."""
+    historia = db.get(HistoriaClinica, historia_id)
+    if not historia or historia.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Historia clínica no encontrada")
+    request.state.actividad_detalle = historia.paciente.nombre if historia.paciente else f"historia #{historia_id}"
+    db.delete(historia)
+    db.commit()
 
