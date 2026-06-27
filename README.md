@@ -176,6 +176,16 @@ en un lugar externo y, si el proveedor lo ofrece, activar backups automáticos /
 - [ ] `VITE_API_URL` apuntando al backend correcto.
 - [ ] `GET /api/health` → 200 tras el deploy.
 
+### Checklist de salida a producción (go-live)
+Antes de abrir el sistema a la clínica:
+- [ ] **Backups automáticos de la BD activados** en Railway (Database → Settings → Backups). Es lo más crítico: hay datos reales de clientes.
+- [ ] **Cambiar la contraseña del admin** por defecto (la inicial es pública).
+- [ ] **CI en verde**: backend (tests) y frontend (build) pasan en GitHub Actions.
+- [ ] **Smoke test de los flujos críticos** con un usuario real: login, crear cliente+mascota, registrar una consulta, una venta, abrir/cerrar caja.
+- [ ] **Probar ambos roles** (veterinario y recepcionista): cada uno ve solo lo suyo.
+- [ ] (Opcional, gratis) **UptimeRobot** monitoreando `/api/health` con alerta por correo.
+- [ ] Tener a mano el **rollback**: en Railway, Deployments → un deploy anterior en verde → Redeploy.
+
 ### Monitoreo y resiliencia (que el backend no se caiga)
 El despliegue del backend (Railway) está reforzado para auto-recuperarse:
 - **Healthcheck** ([`backend/railway.json`](./backend/railway.json)): Railway no marca un deploy como sano

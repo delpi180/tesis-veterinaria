@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import time
 
@@ -17,6 +18,7 @@ from schemas import (
 from core.deps import usuario_actual
 
 router = APIRouter(prefix="/api/pacientes", tags=["Pacientes"])
+logger = logging.getLogger("vetlospinos")
 
 
 def _generar_cita_proxima(db: Session, historia: HistoriaClinica) -> None:
@@ -97,7 +99,6 @@ def crear_historia(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(usuario_actual),
 ):
-    print(f"[DEBUG] POST /historias/ — paciente_id={paciente_id} payload={payload.model_dump()}")
     paciente = db.get(Paciente, paciente_id)
     if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
@@ -114,12 +115,13 @@ def crear_historia(
         _generar_cita_proxima(db, historia)
         db.commit()
         db.refresh(historia)
-        print(f"[DEBUG] Historia guardada OK — id={historia.id} fecha={historia.fecha}")
         return historia
-    except Exception as e:
+    except Exception:
         db.rollback()
-        print(f"[ERROR] Fallo al guardar historia: {e}")
-        raise HTTPException(status_code=500, detail=f"Error al guardar historia clínica: {str(e)}")
+        # Registramos el detalle del lado servidor (sin exponerlo al cliente ni
+        # volcar datos clínicos del paciente en los logs).
+        logger.exception("Fallo al guardar historia clínica (paciente_id=%s)", paciente_id)
+        raise HTTPException(status_code=500, detail="No se pudo guardar la historia clínica.")
 
 
 @router.get("/{paciente_id}/historias/", response_model=list[HistoriaClinicaOut])

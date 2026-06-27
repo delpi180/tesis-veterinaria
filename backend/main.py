@@ -1,9 +1,13 @@
+import logging
 import re
 
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logger = logging.getLogger("vetlospinos")
 
 from database import SessionLocal
 import models  # registra todos los modelos en Base.metadata
@@ -156,6 +160,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def _error_no_controlado(request: Request, exc: Exception):
+    """Cualquier error NO controlado: lo registramos del lado servidor (con
+    traceback) y devolvemos un 500 limpio, sin filtrar detalles internos al
+    cliente. Las HTTPException (401/404/422, etc.) siguen su flujo normal."""
+    logger.exception("Error no controlado en %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor. Vuelve a intentarlo."},
+    )
+
 
 app.include_router(auth.router)
 app.include_router(usuarios.router)
