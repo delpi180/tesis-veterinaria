@@ -243,7 +243,7 @@ class ProcessHistoriaResponse(BaseModel):
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "message": "Veterinaria Los Pinos API funcionando"}
+    return {"status": "ok", "message": "Veterinaria Los Pinos API funcionando", "build": "redeploy-2026-06-27"}
 
 
 @app.post("/api/transcribe", response_model=TranscribeResponse)
