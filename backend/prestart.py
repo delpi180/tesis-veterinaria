@@ -14,15 +14,39 @@ Reconcilia el estado de Alembic con la base de datos real, SIN destruir datos:
 
 IMPORTANTE: este script nunca ejecuta drop_all ni borra datos en producción.
 """
+import time
+
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
+from sqlalchemy.exc import OperationalError
 
 from database import Base, engine
 import models  # noqa: F401  (registra todos los modelos en Base.metadata)
 
 
+def _esperar_db(intentos: int = 12, espera_seg: int = 3) -> None:
+    """Espera a que la base acepte conexiones antes de migrar.
+
+    En arranques tras un deploy, el contenedor puede ganarle la carrera a la BD
+    (que todavía está despertando). En vez de caerse de inmediato, reintenta:
+    así un blip transitorio de red/BD no tumba el despliegue.
+    """
+    for i in range(1, intentos + 1):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            print(f"[prestart] BD disponible (intento {i}/{intentos}).")
+            return
+        except OperationalError as e:
+            print(f"[prestart] BD aún no responde (intento {i}/{intentos}): {str(e)[:120]}")
+            if i == intentos:
+                raise
+            time.sleep(espera_seg)
+
+
 def main() -> None:
+    _esperar_db()
     inspector = inspect(engine)
     tablas = set(inspector.get_table_names())
     cfg = Config("alembic.ini")
