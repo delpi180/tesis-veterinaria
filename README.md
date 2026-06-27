@@ -174,6 +174,29 @@ en un lugar externo y, si el proveedor lo ofrece, activar backups automáticos /
 - [ ] `VITE_API_URL` apuntando al backend correcto.
 - [ ] `GET /api/health` → 200 tras el deploy.
 
+### Monitoreo y resiliencia (que el backend no se caiga)
+El despliegue del backend (Railway) está reforzado para auto-recuperarse:
+- **Healthcheck** ([`backend/railway.json`](./backend/railway.json)): Railway no marca un deploy como sano
+  hasta que `GET /api/health` responde. Un deploy roto **no entra a producción** (se mantiene el anterior).
+- **Auto-restart**: `restartPolicyType: ON_FAILURE` → si el proceso se cae, Railway lo levanta solo.
+- **Arranque tolerante**: `prestart.py` espera a que la BD acepte conexiones antes de migrar (reintentos),
+  para que un blip transitorio no tumbe el arranque.
+- `GET /api/health` devuelve un campo `build` para confirmar de un vistazo qué versión está viva.
+
+**Monitor externo recomendado (alerta + mantener "caliente") — [UptimeRobot](https://uptimerobot.com), gratis:**
+1. Crea una cuenta y entra al panel.
+2. **+ New monitor** → tipo **HTTP(s)**.
+3. URL: `https://tesis-veterinaria-backend-production.up.railway.app/api/health`
+4. Intervalo: **5 minutos**. Guarda.
+5. En **Alert Contacts**, agrega tu correo para recibir aviso si deja de responder.
+
+> Esto avisa apenas el backend deje de responder (antes que el usuario) y, al hacer ping cada 5 min,
+> evita que el servicio se "duerma" por inactividad. Si la clínica necesita **cero caídas reales**,
+> el siguiente paso es un plan de Railway con **réplicas** (varios contenedores con balanceo).
+
+**Si el backend cae y hay que forzar un redeploy:** cambia un archivo real y haz push (un commit *vacío*
+lo **salta** Railway). Verifica con `GET /api/health` → debe dar `200`.
+
 ### Seguridad
 - Contraseñas con **PBKDF2-SHA256**; sesión con **tokens firmados (HMAC-SHA256)**.
 - **Rate-limit** en el login (anti fuerza bruta), configurable por entorno.
