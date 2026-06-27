@@ -20,14 +20,14 @@
 ┌──────────────────────────┐        HTTPS/JSON        ┌───────────────────────────┐
 │   Frontend (SPA)         │  ───────────────────────▶│   Backend (API REST)      │
 │   React + Vite + Tailwind│                          │   FastAPI (Python)        │
-│   Vercel                 │◀───────────────────────  │   Render                  │
+│   Vercel                 │◀───────────────────────  │   Railway                  │
 └──────────────────────────┘                          └─────────────┬─────────────┘
                                                                      │ SQLAlchemy 2.0
                                        ┌─────────────────────────────┼───────────────────────────┐
                                        │                             │                           │
                                 ┌──────▼──────┐            ┌─────────▼────────┐        ┌──────────▼─────────┐
                                 │ PostgreSQL  │            │  OpenAI API      │        │  Deepgram API      │
-                                │ (Render)    │            │ (extracción SOAP)│        │ (voz → texto)      │
+                                │ (Railway)    │            │ (extracción SOAP)│        │ (voz → texto)      │
                                 └─────────────┘            └──────────────────┘        └────────────────────┘
 ```
 
@@ -65,7 +65,7 @@
 - Tokens de sesión: **HMAC-SHA256** firmados (sin librerías JWT externas), con expiración configurable.
 
 ### Infraestructura
-- **Render:** backend (web service) + PostgreSQL gestionado. Despliegue declarado en `render.yaml`.
+- **Railway:** backend (web service) + PostgreSQL gestionado. Arranque vía `Procfile`; healthcheck y auto-restart en `backend/railway.json`.
 - **Vercel:** frontend estático.
 
 ---
@@ -79,7 +79,7 @@ tesis-veterinaria/
 │   ├── database.py             # Engine SQLAlchemy + normalización de URL (psycopg)
 │   ├── models.py               # Modelos ORM (todas las tablas)
 │   ├── schemas.py              # Esquemas Pydantic (entrada/salida)
-│   ├── prestart.py             # Reconcilia Alembic con la BD antes de arrancar (Render)
+│   ├── prestart.py             # Reconcilia Alembic con la BD antes de arrancar (Railway)
 │   ├── requirements.txt
 │   ├── core/
 │   │   ├── config.py           # Settings (.env): claves de IA, auth, BD
@@ -101,7 +101,7 @@ tesis-veterinaria/
 │       ├── pages/              # Una página por vista (ver sección 10)
 │       ├── services/api.js     # Cliente HTTP + manejo de sesión
 │       └── utils/              # Helpers (citas, export, etc.)
-└── render.yaml                 # Infra como código (Render)
+└── backend/railway.json        # Infra Railway (healthcheck + auto-restart)
 ```
 
 ---
@@ -296,11 +296,11 @@ Se miden en `routers/encuestas.py` + `services/estadistica.py`:
 
 ## 11. Despliegue
 
-- **`render.yaml`** declara: base PostgreSQL + web service. `startCommand: python prestart.py && uvicorn …`.
+- **`Procfile`** define el arranque: `web: python prestart.py && uvicorn main:app --host 0.0.0.0 --port $PORT`. **`backend/railway.json`** agrega healthcheck (`/api/health`) y auto-restart.
 - **`prestart.py`** reconcilia el estado de Alembic con la BD (maneja esquemas creados por `create_all` heredado) y aplica migraciones antes de arrancar.
-- **`database.py`** normaliza la URL de Render (`postgres://` → `postgresql+psycopg://`).
-- **Variables de entorno (Render):** `DATABASE_URL`, `OPENAI_API_KEY`, `DEEPGRAM_API_KEY`, `AUTH_PASSWORD`, `AUTH_SECRET`.
-- **Frontend (Vercel):** `VITE_API_URL` debe apuntar a la URL real del backend (`https://tesis-veterinaria-backend.onrender.com`).
+- **`database.py`** normaliza la URL de Railway (`postgres://` → `postgresql+psycopg://`).
+- **Variables de entorno (Railway):** `DATABASE_URL`, `OPENAI_API_KEY`, `DEEPGRAM_API_KEY`, `AUTH_PASSWORD`, `AUTH_SECRET`.
+- **Frontend (Vercel):** `VITE_API_URL` debe apuntar a la URL real del backend (`https://tesis-veterinaria-backend-production.up.railway.app`).
 - **Seed inicial:** al arrancar con BD vacía se crean `admin` (recepcionista) y `doctor` (veterinario).
 
 ---

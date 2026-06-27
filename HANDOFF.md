@@ -32,7 +32,7 @@ Moneda: **soles peruanos (S/)**. Zona horaria: **Perú (UTC-5)**.
 - **Backend + PostgreSQL → Railway.** Root Directory = `backend`. Arranca con el `Procfile`:
   `web: python prestart.py && uvicorn main:app --host 0.0.0.0 --port $PORT`.
 - **Frontend → Vercel.** Variable `VITE_API_URL` apunta al backend de Railway.
-- `render.yaml` es **legado** (se migró de Render a Railway). El despliegue vigente es Railway+Vercel.
+- El despliegue vigente es **Railway+Vercel** (se migró desde Render, ya eliminado). La config de Railway vive en `backend/railway.json` (healthcheck + auto-restart).
 - Carpeta de trabajo local: **`C:\dev\tesis-veterinaria`** (se sacó de OneDrive porque rompía el dev server).
 
 `prestart.py` reconcilia Alembic con la BD al arrancar: si la BD ya está gestionada por Alembic

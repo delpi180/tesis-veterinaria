@@ -1,5 +1,5 @@
 """
-Inicialización previa al arranque (usada por Render antes de levantar uvicorn).
+Inicialización previa al arranque (corre antes de uvicorn, ver Procfile).
 
 Reconcilia el estado de Alembic con la base de datos real, SIN destruir datos:
 

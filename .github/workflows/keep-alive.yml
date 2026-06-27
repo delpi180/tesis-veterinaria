@@ -1,4 +1,4 @@
-name: Keep Render Awake
+name: Keep Railway Awake
 
 on:
   schedule:
@@ -10,4 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Backend
-        run: curl -s https://tesis-veterinaria-backend.onrender.com/api/health
+        run: curl -s https://tesis-veterinaria-backend-production.up.railway.app/api/health

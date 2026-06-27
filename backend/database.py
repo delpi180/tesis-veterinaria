@@ -6,8 +6,9 @@ from core.config import settings
 
 def _normalizar_url(url: str) -> str:
     """
-    Render entrega la URL como 'postgres://' o 'postgresql://', pero este backend
-    usa el driver psycopg (v3), que requiere el esquema 'postgresql+psycopg://'.
+    Railway (o cualquier Postgres) entrega la URL como 'postgres://' o
+    'postgresql://', pero este backend usa el driver psycopg (v3), que requiere
+    el esquema 'postgresql+psycopg://'.
     Si ya viene con un driver explícito (p. ej. +psycopg), se deja igual.
     """
     if url.startswith("postgres://"):

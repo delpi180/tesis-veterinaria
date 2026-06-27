@@ -26,7 +26,7 @@ RUTAS_PUBLICAS = {"/api/auth/login", "/api/health"}
 
 
 def _clave_cliente(request: Request) -> str:
-    """IP del cliente para el rate-limit (respeta el proxy de Render/Vercel)."""
+    """IP del cliente para el rate-limit (respeta el proxy de Railway/Vercel)."""
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
         return fwd.split(",")[0].strip()
@@ -179,9 +179,8 @@ app.include_router(actividad.router)
 
 @app.on_event("startup")
 async def startup():
-    # El esquema lo gestiona Alembic (ver prestart.py / startCommand en
-    # render.yaml). No usamos create_all para evitar que la BD quede sin
-    # control de migraciones.
+    # El esquema lo gestiona Alembic (ver prestart.py / Procfile). No usamos
+    # create_all para evitar que la BD quede sin control de migraciones.
     _seed_admin()
 
     from routers.citas import poll_sse_events

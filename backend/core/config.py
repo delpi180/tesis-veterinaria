@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Corrección para Render: Forzar el uso de psycopg3 (psycopg-binary)
+# Forzar el uso de psycopg3 (psycopg-binary) con la URL de Postgres
 if settings.database_url:
     if settings.database_url.startswith("postgres://"):
         settings.database_url = settings.database_url.replace("postgres://", "postgresql+psycopg://", 1)

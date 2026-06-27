@@ -77,7 +77,9 @@ tesis-veterinaria/
 │       ├── services/         # Llamadas a la API (Fetch/Axios)
 │       └── utils/            # Funciones auxiliares
 │
-└── render.yaml               # Archivo de configuración para despliegue en Render
+└── backend/
+    ├── Procfile              # Comando de arranque en Railway
+    └── railway.json          # Healthcheck + auto-restart en Railway
 ```
 
 ---

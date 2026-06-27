@@ -24,7 +24,7 @@ class LoginResponse(BaseModel):
 
 
 def _clave_cliente(request: Request) -> str:
-    """IP del cliente para el rate-limit (respeta el proxy de Render/Vercel)."""
+    """IP del cliente para el rate-limit (respeta el proxy de Railway/Vercel)."""
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
         return fwd.split(",")[0].strip()
