@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, Paperclip, LayoutDashboard } from 'lucide-react'
+import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, Paperclip, LayoutDashboard, Bug, Scissors } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -10,6 +10,7 @@ import autoTable from 'jspdf-autotable'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
 import DocumentosPaciente from '../components/DocumentosPaciente'
+import RegistrosPaciente from '../components/RegistrosPaciente'
 
 // ── Catálogos de etiquetas (solo lectura) ───────────────────────────────────
 const SISTEMAS_EOP = [
@@ -494,6 +495,8 @@ export default function HistorialPaciente() {
     { id: 'resumen',    label: 'Resumen',    Icon: LayoutDashboard, count: null },
     { id: 'consultas',  label: 'Consultas',  Icon: ClipboardList,   count: historias.length },
     { id: 'vacunas',    label: 'Vacunas',    Icon: Syringe,         count: vacunas.length },
+    { id: 'antiparasitarios', label: 'Antiparasitarios', Icon: Bug, count: null },
+    { id: 'estetica',   label: 'Estética',   Icon: Scissors,        count: null },
     { id: 'peso',       label: 'Peso',       Icon: Weight,          count: pesos.length },
     { id: 'documentos', label: 'Documentos', Icon: Paperclip,       count: null },
   ]
@@ -701,6 +704,16 @@ export default function HistorialPaciente() {
                   )}
                 </section>
               </div>
+            )}
+
+            {/* ── ANTIPARASITARIOS ────────────────────────────────────────── */}
+            {tab === 'antiparasitarios' && (
+              <RegistrosPaciente pacienteId={pacienteId} tipo="antiparasitario" labelProducto="Producto" />
+            )}
+
+            {/* ── ESTÉTICA ────────────────────────────────────────────────── */}
+            {tab === 'estetica' && (
+              <RegistrosPaciente pacienteId={pacienteId} tipo="estetica" labelProducto="Servicio" />
             )}
 
             {/* ── DOCUMENTOS ──────────────────────────────────────────────── */}

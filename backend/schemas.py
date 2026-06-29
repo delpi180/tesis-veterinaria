@@ -712,6 +712,30 @@ class DocumentoOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Registros complementarios (antiparasitarios, estética)
+# ---------------------------------------------------------------------------
+
+class RegistroClinicoCreate(BaseModel):
+    tipo:     Literal["antiparasitario", "estetica"]
+    fecha:    Optional[date] = None
+    producto: Optional[str] = None
+    notas:    Optional[str] = None
+
+
+class RegistroClinicoOut(BaseModel):
+    id:             int
+    paciente_id:    int
+    tipo:           str
+    fecha:          date
+    producto:       Optional[str] = None
+    notas:          Optional[str] = None
+    registrado_por: Optional[str] = None
+    creado_en:      datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
 # Asistencia (control de marcaciones de personal)
 # ---------------------------------------------------------------------------
 

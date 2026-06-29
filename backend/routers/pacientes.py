@@ -1,19 +1,21 @@
 import logging
 import os
-from datetime import time
+from datetime import datetime, time, timezone
+from typing import Optional
 
 from fastapi import (
-    APIRouter, Depends, Form, HTTPException, Request, Response,
+    APIRouter, Depends, Form, HTTPException, Query, Request, Response,
     UploadFile, File, status,
 )
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Cita, DocumentoPaciente, Paciente, HistoriaClinica, Usuario
+from models import Cita, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Usuario
 from schemas import (
     PacienteOut, PacienteUpdate,
     HistoriaClinicaCreate, HistoriaClinicaOut,
     DocumentoOut,
+    RegistroClinicoCreate, RegistroClinicoOut,
 )
 from core.deps import usuario_actual
 
@@ -290,5 +292,71 @@ def eliminar_documento(
         raise HTTPException(status_code=404, detail="Documento no encontrado")
     request.state.actividad_detalle = f"{doc.paciente.nombre if doc.paciente else paciente_id} — {doc.nombre}"
     db.delete(doc)
+    db.commit()
+
+
+# ── Registros complementarios (antiparasitarios / estética) ───────────────────
+
+@router.post(
+    "/{paciente_id}/registros/",
+    response_model=RegistroClinicoOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def crear_registro(
+    paciente_id: int,
+    payload: RegistroClinicoCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    paciente = db.get(Paciente, paciente_id)
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    datos = payload.model_dump(exclude_unset=True)
+    reg = RegistroClinico(
+        paciente_id=paciente_id,
+        tipo=payload.tipo,
+        fecha=datos.get("fecha"),  # si viene None, el default del modelo pone hoy
+        producto=(payload.producto or None),
+        notas=(payload.notas or None),
+        registrado_por=usuario.usuario if usuario else None,
+    )
+    if reg.fecha is None:
+        reg.fecha = datetime.now(timezone.utc).date()
+    db.add(reg)
+    request.state.actividad_detalle = f"{paciente.nombre} — {payload.tipo}"
+    db.commit()
+    db.refresh(reg)
+    return reg
+
+
+@router.get("/{paciente_id}/registros/", response_model=list[RegistroClinicoOut])
+def listar_registros(
+    paciente_id: int,
+    tipo: Optional[str] = Query(None, description="antiparasitario | estetica"),
+    db: Session = Depends(get_db),
+):
+    q = db.query(RegistroClinico).filter(RegistroClinico.paciente_id == paciente_id)
+    if tipo:
+        q = q.filter(RegistroClinico.tipo == tipo)
+    return q.order_by(RegistroClinico.fecha.desc(), RegistroClinico.id.desc()).all()
+
+
+@router.delete(
+    "/{paciente_id}/registros/{registro_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def eliminar_registro(
+    paciente_id: int,
+    registro_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    reg = db.get(RegistroClinico, registro_id)
+    if not reg or reg.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    request.state.actividad_detalle = f"{paciente_id} — {reg.tipo}"
+    db.delete(reg)
     db.commit()
 

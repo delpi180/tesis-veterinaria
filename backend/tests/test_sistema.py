@@ -263,6 +263,38 @@ def test_documentos_paciente_flujo(client, admin, doctor):
         db.commit(); db.close()
 
 
+def test_registros_clinicos_flujo(client, admin, doctor):
+    """Antiparasitarios/estética: crear, listar por tipo y eliminar."""
+    cli = client.post("/api/clientes/", json={"nombre": "QA Dueño4", "dni": "55667711"}, headers=admin).json()
+    pac = client.post(f"/api/clientes/{cli['id']}/pacientes/",
+                      json={"nombre": "QA Toby", "especie": "Canino"}, headers=admin).json()
+    try:
+        r = client.post(f"/api/pacientes/{pac['id']}/registros/",
+                        json={"tipo": "antiparasitario", "producto": "Bravecto", "fecha": "2026-05-01"}, headers=doctor)
+        assert r.status_code == 201
+        reg = r.json()
+        assert reg["tipo"] == "antiparasitario" and reg["producto"] == "Bravecto"
+
+        # otro tipo
+        client.post(f"/api/pacientes/{pac['id']}/registros/",
+                    json={"tipo": "estetica", "producto": "Baño y corte"}, headers=doctor)
+
+        # filtrar por tipo
+        anti = client.get(f"/api/pacientes/{pac['id']}/registros/?tipo=antiparasitario", headers=doctor).json()
+        assert len(anti) == 1 and anti[0]["tipo"] == "antiparasitario"
+        todos = client.get(f"/api/pacientes/{pac['id']}/registros/", headers=doctor).json()
+        assert len(todos) == 2
+
+        # eliminar
+        assert client.delete(f"/api/pacientes/{pac['id']}/registros/{reg['id']}", headers=doctor).status_code == 204
+        assert len(client.get(f"/api/pacientes/{pac['id']}/registros/", headers=doctor).json()) == 1
+    finally:
+        client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
+        db = SessionLocal()
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()
+
+
 # ── Control de asistencia (marcaciones) ──────────────────────────────────────
 
 def _id_doctor(client, admin, nombre="QA Doctor"):

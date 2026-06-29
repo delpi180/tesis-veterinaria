@@ -72,6 +72,11 @@ class Paciente(Base):
         back_populates="paciente",
         cascade="all, delete-orphan",
     )
+    registros = relationship(
+        "RegistroClinico",
+        back_populates="paciente",
+        cascade="all, delete-orphan",
+    )
 
 
 class DocumentoPaciente(Base):
@@ -95,6 +100,26 @@ class DocumentoPaciente(Base):
     creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     paciente = relationship("Paciente", back_populates="documentos")
+
+
+class RegistroClinico(Base):
+    """Registros complementarios simples por mascota: antiparasitarios y estética.
+
+    Son eventos ligeros (fecha + producto/servicio + notas), separados de la
+    historia clínica formal. El campo `tipo` distingue la categoría.
+    """
+    __tablename__ = "registros_clinicos"
+
+    id          = Column(Integer, primary_key=True)
+    paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
+    tipo        = Column(String(20), nullable=False)   # antiparasitario | estetica
+    fecha       = Column(Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
+    producto    = Column(String(200))                  # producto aplicado / servicio realizado
+    notas       = Column(Text)
+    registrado_por = Column(String(50))
+    creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    paciente = relationship("Paciente", back_populates="registros")
 
 
 class HistoriaClinica(Base):
