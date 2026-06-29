@@ -77,7 +77,11 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
         <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
           <label className="text-xs font-semibold text-slate-500">{labelProducto}</label>
           <input type="text" value={producto} onChange={e => setProducto(e.target.value)}
-            placeholder={tipo === 'antiparasitario' ? 'Ej. Bravecto, Drontal…' : 'Ej. Baño, corte, limpieza dental…'}
+            placeholder={{
+              antiparasitario: 'Ej. Bravecto, Drontal…',
+              estetica: 'Ej. Baño, corte, limpieza dental…',
+              complementario: 'Ej. Citología, ecografía, hemograma…',
+            }[tipo] ?? ''}
             className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
         </div>
         <div className="flex flex-col gap-1 flex-1 min-w-[160px]">

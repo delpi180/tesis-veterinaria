@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, Paperclip, LayoutDashboard, Bug, Scissors } from 'lucide-react'
+import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, Paperclip, LayoutDashboard, Bug, Scissors, Microscope } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -494,6 +494,7 @@ export default function HistorialPaciente() {
   const TABS = [
     { id: 'resumen',    label: 'Resumen',    Icon: LayoutDashboard, count: null },
     { id: 'consultas',  label: 'Consultas',  Icon: ClipboardList,   count: historias.length },
+    { id: 'complementarios', label: 'M. Complementarios', Icon: Microscope, count: null },
     { id: 'vacunas',    label: 'Vacunas',    Icon: Syringe,         count: vacunas.length },
     { id: 'antiparasitarios', label: 'Antiparasitarios', Icon: Bug, count: null },
     { id: 'estetica',   label: 'Estética',   Icon: Scissors,        count: null },
@@ -704,6 +705,11 @@ export default function HistorialPaciente() {
                   )}
                 </section>
               </div>
+            )}
+
+            {/* ── M. COMPLEMENTARIOS ──────────────────────────────────────── */}
+            {tab === 'complementarios' && (
+              <RegistrosPaciente pacienteId={pacienteId} tipo="complementario" labelProducto="Método" />
             )}
 
             {/* ── ANTIPARASITARIOS ────────────────────────────────────────── */}

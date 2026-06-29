@@ -716,7 +716,7 @@ class DocumentoOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 class RegistroClinicoCreate(BaseModel):
-    tipo:     Literal["antiparasitario", "estetica"]
+    tipo:     Literal["antiparasitario", "estetica", "complementario"]
     fecha:    Optional[date] = None
     producto: Optional[str] = None
     notas:    Optional[str] = None
