@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2 } from 'lucide-react'
+import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, Paperclip, LayoutDashboard } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -9,6 +9,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
+import DocumentosPaciente from '../components/DocumentosPaciente'
 
 // ── Catálogos de etiquetas (solo lectura) ───────────────────────────────────
 const SISTEMAS_EOP = [
@@ -423,6 +424,7 @@ export default function HistorialPaciente() {
   const [historias, setHistorias] = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
+  const [tab, setTab]             = useState('resumen')
 
   const handleEdit = (h) => {
     navigate(`/consultas/${pacienteId}`, {
@@ -478,6 +480,24 @@ export default function HistorialPaciente() {
   const pesoActual = ordenadas.find(h => h.peso_kg != null)?.peso_kg ?? null
   const proximaCita = ordenadas.map(h => h.proxima_cita).find(Boolean) ?? null
 
+  // Vacunas: aplanamos las vacunas registradas en cada consulta (más reciente primero)
+  const vacunas = ordenadas.flatMap(h =>
+    (Array.isArray(h.vacunas_items) ? h.vacunas_items : [])
+      .filter(v => v?.vacuna?.trim())
+      .map(v => ({ fecha: h.fecha || h.creado_en, ...v }))
+  )
+  // Peso: registros con peso (más reciente primero)
+  const pesos = ordenadas.filter(h => h.peso_kg != null)
+    .map(h => ({ fecha: h.fecha || h.creado_en, peso: Number(h.peso_kg) }))
+
+  const TABS = [
+    { id: 'resumen',    label: 'Resumen',    Icon: LayoutDashboard, count: null },
+    { id: 'consultas',  label: 'Consultas',  Icon: ClipboardList,   count: historias.length },
+    { id: 'vacunas',    label: 'Vacunas',    Icon: Syringe,         count: vacunas.length },
+    { id: 'peso',       label: 'Peso',       Icon: Weight,          count: pesos.length },
+    { id: 'documentos', label: 'Documentos', Icon: Paperclip,       count: null },
+  ]
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
@@ -522,80 +542,171 @@ export default function HistorialPaciente() {
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">⚠ {error}</div>
         )}
 
-        {/* Resumen de evolución */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
-            <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center">
-              <ClipboardList className="w-4 h-4 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-medium">Consultas</p>
-              <p className="text-xl font-bold text-slate-800">{loading ? '—' : historias.length}</p>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
-            <div className="w-9 h-9 rounded-lg bg-sky-100 flex items-center justify-center">
-              <FileText className="w-4 h-4 text-sky-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-medium">Última visita</p>
-              <p className="text-sm font-bold text-slate-800">{ultima ? fmtFecha(ultima.fecha || ultima.creado_en) : '—'}</p>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
-            <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
-              <Weight className="w-4 h-4 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-medium">Peso reciente</p>
-              <p className="text-sm font-bold text-slate-800">{pesoActual != null ? `${pesoActual} kg` : '—'}</p>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
-            <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
-              <CalendarClock className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400 font-medium">Próxima cita</p>
-              <p className="text-sm font-bold text-slate-800">{proximaCita ? fmtFecha(proximaCita) : 'Sin programar'}</p>
-            </div>
-          </div>
+        {/* Barra de pestañas (estilo ficha del paciente) */}
+        <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto">
+          {TABS.map(({ id, label, Icon, count }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
+                tab === id
+                  ? 'border-purple-600 text-purple-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Icon className="w-4 h-4" /> {label}
+              {count != null && count > 0 && (
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${tab === id ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+              )}
+            </button>
+          ))}
         </div>
 
-        {/* Gráfico de evolución clínica */}
-        {!loading && historias.length > 0 && <GraficoEvolucion historias={historias} />}
-
-        {/* Timeline de consultas */}
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Consultas registradas</h2>
-            <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{ordenadas.length}</span>
+        {loading ? (
+          <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
+            <Spinner /> <span className="text-sm">Cargando ficha…</span>
           </div>
+        ) : (
+          <>
+            {/* ── RESUMEN ─────────────────────────────────────────────────── */}
+            {tab === 'resumen' && (
+              <div className="flex flex-col gap-5">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
+                    <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center">
+                      <ClipboardList className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">Consultas</p>
+                      <p className="text-xl font-bold text-slate-800">{historias.length}</p>
+                    </div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
+                    <div className="w-9 h-9 rounded-lg bg-sky-100 flex items-center justify-center">
+                      <FileText className="w-4 h-4 text-sky-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">Última visita</p>
+                      <p className="text-sm font-bold text-slate-800">{ultima ? fmtFecha(ultima.fecha || ultima.creado_en) : '—'}</p>
+                    </div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
+                    <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
+                      <Weight className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">Peso reciente</p>
+                      <p className="text-sm font-bold text-slate-800">{pesoActual != null ? `${pesoActual} kg` : '—'}</p>
+                    </div>
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
+                      <CalendarClock className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 font-medium">Próxima cita</p>
+                      <p className="text-sm font-bold text-slate-800">{proximaCita ? fmtFecha(proximaCita) : 'Sin programar'}</p>
+                    </div>
+                  </div>
+                </div>
+                {historias.length > 0 && <GraficoEvolucion historias={historias} />}
+              </div>
+            )}
 
-          {loading ? (
-            <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
-              <Spinner /> <span className="text-sm">Cargando historial…</span>
-            </div>
-          ) : ordenadas.length === 0 ? (
-            <div className="bg-white rounded-xl border border-dashed border-slate-200 flex flex-col items-center justify-center py-16 text-slate-400">
-              <FileText className="w-8 h-8 mb-2 opacity-40" />
-              <p className="text-sm font-medium text-slate-500">Aún no hay consultas registradas</p>
-              <p className="text-xs mt-1">Usa "Atender / Nueva consulta" para registrar la primera.</p>
-            </div>
-          ) : (
-            ordenadas.map((h, i) => (
-              <HistoriaCard
-                key={h.id}
-                h={h}
-                paciente={paciente}
-                cliente={cliente}
-                defaultOpen={i === 0}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            ))
-          )}
-        </section>
+            {/* ── CONSULTAS ───────────────────────────────────────────────── */}
+            {tab === 'consultas' && (
+              <section className="flex flex-col gap-3">
+                {ordenadas.length === 0 ? (
+                  <div className="bg-white rounded-xl border border-dashed border-slate-200 flex flex-col items-center justify-center py-16 text-slate-400">
+                    <FileText className="w-8 h-8 mb-2 opacity-40" />
+                    <p className="text-sm font-medium text-slate-500">Aún no hay consultas registradas</p>
+                    <p className="text-xs mt-1">Usa "Atender / Nueva consulta" para registrar la primera.</p>
+                  </div>
+                ) : (
+                  ordenadas.map((h, i) => (
+                    <HistoriaCard
+                      key={h.id}
+                      h={h}
+                      paciente={paciente}
+                      cliente={cliente}
+                      defaultOpen={i === 0}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))
+                )}
+              </section>
+            )}
+
+            {/* ── VACUNAS ─────────────────────────────────────────────────── */}
+            {tab === 'vacunas' && (
+              <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                {vacunas.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                    <Syringe className="w-7 h-7 mb-2 opacity-40" />
+                    <p className="text-sm">Sin vacunas registradas en las consultas</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto"><table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 bg-slate-50">
+                        <th className="text-left px-5 py-3 font-semibold">Fecha</th>
+                        <th className="text-left px-5 py-3 font-semibold">Vacuna</th>
+                        <th className="text-left px-5 py-3 font-semibold">Lote</th>
+                        <th className="text-left px-5 py-3 font-semibold">Próxima dosis</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vacunas.map((v, i) => (
+                        <tr key={i} className="border-b border-slate-50">
+                          <td className="px-5 py-3 text-slate-500">{fmtFecha(v.fecha)}</td>
+                          <td className="px-5 py-3 font-medium text-slate-800">{v.vacuna}</td>
+                          <td className="px-5 py-3 text-slate-500">{v.lote || '—'}</td>
+                          <td className="px-5 py-3 text-slate-500">{v.proxima_dosis || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table></div>
+                )}
+              </section>
+            )}
+
+            {/* ── PESO ────────────────────────────────────────────────────── */}
+            {tab === 'peso' && (
+              <div className="flex flex-col gap-5">
+                {historias.length > 0 && <GraficoEvolucion historias={historias} />}
+                <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  {pesos.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                      <Weight className="w-7 h-7 mb-2 opacity-40" />
+                      <p className="text-sm">Sin registros de peso</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto"><table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 bg-slate-50">
+                          <th className="text-left px-5 py-3 font-semibold">Fecha</th>
+                          <th className="text-right px-5 py-3 font-semibold">Peso</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pesos.map((p, i) => (
+                          <tr key={i} className="border-b border-slate-50">
+                            <td className="px-5 py-3 text-slate-500">{fmtFecha(p.fecha)}</td>
+                            <td className="px-5 py-3 text-right font-medium text-slate-800">{p.peso} kg</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table></div>
+                  )}
+                </section>
+              </div>
+            )}
+
+            {/* ── DOCUMENTOS ──────────────────────────────────────────────── */}
+            {tab === 'documentos' && <DocumentosPaciente pacienteId={pacienteId} />}
+          </>
+        )}
 
       </main>
     </div>
