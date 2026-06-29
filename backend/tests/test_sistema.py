@@ -43,20 +43,24 @@ def test_roles(client, admin, doctor):
     assert client.get("/api/usuarios/", headers=admin).status_code == 200
     # el doctor NO gestiona usuarios (función de la administradora)
     assert client.get("/api/usuarios/", headers=doctor).status_code == 403
-    # historias clínicas: el doctor sí; la recepcionista no
+    # historias clínicas: leer la ficha lo pueden ambos; el doctor además registra
     cli = client.get("/api/clientes/", headers=admin).json()
     if cli and cli[0]["pacientes"]:
         pid = cli[0]["pacientes"][0]["id"]
-        assert client.get(f"/api/pacientes/{pid}/historias/", headers=admin).status_code == 403
+        assert client.get(f"/api/pacientes/{pid}/historias/", headers=admin).status_code == 200
         assert client.get(f"/api/pacientes/{pid}/historias/", headers=doctor).status_code == 200
 
 
-def test_admin_es_recepcionista_no_ve_historias(client, admin):
-    """La administradora del sistema es recepcionista: no accede a lo clínico."""
+def test_recepcionista_lee_pero_no_escribe_historias(client, admin):
+    """La recepcionista puede VER la historia (ficha) pero no crearla/editarla."""
     cli = client.get("/api/clientes/", headers=admin).json()
     if cli and cli[0]["pacientes"]:
         pid = cli[0]["pacientes"][0]["id"]
-        assert client.get(f"/api/pacientes/{pid}/historias/", headers=admin).status_code == 403
+        # leer: permitido
+        assert client.get(f"/api/pacientes/{pid}/historias/", headers=admin).status_code == 200
+        # crear: bloqueado (reservado al veterinario)
+        r = client.post(f"/api/pacientes/{pid}/historias/", json={"motivo_consulta": "x"}, headers=admin)
+        assert r.status_code == 403
 
 
 def test_listar_doctores(client, admin, doctor):

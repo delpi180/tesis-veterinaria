@@ -121,8 +121,15 @@ async def auth_middleware(request: Request, call_next):
                 status_code=401,
                 content={"detail": "No autorizado. Inicia sesión para continuar."},
             )
-        # Control de rol: la recepcionista no accede a historias clínicas
-        if sesion["rol"] != "veterinario" and _es_ruta_clinica(path):
+        # Control de rol: la recepcionista puede LEER (GET) la historia clínica del
+        # paciente (para ver su ficha completa), pero no crear/editar/eliminar
+        # consultas ni usar el pipeline de IA — eso queda reservado al veterinario.
+        lectura_historias = request.method == "GET" and "/historias" in path
+        if (
+            sesion["rol"] != "veterinario"
+            and _es_ruta_clinica(path)
+            and not lectura_historias
+        ):
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Acceso restringido al personal veterinario."},

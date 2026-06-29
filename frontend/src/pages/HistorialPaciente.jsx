@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { api } from '../services/api'
+import { api, esVeterinario } from '../services/api'
 import { useToast } from '../components/Toast'
 import DocumentosPaciente from '../components/DocumentosPaciente'
 import RegistrosPaciente from '../components/RegistrosPaciente'
@@ -531,12 +531,14 @@ export default function HistorialPaciente() {
           >
             <Download className="w-4 h-4" /> PDF
           </button>
-          <button
-            onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente } })}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition"
-          >
-            <Stethoscope className="w-4 h-4" /> Atender / Nueva consulta
-          </button>
+          {esVeterinario() && (
+            <button
+              onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente } })}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition"
+            >
+              <Stethoscope className="w-4 h-4" /> Atender / Nueva consulta
+            </button>
+          )}
         </div>
       </header>
 
@@ -634,8 +636,8 @@ export default function HistorialPaciente() {
                       paciente={paciente}
                       cliente={cliente}
                       defaultOpen={i === 0}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
+                      onEdit={esVeterinario() ? handleEdit : undefined}
+                      onDelete={esVeterinario() ? handleDelete : undefined}
                     />
                   ))
                 )}

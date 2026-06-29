@@ -53,7 +53,8 @@ function AppProtegida() {
           <Route path="/clientes/:id"           element={<DetalleCliente />} />
           <Route path="/consultas"              element={<SoloVet><HistoriasClinicas /></SoloVet>} />
           <Route path="/consultas/:pacienteId"  element={<SoloVet><HistoriasClinicas /></SoloVet>} />
-          <Route path="/pacientes/:pacienteId/historial" element={<SoloVet><HistorialPaciente /></SoloVet>} />
+          {/* Ficha del paciente: ambos roles la VEN; las acciones de escritura van gateadas adentro */}
+          <Route path="/pacientes/:pacienteId/historial" element={<HistorialPaciente />} />
           <Route path="/turnos"                 element={<Turnos />} />
           <Route path="/inventario"             element={<SoloAdmin><Inventario /></SoloAdmin>} />
           <Route path="/servicios"              element={<SoloAdmin><Servicios /></SoloAdmin>} />

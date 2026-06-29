@@ -708,12 +708,13 @@ export default function DetalleCliente() {
                 {pacientesFiltrados.map(p => {
                   const activo = p.id === selectedId
                   return (
-                    <li key={p.id}>
+                    <li key={p.id} className="flex items-stretch">
+                      {/* Clic en la mascota → abre su ficha clínica completa (pestañas) */}
                       <button
-                        onClick={() => setSelectedId(p.id)}
-                        className={`w-full text-left px-5 py-3.5 flex items-center gap-3 transition ${activo ? 'bg-purple-50' : 'hover:bg-slate-50/60'}`}
+                        onClick={() => navigate(`/pacientes/${p.id}/historial`, { state: { paciente: p, cliente } })}
+                        className="flex-1 text-left px-5 py-3.5 flex items-center gap-3 transition hover:bg-slate-50/60 min-w-0"
                       >
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${activo ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 text-slate-400">
                           <PawPrint className="w-4 h-4" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -725,7 +726,14 @@ export default function DetalleCliente() {
                         <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${especieColor(p.especie)}`}>
                           {p.especie}
                         </span>
-                        <ChevronRight className={`w-4 h-4 shrink-0 ${activo ? 'text-purple-500' : 'text-slate-300'}`} />
+                      </button>
+                      {/* Opciones rápidas (agendar, WhatsApp, cobrar…) sin salir de la lista */}
+                      <button
+                        onClick={() => setSelectedId(activo ? null : p.id)}
+                        title="Opciones rápidas (agendar, WhatsApp, cobrar)"
+                        className={`px-3 flex items-center border-l border-slate-100 transition ${activo ? 'text-purple-600 bg-purple-50' : 'text-slate-300 hover:text-purple-600 hover:bg-slate-50'}`}
+                      >
+                        <ClipboardList className="w-4 h-4" />
                       </button>
                     </li>
                   )
