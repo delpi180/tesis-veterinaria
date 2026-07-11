@@ -23,18 +23,36 @@ def _norm(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
 
 
+def _stem(w: str) -> str:
+    """Normaliza singular/plural en español de forma simple (vendas -> venda)."""
+    if len(w) > 4 and w.endswith("es"):
+        return w[:-2]
+    if len(w) > 3 and w.endswith("s"):
+        return w[:-1]
+    return w
+
+
+def _stem_phrase(s: str) -> str:
+    return " ".join(_stem(w) for w in s.split())
+
+
 def _match_producto(nombre: str, productos: list[Producto]) -> Producto | None:
     objetivo = _norm(nombre)
     if not objetivo:
         return None
-    palabras = {w for w in objetivo.split() if len(w) > 2}
+    objetivo_stem = _stem_phrase(objetivo)
+    palabras = {_stem(w) for w in objetivo.split() if len(w) > 2}
 
     mejor, mejor_score = None, 0.0
     for p in productos:
         pn = _norm(p.nombre)
-        if objetivo == pn or objetivo in pn or pn in objetivo:
-            return p   # match directo
-        tokens = {w for w in pn.split() if len(w) > 2}
+        pn_stem = _stem_phrase(pn)
+        if (
+            objetivo == pn or objetivo in pn or pn in objetivo
+            or objetivo_stem == pn_stem or objetivo_stem in pn_stem or pn_stem in objetivo_stem
+        ):
+            return p   # match directo (incluye singular/plural)
+        tokens = {_stem(w) for w in pn.split() if len(w) > 2}
         if not palabras or not tokens:
             continue
         score = len(palabras & tokens) / len(palabras | tokens)

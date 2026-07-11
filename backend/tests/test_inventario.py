@@ -12,6 +12,7 @@ PRODUCTOS = [
     _P("Amoxicilina 250 mg x 20 caps", 1, "MED-0001"),
     _P("Bravecto antipulgas", 2, "MED-0002"),
     _P("Alimento Royal Canin 3kg", 3, "COM-0001"),
+    _P("Venda elástica 5cm", 4, "MED-0003"),
 ]
 
 
@@ -37,3 +38,8 @@ def test_sin_match_devuelve_none():
 
 def test_nombre_vacio():
     assert _match_producto("", PRODUCTOS) is None
+
+
+def test_match_plural_contra_singular():
+    assert _match_producto("vendas", PRODUCTOS).id == 4
+    assert _match_producto("Vendas", PRODUCTOS).id == 4
