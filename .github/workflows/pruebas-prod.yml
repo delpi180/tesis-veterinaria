@@ -1,0 +1,33 @@
+name: Pruebas contra producción (integración / disponibilidad / concurrencia)
+
+# Disparo manual únicamente: estas pruebas le pegan al backend real en Railway
+# y al frontend real en Vercel, así que NO corren en cada push/PR.
+#
+# Requiere el secret de repo PROD_ADMIN_PASSWORD (Settings → Secrets and
+# variables → Actions → New repository secret). Sin ese secret, las pruebas
+# de integración y concurrencia se saltan solas (disponibilidad no lo necesita).
+on:
+  workflow_dispatch:
+
+jobs:
+  pruebas-prod:
+    runs-on: ubuntu-latest
+
+    env:
+      PROD_ADMIN_PASSWORD: ${{ secrets.PROD_ADMIN_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar pruebas contra producción
+        working-directory: backend
+        run: python -m pytest -m prod -v -s

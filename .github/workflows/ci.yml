@@ -47,7 +47,7 @@ jobs:
 
       - name: Ejecutar tests
         working-directory: backend
-        run: python -m pytest -q
+        run: python -m pytest -q -m "not prod"
 
   frontend:
     runs-on: ubuntu-latest
@@ -62,6 +62,10 @@ jobs:
       - name: Instalar dependencias
         working-directory: frontend
         run: npm ci
+
+      - name: Ejecutar tests
+        working-directory: frontend
+        run: npm run test -- --run
 
       - name: Compilar (build)
         working-directory: frontend
