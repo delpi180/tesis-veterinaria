@@ -32,7 +32,7 @@ def crear_cliente(payload: ClienteCreate, db: Session = Depends(get_db)):
 
 @router.get("/", response_model=list[ClienteOut])
 def listar_clientes(
-    q: Optional[str] = Query(None, description="Busca por nombre o DNI"),
+    q: Optional[str] = Query(None, description="Busca por nombre/DNI del dueño o nombre de mascota"),
     skip: int = 0,
     limit: int = Query(300, le=1000),
     db: Session = Depends(get_db),
@@ -40,7 +40,11 @@ def listar_clientes(
     query = db.query(Cliente).options(joinedload(Cliente.pacientes))
     if q and q.strip():
         like = f"%{q.strip()}%"
-        query = query.filter(or_(Cliente.nombre.ilike(like), Cliente.dni.ilike(like)))
+        query = query.filter(or_(
+            Cliente.nombre.ilike(like),
+            Cliente.dni.ilike(like),
+            Cliente.pacientes.any(Paciente.nombre.ilike(like)),
+        ))
     return query.order_by(Cliente.nombre).offset(skip).limit(limit).all()
 
 

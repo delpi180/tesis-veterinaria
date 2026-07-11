@@ -20,6 +20,7 @@ env.txt
 .DS_Store
 .claude/
 .gemini/
+~$*
 
 # Builds
 dist/

@@ -170,6 +170,7 @@ function AgendarCitaModal({ paciente, onClose, onCreated }) {
   const hoy = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`
   const [form, setForm] = useState({ fecha: hoy, hora: '09:00', motivo: '', notas: '', veterinario_id: '' })
   const [doctores, setDoctores] = useState([])
+  const [citas, setCitas] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState(null)
 
@@ -177,7 +178,37 @@ function AgendarCitaModal({ paciente, onClose, onCreated }) {
     api.get('/api/usuarios/doctores')
       .then(setDoctores)
       .catch(err => console.error('Error al obtener doctores:', err))
+    // Se necesitan las citas existentes para poder avisar de un choque de horario.
+    api.get('/api/citas/')
+      .then(setCitas)
+      .catch(err => console.error('Error al obtener citas:', err))
   }, [])
+
+  // Aviso si el doctor asignado no labora ese día (según su perfil) — misma lógica que Turnos.jsx
+  const avisoHorario = (() => {
+    if (!form.veterinario_id || !form.fecha) return null
+    const doc = doctores.find(d => String(d.id) === String(form.veterinario_id))
+    if (!doc || !doc.dias_laborales) return null
+    const codigos = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab']
+    const [y, m, d] = form.fecha.split('-').map(Number)
+    const code = codigos[new Date(y, m - 1, d).getDay()]
+    const labora = doc.dias_laborales.split(',').includes(code)
+    return labora ? null : `${doc.nombre} no tiene ese día en su horario laboral.`
+  })()
+
+  // Aviso si el doctor ya tiene otro turno a esa misma fecha y hora — misma lógica que Turnos.jsx
+  const avisoChoque = (() => {
+    if (!form.veterinario_id || !form.fecha || !form.hora) return null
+    const pad = (n) => String(n).padStart(2, '0')
+    const choca = citas.some(c => {
+      if (String(c.veterinario_id) !== String(form.veterinario_id)) return false
+      const d = new Date(c.fecha_hora)
+      const fechaC = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      const horaC = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+      return fechaC === form.fecha && horaC === form.hora
+    })
+    return choca ? 'Este doctor ya tiene un turno a esa hora.' : null
+  })()
 
   const submit = async (e) => {
     e.preventDefault()
@@ -239,6 +270,16 @@ function AgendarCitaModal({ paciente, onClose, onCreated }) {
                   <option key={doc.id} value={doc.id}>{doc.nombre}</option>
                 ))}
               </select>
+              {avisoHorario && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1.5 rounded-lg">
+                  ⚠️ {avisoHorario}
+                </p>
+              )}
+              {avisoChoque && (
+                <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1.5 rounded-lg">
+                  ⛔ {avisoChoque}
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-1">
               <label className={labelCls}>Notas</label>

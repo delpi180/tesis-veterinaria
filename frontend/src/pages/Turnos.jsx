@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Stethoscope, Pencil, RefreshCw, Trash2, Printer } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { api, esVeterinario } from '../services/api'
+import { api, esVeterinario, getToken } from '../services/api'
 import { estadoStyle, estadoLabel, ESTADOS_CITA, waRecordatorio } from '../utils/citas'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 const NOMBRES_MES = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -106,8 +108,8 @@ export default function Turnos() {
 
   // Sincronización en tiempo real vía Server-Sent Events (SSE)
   useEffect(() => {
-    const token = localStorage.getItem('token') || '';
-    const es = new EventSource(`/api/citas/stream?token=${encodeURIComponent(token)}`);
+    const token = getToken() || '';
+    const es = new EventSource(`${API_BASE_URL}/api/citas/stream?token=${encodeURIComponent(token)}`);
     es.onmessage = (e) => {
       if (e.data === 'citas_updated') {
         if (!modalAbierto) cargar(true);
