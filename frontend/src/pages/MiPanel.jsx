@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calendar, PawPrint, Syringe, FileText, Clock, LogIn, LogOut, ClipboardList, RefreshCw, IdCard,
+  Users, Stethoscope,
 } from 'lucide-react'
 import { api, getNombre } from '../services/api'
 
@@ -76,6 +77,13 @@ export default function MiPanel() {
 
   const nombre = getNombre() || 'Doctor'
   const hoy = new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+
+  // Vista compartida del equipo. Con valores por defecto para que el panel no
+  // se rompa si responde un backend anterior que todavía no la envía.
+  const clinica = {
+    agenda: [], colegas: [], consultas_equipo: [],
+    ...(data?.clinica_hoy ?? {}),
+  }
 
   const irACliente = (cid) => cid && navigate(`/clientes/${cid}`)
 
@@ -263,6 +271,99 @@ export default function MiPanel() {
                 </div>
               )}
             </Card>
+
+            {/* ── La clínica hoy: lo que hace todo el equipo ──────────────────
+                Los doctores se cubren entre sí; para retomar un paciente que
+                atendió un colega o preguntarle algo, hace falta ver qué está
+                pasando en la clínica, no solo lo propio. */}
+            <div className="pt-1">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Users className="w-4 h-4 text-purple-500" />
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">La clínica hoy</h2>
+                <span className="text-[11px] text-slate-400">· visible para todo el equipo</span>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-5">
+                <Card title="Agenda del día" Icon={Calendar} count={clinica.agenda.length}>
+                  {clinica.agenda.length === 0 ? (
+                    <p className="text-xs text-slate-400 px-4 md:px-5 py-8 text-center">Sin turnos agendados para hoy.</p>
+                  ) : (
+                    <div className="divide-y divide-slate-50 max-h-72 overflow-y-auto">
+                      {clinica.agenda.map(t => (
+                        <button key={t.id} onClick={() => irACliente(t.cliente_id)}
+                          className="w-full text-left px-4 md:px-5 py-2.5 hover:bg-slate-50/70 transition flex items-center gap-3">
+                          <span className={`text-xs font-mono font-semibold shrink-0 tabular-nums ${t.es_mio ? 'text-purple-700' : 'text-slate-400'}`}>
+                            {fmtHora(t.fecha_hora)}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-800 truncate">
+                              {t.paciente}
+                              {t.es_mio && <span className="ml-2 text-[10px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">Tuyo</span>}
+                            </p>
+                            <p className="text-xs text-slate-500 truncate">
+                              {t.veterinario ?? 'Sin asignar'}{t.motivo ? ` · ${t.motivo}` : ''}
+                            </p>
+                          </div>
+                          <span className="text-[10px] text-slate-400 shrink-0 capitalize">{t.estado}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+
+                <Card title="Colegas de turno" Icon={IdCard} count={clinica.colegas.length}>
+                  {clinica.colegas.length === 0 ? (
+                    <p className="text-xs text-slate-400 px-4 md:px-5 py-8 text-center">Nadie más tiene marcación registrada hoy.</p>
+                  ) : (
+                    <div className="divide-y divide-slate-50">
+                      {clinica.colegas.map((c, i) => (
+                        <div key={i} className="px-4 md:px-5 py-2.5 flex items-center gap-3">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${c.en_turno ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-800 truncate">{c.nombre}</p>
+                            <p className="text-xs text-slate-500 capitalize">{c.rol}</p>
+                          </div>
+                          <span className="text-xs text-slate-400 shrink-0">
+                            {c.en_turno ? `desde ${fmtHora(c.hora_ingreso)}` : 'salió'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+
+              <div className="mt-4 md:mt-5">
+                <Card title="Últimas consultas del equipo" Icon={ClipboardList} count={clinica.consultas_equipo.length}>
+                  {clinica.consultas_equipo.length === 0 ? (
+                    <p className="text-xs text-slate-400 px-4 md:px-5 py-8 text-center">Todavía no hay consultas registradas.</p>
+                  ) : (
+                    <div className="divide-y divide-slate-50">
+                      {clinica.consultas_equipo.map(h => (
+                        <button key={h.id} onClick={() => h.paciente_id && navigate(`/pacientes/${h.paciente_id}/historial`)}
+                          className="w-full text-left px-4 md:px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
+                          <Stethoscope className={`w-4 h-4 shrink-0 ${h.es_mio ? 'text-purple-400' : 'text-slate-300'}`} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-slate-800 truncate">
+                              {h.paciente} · {h.especie}
+                            </p>
+                            <p className="text-xs text-slate-500 truncate">
+                              {h.diagnostico || h.motivo || '(sin diagnóstico)'}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className={`text-xs font-medium ${h.es_mio ? 'text-purple-700' : 'text-slate-500'}`}>
+                              {h.es_mio ? 'Tú' : h.veterinario ?? '—'}
+                            </p>
+                            <p className="text-[10px] text-slate-400">{fmtFecha(h.fecha)}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            </div>
           </>
         )}
       </main>

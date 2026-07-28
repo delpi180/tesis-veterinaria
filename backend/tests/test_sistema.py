@@ -6,6 +6,7 @@ Se ejecutan contra la base de datos configurada en .env. Limpian sus propios dat
     ./venv/Scripts/python.exe -m pytest tests/ -v
 """
 import io
+import uuid
 
 import pytest
 from sqlalchemy import text
@@ -438,6 +439,62 @@ def test_mi_panel_doctor(client, doctor):
 def test_mi_panel_no_para_recepcion(client, admin):
     # la administradora (recepcionista) no tiene panel clínico personal
     assert client.get("/api/mi-panel/", headers=admin).status_code == 403
+
+
+def test_mi_panel_muestra_trabajo_de_los_colegas(client, admin, doctor):
+    """El panel incluye la vista compartida del día: los doctores se cubren
+    entre sí, así que necesitan ver la consulta que atendió un colega (y poder
+    entrar a esa ficha) sin depender de preguntarle."""
+    # Identificadores únicos por corrida: con valores fijos, si una corrida
+    # falla a mitad y deja restos, la siguiente choca contra ellos y falla por
+    # un motivo que no es el que se quiere probar.
+    sufijo = uuid.uuid4().hex[:8]
+    usuario_colega = f"qa_colega_{sufijo}"
+    marca = f"DiagnosticoColega{sufijo}"
+
+    cli = client.post("/api/clientes/",
+                      json={"nombre": "QA Dueño Equipo", "dni": f"5{uuid.uuid4().int % 10_000_000:07d}"},
+                      headers=admin).json()
+    assert "id" in cli, f"No se pudo crear el cliente de prueba: {cli}"
+    pac = client.post(f"/api/clientes/{cli['id']}/pacientes/",
+                      json={"nombre": "QA Colega Pet", "especie": "Canino"}, headers=admin).json()
+    otro = None
+    try:
+        # Otro veterinario registra una consulta
+        otro = client.post("/api/usuarios/", json={
+            "usuario": usuario_colega, "nombre": "QA Colega Panel",
+            "password": "qa_colega_1234", "rol": "veterinario",
+        }, headers=admin).json()
+        assert "id" in otro, f"No se pudo crear el veterinario colega: {otro}"
+        token_otro = client.post("/api/auth/login",
+                                 json={"usuario": usuario_colega, "password": "qa_colega_1234"}).json()["token"]
+        cab_otro = {"Authorization": f"Bearer {token_otro}"}
+        client.post(f"/api/pacientes/{pac['id']}/historias/",
+                    json={"motivo_consulta": "Atendido por el colega",
+                          "diagnostico_presuntivo": marca}, headers=cab_otro)
+
+        d = client.get("/api/mi-panel/", headers=doctor).json()
+        assert "clinica_hoy" in d
+        equipo = d["clinica_hoy"]["consultas_equipo"]
+
+        # La consulta del colega aparece, atribuida a él y marcada como ajena
+        del_colega = next((h for h in equipo if h["diagnostico"] == marca), None)
+        assert del_colega is not None, "el panel no muestra la consulta que registró el colega"
+        assert del_colega["veterinario"] == "QA Colega Panel"
+        assert del_colega["es_mio"] is False
+        assert del_colega["paciente_id"] == pac["id"]   # permite entrar a la ficha del paciente
+    finally:
+        # La limpieza va por SQL y tolera fallos parciales: si se hiciera solo
+        # por la API y una creación falló antes, quedarían restos que rompen la
+        # siguiente corrida.
+        client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
+        db = SessionLocal()
+        db.execute(text("DELETE FROM historias_clinicas WHERE veterinario_id IN "
+                        "(SELECT id FROM usuarios WHERE usuario = :u)"), {"u": usuario_colega})
+        db.execute(text("DELETE FROM usuarios WHERE usuario = :u"), {"u": usuario_colega})
+        db.execute(text("DELETE FROM pacientes WHERE cliente_id = :c"), {"c": cli["id"]})
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()
 
 
 # ── Datos compartidos entre cuentas (una sola base de datos) ─────────────────
