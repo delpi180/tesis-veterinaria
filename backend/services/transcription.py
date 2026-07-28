@@ -38,7 +38,10 @@ def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav") -> str:
         )
 
     ext = os.path.splitext(filename)[-1].lower() or ".wav"
-    client = DeepgramClient(api_key=settings.deepgram_api_key, timeout=300.0)
+    # Timeout amplio: una consulta de 90 min (el tope que permite el grabador)
+    # tarda varios minutos en transcribirse. Con 5 min se cortaba y se perdía
+    # el trabajo de toda la consulta.
+    client = DeepgramClient(api_key=settings.deepgram_api_key, timeout=900.0)
 
     base_kwargs = dict(
         request=audio_bytes,

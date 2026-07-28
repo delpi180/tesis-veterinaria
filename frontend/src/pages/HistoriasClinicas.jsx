@@ -414,6 +414,22 @@ function DSec({ title, show, children }) {
   );
 }
 
+/** Cuenta los campos que la IA logró completar (incluye los sistemas del EOP). */
+function contarCamposLlenos(datos) {
+  if (!datos) return 0;
+  const lleno = (v) => v !== null && v !== undefined && v !== "" &&
+    !(Array.isArray(v) && v.length === 0);
+  let n = 0;
+  for (const [k, v] of Object.entries(datos)) {
+    if (k === "examen_particular") {
+      n += Object.values(v || {}).filter(lleno).length;
+    } else if (lleno(v)) {
+      n += 1;
+    }
+  }
+  return n;
+}
+
 function HistoriaCard({ h, onEdit, onDelete }) {
   const fecha = new Date(h.fecha || h.creado_en).toLocaleString("es-PE", {
     day: "2-digit", month: "short", year: "numeric",
@@ -855,6 +871,12 @@ export default function HistoriasClinicas() {
             setDatosIA(datos);
             setInferenciasBrut(inferencias);
             applyIA(datos, inferencias, alertas_rango);
+          }}
+          resumirResultado={({ datos }) => {
+            // Confirmar cuántos campos se completaron: sin esto el veterinario
+            // tiene que recorrer el formulario entero para saber qué entendió la IA.
+            const n = contarCamposLlenos(datos);
+            return n ? `${n} campo${n > 1 ? "s" : ""} completado${n > 1 ? "s" : ""}` : "No se detectaron datos";
           }}
         />
 

@@ -303,6 +303,10 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
             labelGrabar="Dictar receta"
             placeholderTexto="Escriba o pegue lo que va a recetar (medicamento, dosis, vía, frecuencia, duración)…"
             onResult={({ diagnostico, indicaciones, items }) => applyDictado({ diagnostico, indicaciones, items })}
+            resumirResultado={({ items }) => {
+              const n = (items || []).filter(i => i.medicamento?.trim()).length
+              return n ? `${n} medicamento${n > 1 ? 's' : ''} detectado${n > 1 ? 's' : ''}` : 'No se detectaron medicamentos'
+            }}
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

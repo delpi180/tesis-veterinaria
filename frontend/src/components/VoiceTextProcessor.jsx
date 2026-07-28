@@ -5,12 +5,64 @@ import { api, authHeaders } from "../services/api";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
+const fmtSec = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+const fmtMB  = (b) => b >= 1024 * 1024
+  ? `${(b / 1024 / 1024).toFixed(1)} MB`
+  : `${Math.max(1, Math.round(b / 1024))} KB`;
+
+/**
+ * Panel de progreso de la transcripción/extracción.
+ *
+ * Una consulta larga puede tardar un par de minutos entre subir el audio,
+ * transcribirlo y estructurarlo. Sin un cronómetro y unas etapas visibles, el
+ * veterinario no sabe si el sistema avanza o se colgó, y puede recargar la
+ * página perdiendo la grabación.
+ */
+function EstadoProceso({ aiState, esperaSeg, audioInfo }) {
+  if (aiState !== "transcribing" && aiState !== "processing") return null;
+  const transcribiendo = aiState === "transcribing";
+  // En modo "texto libre" no hay audio que transcribir: es un solo paso.
+  const conAudio = audioInfo != null;
+
+  const etiqueta = transcribiendo
+    ? "Paso 1 de 2 — Transcribiendo el audio…"
+    : conAudio
+      ? "Paso 2 de 2 — Extrayendo los datos…"
+      : "Extrayendo los datos…";
+
+  return (
+    <div className="rounded-md border border-purple-200 bg-purple-50 px-3 py-2.5 space-y-2">
+      <div className="flex items-center gap-2">
+        <Loader2 size={14} className="animate-spin text-purple-700 shrink-0" />
+        <span className="text-xs font-semibold text-purple-800">{etiqueta}</span>
+        <span className="ml-auto text-xs font-mono text-purple-700 tabular-nums">{fmtSec(esperaSeg)}</span>
+      </div>
+
+      <div className="h-1.5 rounded-full bg-purple-200 overflow-hidden">
+        <div
+          className={`h-full bg-purple-600 rounded-full transition-all duration-700 ease-out ${
+            transcribiendo ? "w-1/2" : "w-[92%]"
+          }`}
+        />
+      </div>
+
+      <p className="text-[11px] text-purple-700 leading-snug">
+        {audioInfo?.segundos != null && `Audio de ${fmtSec(audioInfo.segundos)} · ${fmtMB(audioInfo.bytes)}. `}
+        Las consultas largas pueden tardar un par de minutos. No cierres esta ventana.
+      </p>
+    </div>
+  );
+}
+
 export default function VoiceTextProcessor({
   onResult,
   onStateChange,
   endpoint = "/api/procesar-historia",
   labelGrabar = "Grabar consulta",
   placeholderTexto = "Pegue la transcripción o escriba el resumen de la consulta para que la IA extraiga los campos…",
+  // Opcional: recibe la respuesta del backend y devuelve un texto corto
+  // ("24 campos completados") para confirmarle al usuario qué se extrajo.
+  resumirResultado,
 }) {
   const [modoTexto, setModoTexto] = useState(false);
   const [textoManual, setTextoManual] = useState("");
@@ -19,6 +71,9 @@ export default function VoiceTextProcessor({
   const [aiError, setAiError] = useState(null);
   const [avisoLimite, setAvisoLimite] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);   // último audio grabado (para reintentar/descargar)
+  const [audioInfo, setAudioInfo] = useState(null);   // {segundos, bytes} del audio que se está procesando
+  const [esperaSeg, setEsperaSeg] = useState(0);      // cronómetro de la espera (transcripción + IA)
+  const [resumen, setResumen]     = useState(null);   // qué se extrajo, para confirmárselo al usuario
   const limiteRef = useRef(false);   // evita que el auto-corte se dispare más de una vez
   // Guarda extra contra re-entradas (además del `disabled` de los botones):
   // evita que dos llamadas a procesarAudio/handleProcesarTexto corran a la vez
@@ -27,10 +82,11 @@ export default function VoiceTextProcessor({
 
   const { isRecording, seconds, micError, start, stop } = useAudioRecorder();
 
-  // Límite máximo de grabación (40 min). Con opus a ~32 kbps el archivo sigue
-  // siendo liviano; el corte solo evita grabaciones olvidadas abiertas horas.
-  // El audio igual se procesa: solo avisamos que se detuvo (no es un error).
-  const LIMITE_SEG = 40 * 60;
+  // Tope de grabación. A ~32 kbps (opus) 90 min pesan ~20 MB, dentro del límite
+  // de 25 MB que acepta el backend: una consulta larga no se corta a la mitad.
+  // Además se avisa antes de llegar al tope, para que el corte nunca sorprenda.
+  const LIMITE_SEG = 90 * 60;
+  const AVISO_SEG  = 75 * 60;
   useEffect(() => {
     if (isRecording && seconds >= LIMITE_SEG && !limiteRef.current) {
       limiteRef.current = true;
@@ -39,16 +95,23 @@ export default function VoiceTextProcessor({
     }
   }, [seconds, isRecording]);
 
+  // Cronómetro de la espera: sin esto, una consulta larga deja al veterinario
+  // mirando un "Transcribiendo…" fijo, sin saber si avanza o si se colgó.
+  useEffect(() => {
+    const enEspera = aiState === "transcribing" || aiState === "processing";
+    if (!enEspera) { setEsperaSeg(0); return; }
+    const t = setInterval(() => setEsperaSeg((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [aiState]);
+
   const updateAiState = (state) => {
     setAiState(state);
     onStateChange?.(state);
   };
 
-  const fmtSec = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-
   // Transcribe + estructura un blob de audio. Se reutiliza para reintentar sin
   // tener que volver a grabar la consulta si la transcripción falla.
-  const procesarAudio = async (blob) => {
+  const procesarAudio = async (blob, duracionSeg = null) => {
     if (procesandoRef.current) return;   // ya hay un procesamiento en curso
     if (!blob) {
       setAiError("No se capturó audio.");
@@ -57,6 +120,11 @@ export default function VoiceTextProcessor({
     }
     procesandoRef.current = true;
     setAudioBlob(blob);
+    setAudioInfo({
+      segundos: duracionSeg ?? audioInfo?.segundos ?? null,
+      bytes: blob.size,
+    });
+    setResumen(null);
     updateAiState("transcribing");
     setAiError(null);
     try {
@@ -80,6 +148,7 @@ export default function VoiceTextProcessor({
       const resultado = await api.post(endpoint, { texto: transcripcion });
 
       onResult?.({ ...resultado, transcripcion });
+      setResumen(resumirResultado?.({ ...resultado, transcripcion }) ?? null);
       updateAiState("done");
     } catch (e) {
       setAiError(e.message);
@@ -91,8 +160,9 @@ export default function VoiceTextProcessor({
 
   const handleGrabar = async () => {
     if (isRecording) {
+      const duracion = seconds;      // `stop()` reinicia el cronómetro: se guarda antes
       const blob = await stop();
-      await procesarAudio(blob);
+      await procesarAudio(blob, duracion);
     } else {
       updateAiState("recording");
       setAiError(null);
@@ -120,12 +190,15 @@ export default function VoiceTextProcessor({
     if (procesandoRef.current) return;
     if (!textoManual.trim()) return;
     procesandoRef.current = true;
+    setAudioInfo(null);    // modo texto: no hay audio, es un solo paso
+    setResumen(null);
     updateAiState("processing");
     setAiError(null);
     try {
       const resultado = await api.post(endpoint, { texto: textoManual });
       setTranscripcionIA(resultado.transcripcion);
       onResult?.(resultado);
+      setResumen(resumirResultado?.(resultado) ?? null);
       updateAiState("done");
     } catch (e) {
       setAiError(e.message);
@@ -205,22 +278,25 @@ export default function VoiceTextProcessor({
               )}
             </button>
 
-            {aiState === "transcribing" && (
-              <span className="flex items-center gap-1.5 text-xs text-slate-500 animate-pulse">
-                <Loader2 size={13} className="animate-spin" /> Transcribiendo…
-              </span>
-            )}
-            {aiState === "processing" && (
-              <span className="flex items-center gap-1.5 text-xs text-slate-500 animate-pulse">
-                <Loader2 size={13} className="animate-spin" /> Procesando con IA…
-              </span>
-            )}
             {aiState === "done" && (
               <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-                <Check size={13} /> Formulario autocompletado
+                <Check size={13} /> {resumen ?? "Formulario autocompletado"}
               </span>
             )}
           </div>
+
+          {/* Aviso al acercarse al tope: el corte nunca debe ser una sorpresa */}
+          {isRecording && seconds >= AVISO_SEG && (
+            <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              <AlertTriangle size={13} className="shrink-0 mt-px" />
+              <span>
+                Llevas {fmtSec(seconds)} grabando. La grabación se detendrá sola a los{" "}
+                {LIMITE_SEG / 60} minutos y el audio se procesará igual.
+              </span>
+            </div>
+          )}
+
+          <EstadoProceso aiState={aiState} esperaSeg={esperaSeg} audioInfo={audioInfo} />
 
           {micError && (
             <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
@@ -270,10 +346,11 @@ export default function VoiceTextProcessor({
             </button>
             {aiState === "done" && (
               <span className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-                <Check size={13} /> Formulario autocompletado
+                <Check size={13} /> {resumen ?? "Formulario autocompletado"}
               </span>
             )}
           </div>
+          <EstadoProceso aiState={aiState} esperaSeg={esperaSeg} audioInfo={audioInfo} />
         </div>
       )}
 
@@ -281,7 +358,10 @@ export default function VoiceTextProcessor({
       {avisoLimite && (
         <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
           <AlertTriangle size={13} className="shrink-0 mt-px" />
-          <span>La grabación alcanzó el límite de 40 minutos y se detuvo automáticamente. Procesando el audio capturado…</span>
+          <span>
+            La grabación alcanzó el límite de {LIMITE_SEG / 60} minutos y se detuvo
+            automáticamente. Procesando el audio capturado…
+          </span>
         </div>
       )}
 

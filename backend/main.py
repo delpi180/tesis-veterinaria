@@ -441,7 +441,9 @@ async def transcribe_endpoint(request: Request, audio: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="El archivo de audio está vacío.")
 
     # Tope de tamaño: evita que un audio enorme agote la memoria del proceso.
-    # Con opus a ~32 kbps, 25 MB equivalen a más de 1 h de grabación.
+    # Con opus a ~32 kbps (lo que graba el frontend), 25 MB dan para ~108 min,
+    # con margen sobre el tope de 90 min del grabador: una consulta larga nunca
+    # debería rebotar aquí.
     MAX_AUDIO_MB = 25
     if len(audio_bytes) > MAX_AUDIO_MB * 1024 * 1024:
         raise HTTPException(
