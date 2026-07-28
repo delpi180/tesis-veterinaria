@@ -137,10 +137,14 @@ export default function DocumentosPaciente({ pacienteId, historiaId = null, titu
           Radiografías, análisis de sangre, recetas y cualquier documento (imágenes, PDF u Office). Máx. 10 MB.
         </p>
         <div className="flex flex-wrap items-center gap-2">
+          {/* El botón nativo de "elegir archivo" crece con el tamaño de letra y
+              con el idioma del navegador. Con un ancho mínimo fijo desbordaba
+              la pantalla en móvil, así que ocupa la fila completa ahí y recién
+              comparte espacio en pantallas anchas. */}
           <input
             type="file"
             onChange={e => setArchivo(e.target.files?.[0] ?? null)}
-            className="text-xs file:mr-2 file:rounded-md file:border-0 file:bg-purple-100 file:text-purple-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:cursor-pointer flex-1 min-w-[180px]"
+            className="text-xs file:mr-2 file:rounded-md file:border-0 file:bg-purple-100 file:text-purple-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:cursor-pointer w-full sm:w-auto sm:flex-1 min-w-0"
           />
           <select
             value={categoria}
@@ -156,7 +160,7 @@ export default function DocumentosPaciente({ pacienteId, historiaId = null, titu
             value={descripcion}
             onChange={e => setDescripcion(e.target.value)}
             placeholder="Descripción (opcional)"
-            className="flex-1 min-w-[180px] text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+            className="flex-1 min-w-0 sm:min-w-[180px] text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
           />
           <button
             type="submit"

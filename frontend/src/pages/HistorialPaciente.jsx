@@ -504,7 +504,7 @@ export default function HistorialPaciente() {
   ]
 
   return (
-    <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
+    <div className="flex-1 min-w-0 flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center gap-3 static md:sticky md:top-0 md:z-10 flex-wrap">
         <button onClick={() => navigate(-1)}
@@ -543,14 +543,18 @@ export default function HistorialPaciente() {
         </div>
       </header>
 
-      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
+      <main className="flex-1 min-w-0 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
 
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">⚠ {error}</div>
         )}
 
-        {/* Barra de pestañas (estilo ficha del paciente) */}
-        <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto">
+        {/* Barra de pestañas (estilo ficha del paciente).
+            `min-w-0` es lo que hace efectivo al `overflow-x-auto`: dentro de un
+            contenedor flex, un hijo no baja de su ancho de contenido salvo que
+            se le permita, y sin eso las pestañas estiraban la página a 896 px
+            en móvil (se desplazaba de lado toda la ficha en vez de solo ellas). */}
+        <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto min-w-0">
           {TABS.map(({ id, label, Icon, count }) => (
             <button
               key={id}
