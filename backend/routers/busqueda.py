@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import cast, Text
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Cliente, Paciente, Cita
+from models import Cliente, Paciente, Cita, HistoriaClinica
 
 router = APIRouter(prefix="/api/busqueda", tags=["Búsqueda"])
 
@@ -76,4 +77,39 @@ def busqueda_global(q: str = Query(..., min_length=1), db: Session = Depends(get
         for c in citas_rows
     ]
 
-    return {"clientes": clientes, "pacientes": pacientes, "citas": citas}
+    # ── Historias clínicas (motivo, diagnóstico, tratamiento) ─────────────────
+    # Busca en toda la clínica, no solo en el paciente que se está viendo: útil
+    # para "¿quién tuvo parvovirus este mes?" o "¿quién está con carprofeno?".
+    historias_rows = (
+        db.query(HistoriaClinica)
+        .options(joinedload(HistoriaClinica.paciente).joinedload(Paciente.cliente),
+                 joinedload(HistoriaClinica.veterinario))
+        .filter(
+            HistoriaClinica.motivo_consulta.ilike(patron)
+            | HistoriaClinica.diagnostico_presuntivo.ilike(patron)
+            | HistoriaClinica.diagnosticos_diferenciales.ilike(patron)
+            | HistoriaClinica.diagnostico_definitivo.ilike(patron)
+            | HistoriaClinica.antecedentes.ilike(patron)
+            | HistoriaClinica.indicaciones.ilike(patron)
+            | cast(HistoriaClinica.tratamiento_items, Text).ilike(patron)
+            | cast(HistoriaClinica.vacunas_items, Text).ilike(patron)
+        )
+        .order_by(HistoriaClinica.fecha.desc())
+        .limit(5)
+        .all()
+    )
+    historias = [
+        {
+            "id": h.id,
+            "paciente_id": h.paciente_id,
+            "paciente": h.paciente.nombre if h.paciente else None,
+            "especie": h.paciente.especie if h.paciente else None,
+            "propietario": h.paciente.cliente.nombre if h.paciente and h.paciente.cliente else None,
+            "veterinario": h.veterinario.nombre if h.veterinario else None,
+            "fecha": h.fecha.isoformat() if h.fecha else None,
+            "resumen": h.diagnostico_presuntivo or h.diagnostico_definitivo or h.motivo_consulta,
+        }
+        for h in historias_rows
+    ]
+
+    return {"clientes": clientes, "pacientes": pacientes, "citas": citas, "historias": historias}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, User, PawPrint, Calendar } from 'lucide-react';
+import { Search, X, User, PawPrint, Calendar, Stethoscope } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function GlobalSearch() {
@@ -48,7 +48,7 @@ export default function GlobalSearch() {
       const data = await api.get(`/api/busqueda/?q=${encodeURIComponent(q.trim())}`);
       setResults(data);
     } catch {
-      setResults({ clientes: [], mascotas: [], citas: [] });
+      setResults({ clientes: [], pacientes: [], citas: [], historias: [] });
     } finally {
       setLoading(false);
     }
@@ -67,7 +67,8 @@ export default function GlobalSearch() {
   };
 
   const hasResults = results &&
-    ((results.clientes?.length || 0) + (results.mascotas?.length || 0) + (results.citas?.length || 0)) > 0;
+    ((results.clientes?.length || 0) + (results.pacientes?.length || 0)
+      + (results.citas?.length || 0) + (results.historias?.length || 0)) > 0;
 
   const showEmpty = results && !hasResults && query.trim().length >= 2;
 
@@ -114,7 +115,7 @@ export default function GlobalSearch() {
                 type="text"
                 value={query}
                 onChange={handleChange}
-                placeholder="Buscar clientes, mascotas, citas..."
+                placeholder="Buscar clientes, mascotas, citas, historias..."
                 className="flex-1 bg-transparent outline-none text-sm"
                 style={{ color: 'var(--text-primary)' }}
               />
@@ -156,11 +157,11 @@ export default function GlobalSearch() {
                   )}
 
                   {/* Mascotas */}
-                  {results.mascotas?.length > 0 && (
+                  {results.pacientes?.length > 0 && (
                     <ResultSection
                       title="Mascotas"
                       icon={<PawPrint size={14} />}
-                      items={results.mascotas}
+                      items={results.pacientes}
                       onSelect={(item) => goTo(item.cliente_id ? `/clientes/${item.cliente_id}` : '/clientes')}
                       renderLabel={(item) => item.nombre || item.name || `Mascota #${item.id}`}
                       renderSub={(item) => item.especie || item.raza || ''}
@@ -176,6 +177,18 @@ export default function GlobalSearch() {
                       onSelect={() => goTo('/turnos')}
                       renderLabel={(item) => item.motivo || item.titulo || `Cita #${item.id}`}
                       renderSub={(item) => item.fecha || item.hora || ''}
+                    />
+                  )}
+
+                  {/* Historias clínicas — busca en toda la clínica, no solo un paciente */}
+                  {results.historias?.length > 0 && (
+                    <ResultSection
+                      title="Historias clínicas"
+                      icon={<Stethoscope size={14} />}
+                      items={results.historias}
+                      onSelect={(item) => goTo(item.paciente_id ? `/pacientes/${item.paciente_id}/historial` : '/clientes')}
+                      renderLabel={(item) => item.resumen || `Historia de ${item.paciente ?? 'paciente'}`}
+                      renderSub={(item) => [item.paciente, item.propietario].filter(Boolean).join(' · ')}
                     />
                   )}
                 </div>

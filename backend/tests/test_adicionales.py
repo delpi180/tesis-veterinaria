@@ -61,6 +61,42 @@ def test_busqueda_global_flujo(client, admin):
         db.close()
 
 
+def test_busqueda_global_incluye_historias_clinicas(client, admin, doctor):
+    """La búsqueda global también encuentra historias por diagnóstico/motivo,
+    a través de todos los pacientes (no solo dentro de la ficha de uno)."""
+    cli_id = None
+    pac_id = None
+    hist_id = None
+    try:
+        cli = client.post("/api/clientes/", json={"nombre": "BusquedaHist Propietario", "dni": "98989899"}, headers=admin).json()
+        cli_id = cli["id"]
+        pac = client.post(f"/api/clientes/{cli_id}/pacientes/", json={"nombre": "BusquedaHist Paciente", "especie": "Canino"}, headers=admin).json()
+        pac_id = pac["id"]
+        hist = client.post(f"/api/pacientes/{pac_id}/historias/",
+                           json={"diagnostico_presuntivo": "ParvovirusUnicoQA"}, headers=doctor).json()
+        hist_id = hist["id"]
+
+        r = client.get("/api/busqueda/?q=ParvovirusUnicoQA", headers=admin)
+        assert r.status_code == 200
+        res = r.json()
+        assert "historias" in res
+        assert len(res["historias"]) >= 1
+        encontrada = res["historias"][0]
+        assert encontrada["resumen"] == "ParvovirusUnicoQA"
+        assert encontrada["paciente_id"] == pac_id
+        assert encontrada["paciente"] == "BusquedaHist Paciente"
+    finally:
+        db = SessionLocal()
+        if hist_id:
+            db.execute(text("DELETE FROM historias_clinicas WHERE id=:id"), {"id": hist_id})
+        if pac_id:
+            db.execute(text("DELETE FROM pacientes WHERE id=:id"), {"id": pac_id})
+        if cli_id:
+            db.execute(text("DELETE FROM clientes WHERE id=:id"), {"id": cli_id})
+        db.commit()
+        db.close()
+
+
 # ── Evaluadores y Encuestas (SUS & TAM) ───────────────────────────────────────
 
 def test_evaluadores_y_encuestas_flujo(client, admin):
