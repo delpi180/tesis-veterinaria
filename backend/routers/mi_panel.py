@@ -15,12 +15,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Usuario, Cita, HistoriaClinica, Asistencia
+from models import Usuario, Cita, HistoriaClinica, Asistencia, Paciente
 from core.deps import usuario_actual
 
 router = APIRouter(prefix="/api/mi-panel", tags=["Mi Panel"])
 
 PERU_TZ = timezone(timedelta(hours=-5))
+
+
+# Ojo al tocar las consultas de abajo: todas pasan por _paciente_info(), que lee
+# el nombre del propietario (paciente → cliente). Si esa relación no se precarga
+# con joinedload, SQLAlchemy la resuelve de a una consulta por fila y el panel
+# se va a 16 viajes a la base en vez de 10.
 
 
 def _paciente_info(pac):
@@ -47,6 +53,7 @@ def mi_panel(db: Session = Depends(get_db), usuario: Usuario = Depends(usuario_a
     # ── Mis turnos próximos (citas donde yo soy el doctor asignado) ──────────
     turnos = (
         db.query(Cita)
+        .options(joinedload(Cita.paciente).joinedload(Paciente.cliente))
         .filter(
             Cita.veterinario_id == usuario.id,
             Cita.fecha_hora >= ahora,
@@ -64,6 +71,7 @@ def mi_panel(db: Session = Depends(get_db), usuario: Usuario = Depends(usuario_a
     # ── Seguimiento: pacientes que atendí con una próxima cita agendada ──────
     historias_seguimiento = (
         db.query(HistoriaClinica)
+        .options(joinedload(HistoriaClinica.paciente).joinedload(Paciente.cliente))
         .filter(
             HistoriaClinica.veterinario_id == usuario.id,
             HistoriaClinica.proxima_cita.isnot(None),
@@ -87,6 +95,7 @@ def mi_panel(db: Session = Depends(get_db), usuario: Usuario = Depends(usuario_a
     )
     ultimas = (
         db.query(HistoriaClinica)
+        .options(joinedload(HistoriaClinica.paciente).joinedload(Paciente.cliente))
         .filter(HistoriaClinica.veterinario_id == usuario.id)
         .order_by(HistoriaClinica.creado_en.desc())
         .limit(5)
@@ -125,7 +134,7 @@ def mi_panel(db: Session = Depends(get_db), usuario: Usuario = Depends(usuario_a
 
     agenda_rows = (
         db.query(Cita)
-        .options(joinedload(Cita.paciente), joinedload(Cita.veterinario))
+        .options(joinedload(Cita.paciente).joinedload(Paciente.cliente), joinedload(Cita.veterinario))
         .filter(Cita.fecha_hora >= inicio_dia, Cita.fecha_hora < fin_dia)
         .order_by(Cita.fecha_hora)
         .all()
@@ -165,7 +174,10 @@ def mi_panel(db: Session = Depends(get_db), usuario: Usuario = Depends(usuario_a
     # hilo completo de lo que se atendió).
     equipo_rows = (
         db.query(HistoriaClinica)
-        .options(joinedload(HistoriaClinica.paciente), joinedload(HistoriaClinica.veterinario))
+        .options(
+            joinedload(HistoriaClinica.paciente).joinedload(Paciente.cliente),
+            joinedload(HistoriaClinica.veterinario),
+        )
         .order_by(HistoriaClinica.creado_en.desc())
         .limit(8)
         .all()

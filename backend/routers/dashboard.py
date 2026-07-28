@@ -166,16 +166,24 @@ def resumen_dashboard(db: Session = Depends(get_db)):
     ]
 
     # ── Ingresos de la semana (últimos 7 días, por día) ───────────────────────
+    # Antes esto hacía una consulta por cada día: siete viajes a la base solo
+    # para dibujar el gráfico de la portada. Ahora se traen las ventas de la
+    # semana de una vez y se reparten por día acá. Se agrupa en Python (y no con
+    # un GROUP BY por fecha) para no tener que convertir zonas horarias en SQL:
+    # el corte de día tiene que ser el mismo que usa el resto del panel.
     ingresos_semana_data: dict[int, float] = {i: 0.0 for i in range(7)}
-    for i in range(7):
-        dia = lunes + timedelta(days=i)
-        dia_ini, dia_fin = _rango_local(dia)
-        total_dia = (
-            db.query(func.coalesce(func.sum(Venta.total), 0))
-            .filter(Venta.fecha >= dia_ini, Venta.fecha < dia_fin)
-            .scalar()
-        )
-        ingresos_semana_data[i] = float(total_dia)
+    sem_fin = _rango_local(lunes + timedelta(days=6))[1]
+    ventas_semana = (
+        db.query(Venta.fecha, Venta.total)
+        .filter(Venta.fecha >= sem_ini, Venta.fecha < sem_fin)
+        .all()
+    )
+    limites = [_rango_local(lunes + timedelta(days=i)) for i in range(7)]
+    for fecha_venta, total in ventas_semana:
+        for i, (ini, fin) in enumerate(limites):
+            if ini <= fecha_venta < fin:
+                ingresos_semana_data[i] += float(total or 0)
+                break
     ingresos_semana = [
         {"dia": DIAS[i], "total": ingresos_semana_data[i]} for i in range(7)
     ]

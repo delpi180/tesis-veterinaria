@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { api, getNombre } from '../services/api'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
+import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
 
 const fmtMoneda = (n) => `S/ ${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtHora = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '—'
@@ -36,11 +37,8 @@ export default function PanelRecepcion() {
       .finally(() => setLoading(false))
   }
   useEffect(() => { cargar() }, [])
-  // Auto-actualización cada 20 s
-  useEffect(() => {
-    const t = setInterval(() => cargar(true), 20000)
-    return () => clearInterval(t)
-  }, [])
+  // Auto-actualización cada 20 s, solo con la pestaña a la vista
+  useRefrescoAuto(() => cargar(true), 20000)
 
   const refrescar = async () => { setRefrescando(true); await cargar(true); setRefrescando(false) }
 

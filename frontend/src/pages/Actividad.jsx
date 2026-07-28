@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { History, RefreshCw, User, Stethoscope, Download, Filter } from 'lucide-react'
 import { api } from '../services/api'
 import Paginacion from '../components/Paginacion'
+import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
 
 const INTERVALO_MS = 15000  // auto-actualización cada 15 s
 const POR_PAGINA = 50
@@ -40,7 +41,6 @@ export default function Actividad() {
   const [filtros, setFiltros] = useState({ usuario: '', desde: '', hasta: '' })
   const [pagina, setPagina] = useState(1)
   const [total, setTotal] = useState(0)
-  const timer = useRef(null)
 
   const cargar = (silencioso = false, f = filtros, pag = pagina) => {
     if (!silencioso) setLoading(true)
@@ -109,12 +109,9 @@ export default function Actividad() {
 
   // Auto-actualización (respeta los filtros y la página vigentes; si no,
   // refrescaba con un closure viejo y regresaba a la página 1 sola).
-  useEffect(() => {
-    if (auto) {
-      timer.current = setInterval(() => cargar(true, filtros, pagina), INTERVALO_MS)
-      return () => clearInterval(timer.current)
-    }
-  }, [auto, filtros, pagina])
+  // Se pausa con la pestaña de fondo: no tiene sentido pedir la bitácora
+  // cada 15 s si nadie la está mirando.
+  useRefrescoAuto(() => cargar(true, filtros, pagina), INTERVALO_MS, auto)
 
   const rolPill = (rol) => rol === 'recepcionista'
     ? 'bg-sky-100 text-sky-700'

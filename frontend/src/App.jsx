@@ -1,29 +1,47 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import { ToastProvider } from './components/Toast'
 import { ClinicaProvider } from './services/clinica'
 import Login from './pages/Login'
-import Inicio from './pages/Inicio'
-import MiPanel from './pages/MiPanel'
-import Clientes from './pages/Clientes'
-import DetalleCliente from './pages/DetalleCliente'
-import HistoriasClinicas from './pages/HistoriasClinicas'
-import HistorialPaciente from './pages/HistorialPaciente'
-import Turnos from './pages/Turnos'
-import Inventario from './pages/Inventario'
-import Servicios from './pages/Servicios'
-import Ventas from './pages/Ventas'
-import Caja from './pages/Caja'
-import Usuarios from './pages/Usuarios'
-import PerfilDoctor from './pages/PerfilDoctor'
-import Asistencia from './pages/Asistencia'
-import Actividad from './pages/Actividad'
-import Reportes from './pages/Reportes'
-import PanelRecepcion from './pages/PanelRecepcion'
-import Vacunacion from './pages/Vacunacion'
-import Mediciones from './pages/Mediciones'
 import { getToken, esVeterinario, esAdmin } from './services/api'
 import './App.css'
+
+// Cada pantalla se descarga recién cuando se entra a ella.
+//
+// Antes toda la aplicación viajaba en un solo archivo de 1,47 MB: la
+// recepcionista descargaba los gráficos de Mediciones y el generador de PDF
+// aunque nunca los abriera, y no veía nada hasta que terminaba de bajar todo.
+// Login queda fuera de esta lista a propósito: es la primera pantalla y
+// dividirla solo agregaría una espera extra antes de poder escribir el usuario.
+const Inicio            = lazy(() => import('./pages/Inicio'))
+const MiPanel           = lazy(() => import('./pages/MiPanel'))
+const Clientes          = lazy(() => import('./pages/Clientes'))
+const DetalleCliente    = lazy(() => import('./pages/DetalleCliente'))
+const HistoriasClinicas = lazy(() => import('./pages/HistoriasClinicas'))
+const HistorialPaciente = lazy(() => import('./pages/HistorialPaciente'))
+const Turnos            = lazy(() => import('./pages/Turnos'))
+const Inventario        = lazy(() => import('./pages/Inventario'))
+const Servicios         = lazy(() => import('./pages/Servicios'))
+const Ventas            = lazy(() => import('./pages/Ventas'))
+const Caja              = lazy(() => import('./pages/Caja'))
+const Usuarios          = lazy(() => import('./pages/Usuarios'))
+const PerfilDoctor      = lazy(() => import('./pages/PerfilDoctor'))
+const Asistencia        = lazy(() => import('./pages/Asistencia'))
+const Actividad         = lazy(() => import('./pages/Actividad'))
+const Reportes          = lazy(() => import('./pages/Reportes'))
+const PanelRecepcion    = lazy(() => import('./pages/PanelRecepcion'))
+const Vacunacion        = lazy(() => import('./pages/Vacunacion'))
+const Mediciones        = lazy(() => import('./pages/Mediciones'))
+
+function CargandoPantalla() {
+  return (
+    <div className="flex-1 flex items-center justify-center py-24 text-slate-500 text-sm gap-3">
+      <span className="w-4 h-4 rounded-full border-2 border-purple-200 border-t-purple-600 animate-spin" />
+      Cargando…
+    </div>
+  )
+}
 
 // Ruta solo para veterinarios; recepcionista es redirigida al inicio
 function SoloVet({ children }) {
@@ -51,6 +69,7 @@ function AppProtegida() {
       <Sidebar />
       {/* min-w-0 evita que gráficos/tablas anchos rompan el centrado del contenido */}
       <div className="flex-1 min-w-0 flex flex-col pt-12 md:pt-0">
+        <Suspense fallback={<CargandoPantalla />}>
         <Routes>
           <Route path="/"                       element={<Home />} />
           <Route path="/mi-panel"               element={<SoloVet><MiPanel /></SoloVet>} />
@@ -75,6 +94,7 @@ function AppProtegida() {
           <Route path="/mediciones"             element={<Mediciones />} />
           <Route path="*"                       element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </div>
     </div>
   )

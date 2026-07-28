@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Clock, LogIn, LogOut, Trash2, Stethoscope, Filter, BarChart3, AlertTriangle, RefreshCw, Pencil, X } from 'lucide-react'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
+import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
 
 const inputCls = 'border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
 
@@ -101,11 +102,8 @@ export default function Asistencia() {
   }
   useEffect(() => { cargarTodo() }, [])
 
-  // Auto-actualización cada 20 s (silenciosa)
-  useEffect(() => {
-    const t = setInterval(() => { Promise.all([cargarHoy(), cargarReporte()]).catch(() => {}) }, 20000)
-    return () => clearInterval(t)
-  }, [filtros])
+  // Auto-actualización cada 20 s (silenciosa), solo con la pestaña a la vista
+  useRefrescoAuto(() => { Promise.all([cargarHoy(), cargarReporte()]).catch(() => {}) }, 20000)
 
   const refrescar = async () => {
     setRefrescando(true)
