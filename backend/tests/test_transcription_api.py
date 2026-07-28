@@ -29,7 +29,9 @@ def test_transcribe_rechaza_audio_muy_grande(client, doctor):
 
 @patch("services.transcription.DeepgramClient")
 def test_transcribe_audio_timeout_passed(mock_deepgram_client):
-    # Verificar que el timeout de 300.0 se pasa correctamente a DeepgramClient
+    # Verificar que el timeout amplio se pasa correctamente a DeepgramClient.
+    # Cambió de 300 s a 900 s: una consulta larga (el grabador permite hasta
+    # 90 min) tardaba más que el timeout y se perdía toda la grabación.
     mock_instance = MagicMock()
     mock_deepgram_client.return_value = mock_instance
     
@@ -42,7 +44,7 @@ def test_transcribe_audio_timeout_passed(mock_deepgram_client):
     res = transcribe_audio(b"dummy_bytes", filename="audio.wav")
     
     assert res == "hola perro"
-    # Verificar que se creó con timeout=300.0
+    # Verificar que se creó con el timeout amplio
     mock_deepgram_client.assert_called_once()
     _, kwargs = mock_deepgram_client.call_args
-    assert kwargs.get("timeout") == 300.0
+    assert kwargs.get("timeout") == 900.0

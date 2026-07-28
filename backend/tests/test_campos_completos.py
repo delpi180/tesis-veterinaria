@@ -1,14 +1,21 @@
+import uuid
+
 import pytest
 from sqlalchemy import text
 from database import SessionLocal
 
 def test_historia_clinica_campos_completos(client, admin, doctor):
-    # 1. Crear cliente y paciente para la prueba
+    # 1. Crear cliente y paciente para la prueba.
+    #    El DNI se genera al vuelo: uno fijo como "99999999" es un comodín que
+    #    alguien puede haber cargado de verdad, y entonces el test choca contra
+    #    un cliente real en vez de fallar por un motivo legítimo.
+    dni_unico = f"9{uuid.uuid4().int % 10_000_000:07d}"
     cli = client.post(
         "/api/clientes/",
-        json={"nombre": "Dueño Prueba Completa", "dni": "99999999"},
+        json={"nombre": "Dueño Prueba Completa", "dni": dni_unico},
         headers=admin
     ).json()
+    assert "id" in cli, f"No se pudo crear el cliente de prueba: {cli}"
     pac = client.post(
         f"/api/clientes/{cli['id']}/pacientes/",
         json={"nombre": "Mascota Completa", "especie": "Canino", "raza": "Labrador"},
