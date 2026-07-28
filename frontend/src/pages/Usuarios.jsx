@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { UserCog, Plus, Pencil, Trash2, X, ShieldCheck, User } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { UserCog, Plus, Pencil, Trash2, X, ShieldCheck, User, IdCard } from 'lucide-react'
 import { api, getUsuario } from '../services/api'
 import { useToast } from '../components/Toast'
+import DatosClinica from '../components/DatosClinica'
 
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
@@ -11,7 +13,10 @@ const ROL_PILL = {
   recepcionista: 'bg-sky-100 text-sky-700',
 }
 
-const FORM_INICIAL = { usuario: '', nombre: '', password: '', rol: 'recepcionista', activo: true, hora_entrada: '', dias_laborales: '' }
+const FORM_INICIAL = {
+  usuario: '', nombre: '', password: '', rol: 'recepcionista', activo: true,
+  dni: '', telefono: '', especialidad: '', hora_entrada: '', dias_laborales: '',
+}
 
 const DIAS = [
   ['lun', 'Lun'], ['mar', 'Mar'], ['mie', 'Mié'], ['jue', 'Jue'],
@@ -27,6 +32,7 @@ const Spinner = () => (
 
 export default function Usuarios() {
   const toast = useToast()
+  const navigate = useNavigate()
   const yo = getUsuario()
   const [usuarios, setUsuarios] = useState([])
   const [loading,  setLoading]  = useState(true)
@@ -55,6 +61,7 @@ export default function Usuarios() {
     setEditId(u.id)
     setForm({
       usuario: u.usuario, nombre: u.nombre, password: '', rol: u.rol, activo: u.activo,
+      dni: u.dni || '', telefono: u.telefono || '', especialidad: u.especialidad || '',
       hora_entrada: u.hora_entrada || '', dias_laborales: u.dias_laborales || '',
     })
     setErrorModal(null); setModalAbierto(true)
@@ -77,21 +84,26 @@ export default function Usuarios() {
     }
     setGuardando(true); setErrorModal(null)
     try {
-      // El horario laboral solo aplica a doctores; para recepción se limpia.
+      // El horario laboral y la especialidad solo aplican a doctores; para recepción se limpian.
       const esDoctor = form.rol === 'veterinario'
       const horario = {
         hora_entrada:   esDoctor ? (form.hora_entrada || null) : null,
         dias_laborales: esDoctor ? (form.dias_laborales || null) : null,
+        especialidad:   esDoctor ? (form.especialidad.trim() || null) : null,
+      }
+      const contacto = {
+        dni:      form.dni.trim() || null,
+        telefono: form.telefono.trim() || null,
       }
       if (editId) {
-        const payload = { nombre: form.nombre.trim(), rol: form.rol, activo: form.activo, ...horario }
+        const payload = { nombre: form.nombre.trim(), rol: form.rol, activo: form.activo, ...contacto, ...horario }
         if (form.password) payload.password = form.password
         await api.put(`/api/usuarios/${editId}`, payload)
         toast.success('Usuario actualizado')
       } else {
         await api.post('/api/usuarios/', {
           usuario: form.usuario.trim(), nombre: form.nombre.trim(),
-          password: form.password, rol: form.rol, activo: form.activo, ...horario,
+          password: form.password, rol: form.rol, activo: form.activo, ...contacto, ...horario,
         })
         toast.success('Usuario creado')
       }
@@ -135,6 +147,8 @@ export default function Usuarios() {
           <p>La <strong>recepcionista</strong> es la administradora: gestiona usuarios, ventas, inventario, turnos y asistencia. El <strong>veterinario</strong> (doctor) atiende y llena las historias clínicas, que quedan firmadas con su nombre.</p>
         </div>
 
+        <DatosClinica />
+
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
             <UserCog className="w-4 h-4 text-purple-500" />
@@ -152,6 +166,7 @@ export default function Usuarios() {
                 <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                   <th className="text-left px-5 py-3 font-semibold">Usuario</th>
                   <th className="text-left px-5 py-3 font-semibold">Nombre</th>
+                  <th className="text-left px-5 py-3 font-semibold">DNI</th>
                   <th className="text-left px-5 py-3 font-semibold">Rol</th>
                   <th className="text-center px-5 py-3 font-semibold">Estado</th>
                   <th className="px-5 py-3" />
@@ -167,6 +182,7 @@ export default function Usuarios() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-slate-600">{u.nombre}</td>
+                    <td className="px-5 py-3.5 text-slate-500">{u.dni || '—'}</td>
                     <td className="px-5 py-3.5">
                       <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${ROL_PILL[u.rol] ?? 'bg-slate-100 text-slate-600'}`}>
                         {u.rol}
@@ -179,6 +195,10 @@ export default function Usuarios() {
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => navigate(`/usuarios/${u.id}/perfil`)} title="Ver perfil"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition">
+                          <IdCard className="w-4 h-4" />
+                        </button>
                         <button onClick={() => abrirEditar(u)} title="Editar"
                           className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition">
                           <Pencil className="w-4 h-4" />
@@ -238,9 +258,29 @@ export default function Usuarios() {
                     </select>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className={labelCls}>DNI</label>
+                    <input type="text" className={inputCls} value={form.dni} maxLength={8}
+                      placeholder="Ej. 12345678"
+                      onChange={e => setForm(f => ({ ...f, dni: e.target.value.replace(/\D/g, '') }))} />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className={labelCls}>Teléfono</label>
+                    <input type="text" className={inputCls} value={form.telefono}
+                      placeholder="Ej. 987654321"
+                      onChange={e => setForm(f => ({ ...f, telefono: e.target.value }))} />
+                  </div>
+                </div>
                 {form.rol === 'veterinario' && (
                   <div className="flex flex-col gap-3 border border-slate-100 bg-slate-50/60 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Horario laboral del doctor</p>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Datos del doctor</p>
+                    <div className="flex flex-col gap-1">
+                      <label className={labelCls}>Especialidad</label>
+                      <input type="text" className={inputCls} value={form.especialidad}
+                        placeholder="Ej. Medicina interna, Cirugía…"
+                        onChange={e => setForm(f => ({ ...f, especialidad: e.target.value }))} />
+                    </div>
                     <div className="flex flex-col gap-1">
                       <label className={labelCls}>Hora de ingreso</label>
                       <input type="time" className={inputCls} value={form.hora_entrada}

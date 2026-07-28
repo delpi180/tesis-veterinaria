@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { clinicaActual } from '../services/clinica'
 import { api } from '../services/api'
 import { exportarCSV } from '../utils/exportUtils'
 
@@ -54,7 +55,7 @@ function reporteVentasPDF(ventas, rango, clienteMap) {
   doc.rect(0, 0, W, 24, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(15); doc.setFont(undefined, 'bold')
-  doc.text('Veterinaria Los Pinos', 14, 11)
+  doc.text(clinicaActual().nombre, 14, 11)
   doc.setFontSize(9); doc.setFont(undefined, 'normal')
   const periodo = rango.desde || rango.hasta
     ? `Período: ${rango.desde || 'inicio'} al ${rango.hasta || 'hoy'}`
@@ -107,13 +108,22 @@ function generarBoleta(venta, cliente) {
   const W = 210
   const morado = [88, 28, 135]
 
+  const clinica = clinicaActual()
+
   doc.setFillColor(...morado)
   doc.rect(0, 0, W, 28, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(16); doc.setFont(undefined, 'bold')
-  doc.text('Veterinaria Los Pinos', 14, 13)
+  doc.text(clinica.nombre, 14, 13)
   doc.setFontSize(9); doc.setFont(undefined, 'normal')
-  doc.text('Boleta de Venta', 14, 20)
+  // Datos fiscales/de contacto de la clínica: es lo que el cliente espera ver
+  // en su comprobante. Se omiten los que no estén cargados.
+  const datosClinica = [
+    clinica.ruc ? `RUC ${clinica.ruc}` : null,
+    clinica.direccion,
+    clinica.telefono,
+  ].filter(Boolean).join('  ·  ')
+  doc.text(datosClinica ? `Boleta de Venta   |   ${datosClinica}` : 'Boleta de Venta', 14, 20)
 
   doc.setDrawColor(...morado); doc.setLineWidth(0.4)
   doc.roundedRect(W - 70, 6, 56, 16, 2, 2)
@@ -187,7 +197,10 @@ function generarBoleta(venta, cliente) {
 
   doc.setTextColor(150, 150, 150)
   doc.setFontSize(8); doc.setFont(undefined, 'normal')
-  doc.text('Gracias por su preferencia — Veterinaria Los Pinos', W / 2, 285, { align: 'center' })
+  doc.text(
+    [clinica.pie_comprobante, clinica.nombre].filter(Boolean).join(' — '),
+    W / 2, 285, { align: 'center' },
+  )
 
   doc.save(`Boleta_${nroBoleta(venta.id)}.pdf`)
 }

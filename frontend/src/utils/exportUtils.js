@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { clinicaActual } from '../services/clinica'
 
 /**
  * Exporta datos a PDF con tabla profesional.
@@ -15,7 +16,7 @@ export function exportarPDF(titulo, columnas, filas, orientacion = 'portrait') {
   // Header
   doc.setFontSize(16);
   doc.setTextColor(107, 33, 168); // purple-700
-  doc.text('Veterinaria Los Pinos', pageWidth / 2, 15, { align: 'center' });
+  doc.text(clinicaActual().nombre, pageWidth / 2, 15, { align: 'center' });
 
   doc.setFontSize(11);
   doc.setTextColor(100, 116, 139); // slate-500

@@ -1,0 +1,50 @@
+name: Respaldo diario de la base de datos
+
+# Antes el único respaldo era correr backend/scripts/backup_db.py a mano.
+# Si nadie se acordaba, no había nada que restaurar tras una falla. Esto usa
+# minutos de Actions gratuitos (unos segundos por corrida) para generar un
+# volcado diario de Postgres y guardarlo como artefacto del repositorio, sin
+# contratar ningún servicio nuevo.
+#
+# Requiere un secreto del repositorio llamado PROD_DATABASE_URL con la cadena
+# de conexión de la base de producción (Settings → Secrets and variables →
+# Actions → New repository secret). Mientras no exista, el job se salta solo
+# en vez de fallar en rojo todos los días.
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # 08:00 UTC = 03:00 hora de Perú
+  workflow_dispatch:        # permite lanzarlo manualmente desde la pestaña Actions
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar que el secreto esté configurado
+        id: check
+        run: |
+          if [ -z "${{ secrets.PROD_DATABASE_URL }}" ]; then
+            echo "configurado=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Falta el secreto PROD_DATABASE_URL — no se generó respaldo."
+          else
+            echo "configurado=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generar el volcado con pg_dump
+        if: steps.check.outputs.configurado == 'true'
+        env:
+          DB_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          # Formato "custom" (-Fc): ya viene comprimido y permite restaurar
+          # tablas sueltas con pg_restore si algún día hace falta.
+          docker run --rm postgres:16 pg_dump "$DB_URL" -Fc > "backup_$(date +%Y%m%d_%H%M%S).dump"
+          ls -lh backup_*.dump
+
+      - name: Subir el respaldo como artefacto
+        if: steps.check.outputs.configurado == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-db-${{ github.run_id }}
+          path: backup_*.dump
+          retention-days: 30
+          compression-level: 0   # el dump de pg_dump -Fc ya está comprimido

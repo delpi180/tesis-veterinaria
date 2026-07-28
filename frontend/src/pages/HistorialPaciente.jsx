@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, Paperclip, LayoutDashboard, Bug, Scissors, Microscope } from 'lucide-react'
+import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, LayoutDashboard, Bug, Scissors, Microscope, Pill } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -9,8 +9,9 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, esVeterinario } from '../services/api'
 import { useToast } from '../components/Toast'
-import DocumentosPaciente from '../components/DocumentosPaciente'
 import RegistrosPaciente from '../components/RegistrosPaciente'
+import RecetasPaciente from '../components/RecetasPaciente'
+import { clinicaActual } from '../services/clinica'
 
 // ── Catálogos de etiquetas (solo lectura) ───────────────────────────────────
 const SISTEMAS_EOP = [
@@ -342,7 +343,7 @@ function _cabecera(doc, subtitulo, derechaArriba, derechaAbajo) {
   doc.rect(0, 0, _W, 24, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(15); doc.setFont(undefined, 'bold')
-  doc.text('Veterinaria Los Pinos', _M, 11)
+  doc.text(clinicaActual().nombre, _M, 11)
   doc.setFontSize(9); doc.setFont(undefined, 'normal')
   doc.text(subtitulo, _M, 18)
   if (derechaArriba) doc.text(derechaArriba, _W - _M, 11, { align: 'right' })
@@ -494,12 +495,12 @@ export default function HistorialPaciente() {
   const TABS = [
     { id: 'resumen',    label: 'Resumen',    Icon: LayoutDashboard, count: null },
     { id: 'consultas',  label: 'Consultas',  Icon: ClipboardList,   count: historias.length },
+    { id: 'recetas',    label: 'Recetas',    Icon: Pill,            count: null },
     { id: 'complementarios', label: 'M. Complementarios', Icon: Microscope, count: null },
     { id: 'vacunas',    label: 'Vacunas',    Icon: Syringe,         count: vacunas.length },
     { id: 'antiparasitarios', label: 'Antiparasitarios', Icon: Bug, count: null },
     { id: 'estetica',   label: 'Estética',   Icon: Scissors,        count: null },
     { id: 'peso',       label: 'Peso',       Icon: Weight,          count: pesos.length },
-    { id: 'documentos', label: 'Documentos', Icon: Paperclip,       count: null },
   ]
 
   return (
@@ -709,6 +710,11 @@ export default function HistorialPaciente() {
               </div>
             )}
 
+            {/* ── RECETAS ─────────────────────────────────────────────────── */}
+            {tab === 'recetas' && (
+              <RecetasPaciente pacienteId={pacienteId} paciente={paciente} cliente={cliente} />
+            )}
+
             {/* ── M. COMPLEMENTARIOS ──────────────────────────────────────── */}
             {tab === 'complementarios' && (
               <RegistrosPaciente pacienteId={pacienteId} tipo="complementario" labelProducto="Método" />
@@ -724,8 +730,6 @@ export default function HistorialPaciente() {
               <RegistrosPaciente pacienteId={pacienteId} tipo="estetica" labelProducto="Servicio" />
             )}
 
-            {/* ── DOCUMENTOS ──────────────────────────────────────────────── */}
-            {tab === 'documentos' && <DocumentosPaciente pacienteId={pacienteId} />}
           </>
         )}
 

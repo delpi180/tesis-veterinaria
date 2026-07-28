@@ -1,8 +1,6 @@
 """Tests del módulo de estadística inferencial (Tier 1 de tesis)."""
 import pytest
-from fastapi.testclient import TestClient
 
-import main
 from services import estadistica as E
 
 
@@ -52,15 +50,14 @@ def test_t_test_welch():
 
 # ── Endpoint integrado ───────────────────────────────────────────────────────
 
-def test_endpoint_estadisticas():
-    with TestClient(main.app) as c:
-        tok = c.post("/api/auth/login", json={"usuario": "admin", "password": "vetlospinos"}).json()["token"]
-        H = {"Authorization": f"Bearer {tok}"}
-        r = c.get("/api/encuestas/estadisticas", headers=H)
-        assert r.status_code == 200
-        d = r.json()
-        assert "sus" in d and "tam" in d
-        assert "alpha" in d["sus"]
-        assert "interpretacion" in d["sus"]
-        assert "alpha_global" in d["tam"]
-        assert "muestra_suficiente" in d
+def test_endpoint_estadisticas(client, admin):
+    # Usa los fixtures de conftest (usuario qa creado directo en la BD) en vez de
+    # credenciales hardcodeadas, para que pase igual en local y en CI.
+    r = client.get("/api/encuestas/estadisticas", headers=admin)
+    assert r.status_code == 200
+    d = r.json()
+    assert "sus" in d and "tam" in d
+    assert "alpha" in d["sus"]
+    assert "interpretacion" in d["sus"]
+    assert "alpha_global" in d["tam"]
+    assert "muestra_suficiente" in d

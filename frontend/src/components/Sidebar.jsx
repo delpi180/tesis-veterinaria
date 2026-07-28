@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
 import GlobalSearch from './GlobalSearch'
+import { useClinica } from '../services/clinica'
 
 const PawIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
@@ -63,6 +64,7 @@ function NavItem({ label, to, Icon, onClick }) {
 
 export default function Sidebar() {
   const navigate = useNavigate()
+  const { clinica } = useClinica()
   const [abierto, setAbierto] = useState(false)
   const nombre = getNombre() || 'Veterinario'
   const rol = getRol() || 'veterinario'
@@ -95,7 +97,7 @@ export default function Sidebar() {
         <button onClick={() => setAbierto(true)} className="p-1.5 rounded-lg hover:bg-purple-800">
           <Menu className="w-5 h-5" />
         </button>
-        <span className="font-bold text-sm">Veterinaria Los Pinos</span>
+        <span className="font-bold text-sm">{clinica.nombre}</span>
       </div>
 
       {/* Overlay móvil */}
@@ -113,8 +115,7 @@ export default function Sidebar() {
             <PawIcon />
           </div>
           <div className="flex-1">
-            <p className="text-white font-bold text-sm leading-tight">Veterinaria</p>
-            <p className="text-purple-300 text-xs font-medium">Los Pinos</p>
+            <p className="text-white font-bold text-sm leading-tight">{clinica.nombre}</p>
           </div>
           <button onClick={cerrar} className="md:hidden p-1 text-purple-300 hover:text-white">
             <X className="w-5 h-5" />

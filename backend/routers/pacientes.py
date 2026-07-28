@@ -10,12 +10,13 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Cita, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Usuario
+from models import Cita, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Receta, Usuario
 from schemas import (
     PacienteOut, PacienteUpdate,
     HistoriaClinicaCreate, HistoriaClinicaOut,
     DocumentoOut,
     RegistroClinicoCreate, RegistroClinicoOut,
+    RecetaCreate, RecetaUpdate, RecetaOut,
 )
 from core.deps import usuario_actual
 
@@ -199,6 +200,27 @@ EXTENSIONES_DOC = {
 }
 
 
+async def _validar_y_leer_archivo(archivo: UploadFile) -> bytes:
+    """Valida extensión y tamaño de un archivo subido y devuelve sus bytes."""
+    ext = os.path.splitext(archivo.filename or "")[-1].lower()
+    if ext not in EXTENSIONES_DOC:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido: '{ext}'. "
+                   f"Acepta imágenes, PDF y documentos de oficina.",
+        )
+    contenido = await archivo.read()
+    if not contenido:
+        raise HTTPException(status_code=400, detail="El archivo está vacío.")
+    if len(contenido) > MAX_DOC_MB * 1024 * 1024:
+        raise HTTPException(
+            status_code=413,
+            detail=f"El archivo pesa {len(contenido) / 1024 / 1024:.1f} MB y "
+                   f"supera el límite de {MAX_DOC_MB} MB.",
+        )
+    return contenido
+
+
 @router.post(
     "/{paciente_id}/documentos/",
     response_model=DocumentoOut,
@@ -219,23 +241,7 @@ async def subir_documento(
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
 
     cat = categoria if categoria in CATEGORIAS_DOC else "otro"
-    ext = os.path.splitext(archivo.filename or "")[-1].lower()
-    if ext not in EXTENSIONES_DOC:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Tipo de archivo no permitido: '{ext}'. "
-                   f"Acepta imágenes, PDF y documentos de oficina.",
-        )
-
-    contenido = await archivo.read()
-    if not contenido:
-        raise HTTPException(status_code=400, detail="El archivo está vacío.")
-    if len(contenido) > MAX_DOC_MB * 1024 * 1024:
-        raise HTTPException(
-            status_code=413,
-            detail=f"El archivo pesa {len(contenido) / 1024 / 1024:.1f} MB y "
-                   f"supera el límite de {MAX_DOC_MB} MB.",
-        )
+    contenido = await _validar_y_leer_archivo(archivo)
 
     doc = DocumentoPaciente(
         paciente_id=paciente_id,
@@ -330,6 +336,50 @@ def crear_registro(
     return reg
 
 
+@router.post(
+    "/{paciente_id}/registros/{registro_id}/documento",
+    response_model=RegistroClinicoOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def adjuntar_documento_registro(
+    paciente_id: int,
+    registro_id: int,
+    request: Request,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Adjunta un archivo (radiografía, análisis, etc.) a un registro de tipo
+    'complementario'. Es la única vía de subida de archivos por mascota: los
+    métodos complementarios llevan su propio estudio adjunto, en vez de un
+    módulo de documentos genérico y desconectado."""
+    reg = db.get(RegistroClinico, registro_id)
+    if not reg or reg.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    if reg.tipo != "complementario":
+        raise HTTPException(
+            status_code=400,
+            detail="Solo los métodos complementarios admiten un archivo adjunto.",
+        )
+
+    contenido = await _validar_y_leer_archivo(archivo)
+    doc = DocumentoPaciente(
+        paciente_id=paciente_id,
+        registro_id=registro_id,
+        nombre=archivo.filename or "documento",
+        categoria="otro",
+        mime_type=archivo.content_type,
+        tamano_bytes=len(contenido),
+        contenido=contenido,
+        subido_por=usuario.usuario if usuario else None,
+    )
+    db.add(doc)
+    request.state.actividad_detalle = f"{reg.producto or reg.tipo} — {doc.nombre}"
+    db.commit()
+    db.refresh(reg)
+    return reg
+
+
 @router.get("/{paciente_id}/registros/", response_model=list[RegistroClinicoOut])
 def listar_registros(
     paciente_id: int,
@@ -356,7 +406,111 @@ def eliminar_registro(
     reg = db.get(RegistroClinico, registro_id)
     if not reg or reg.paciente_id != paciente_id:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
+    for doc in list(reg.documentos):
+        db.delete(doc)
     request.state.actividad_detalle = f"{paciente_id} — {reg.tipo}"
     db.delete(reg)
     db.commit()
+
+
+# ── Recetas (tratamiento formal indicado por el veterinario) ──────────────────
+
+@router.post(
+    "/{paciente_id}/recetas/",
+    response_model=RecetaOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def crear_receta(
+    paciente_id: int,
+    payload: RecetaCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    paciente = db.get(Paciente, paciente_id)
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    items = [i.model_dump() for i in payload.items if (i.medicamento or "").strip()]
+    if not items:
+        raise HTTPException(
+            status_code=422,
+            detail="La receta debe incluir al menos un medicamento.",
+        )
+    ahora = datetime.now(timezone.utc)
+    receta = Receta(
+        paciente_id=paciente_id,
+        fecha=payload.fecha or ahora.date(),
+        diagnostico=(payload.diagnostico or "").strip() or None,
+        indicaciones=(payload.indicaciones or "").strip() or None,
+        items=items,
+        veterinario_id=usuario.id if usuario else None,
+        actualizado_por=usuario.usuario if usuario else None,
+        actualizado_en=ahora,
+    )
+    db.add(receta)
+    request.state.actividad_detalle = paciente.nombre
+    db.commit()
+    db.refresh(receta)
+    return receta
+
+
+@router.get("/{paciente_id}/recetas/", response_model=list[RecetaOut])
+def listar_recetas(paciente_id: int, db: Session = Depends(get_db)):
+    return (
+        db.query(Receta)
+        .filter(Receta.paciente_id == paciente_id)
+        .order_by(Receta.fecha.desc(), Receta.id.desc())
+        .all()
+    )
+
+
+@router.put("/{paciente_id}/recetas/{receta_id}", response_model=RecetaOut)
+def actualizar_receta(
+    paciente_id: int,
+    receta_id: int,
+    payload: RecetaUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    receta = db.get(Receta, receta_id)
+    if not receta or receta.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    datos = payload.model_dump(exclude_unset=True)
+    if "items" in datos:
+        items = [i for i in datos["items"] if (i.get("medicamento") or "").strip()]
+        if not items:
+            raise HTTPException(
+                status_code=422,
+                detail="La receta debe incluir al menos un medicamento.",
+            )
+        datos["items"] = items
+    for campo, valor in datos.items():
+        setattr(receta, campo, valor)
+    receta.actualizado_por = usuario.usuario if usuario else None
+    receta.actualizado_en = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(receta)
+    request.state.actividad_detalle = receta.paciente.nombre if receta.paciente else None
+    return receta
+
+
+@router.delete(
+    "/{paciente_id}/recetas/{receta_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def eliminar_receta(
+    paciente_id: int,
+    receta_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    receta = db.get(Receta, receta_id)
+    if not receta or receta.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Receta no encontrada")
+    nombre = receta.paciente.nombre if receta.paciente else None
+    fecha_txt = receta.fecha.strftime("%d/%m/%Y") if receta.fecha else ""
+    db.delete(receta)
+    db.commit()
+    request.state.actividad_detalle = f"{nombre} — {fecha_txt}" if nombre else fecha_txt
 

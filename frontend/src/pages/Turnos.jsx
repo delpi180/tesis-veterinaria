@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, esVeterinario, getToken } from '../services/api'
 import { estadoStyle, estadoLabel, ESTADOS_CITA, waRecordatorio } from '../utils/citas'
+import { clinicaActual } from '../services/clinica'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
@@ -63,6 +64,7 @@ export default function Turnos() {
   // ── Modal ──────────────────────────────────────────────────────────────────
   const [modalAbierto, setModalAbierto] = useState(false)
   const [editId,       setEditId]       = useState(null)
+  const [editCita,     setEditCita]     = useState(null)  // cita completa, solo para mostrar trazabilidad
   const [form,         setForm]         = useState(FORM_INICIAL)
   const [guardando,    setGuardando]    = useState(false)
   const [errorModal,   setErrorModal]   = useState(null)
@@ -80,14 +82,30 @@ export default function Turnos() {
   const todayYear  = now.getFullYear()
   const isCurrentMonth = viewYear === todayYear && viewMonth === todayMonth
 
+  const pad2 = (n) => String(n).padStart(2, '0')
+
+  // Solo se piden las citas del mes visible en el calendario, más las próximas
+  // 20 (para el widget "Próximos turnos", que puede caer en otro mes). Antes
+  // se traían TODAS las citas de la historia del sistema en cada carga.
   const cargar = (silencioso = false) => {
     if (!silencioso) setLoading(true)
     setError(null)
+    const desdeMes = `${viewYear}-${pad2(viewMonth + 1)}-01`
+    const ultimoDia = new Date(viewYear, viewMonth + 1, 0).getDate()
+    const hastaMes = `${viewYear}-${pad2(viewMonth + 1)}-${pad2(ultimoDia)}`
+    const hoy = new Date()
+    const hoyStr = `${hoy.getFullYear()}-${pad2(hoy.getMonth() + 1)}-${pad2(hoy.getDate())}`
     return Promise.all([
-      api.get('/api/citas/'),
+      api.get(`/api/citas/?desde=${desdeMes}&hasta=${hastaMes}`),
+      api.get(`/api/citas/?desde=${hoyStr}&limit=20`),
       api.get('/api/usuarios/doctores'),
     ])
-      .then(([citasData, doctoresData]) => {
+      .then(([citasMes, citasProximas, doctoresData]) => {
+        // Unión sin duplicados (una cita de hoy puede aparecer en ambas listas)
+        const combinadas = new Map()
+        ;[...citasMes, ...citasProximas].forEach(c => combinadas.set(c.id, c))
+        const citasData = Array.from(combinadas.values())
+
         // La info del paciente/dueño viene embebida en cada cita (no cargamos
         // los 2000+ clientes). Se arma el mapa solo con los pacientes que tienen turno.
         const map = {}
@@ -104,7 +122,7 @@ export default function Turnos() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargar() }, [viewYear, viewMonth])
 
   // Sincronización en tiempo real vía Server-Sent Events (SSE)
   useEffect(() => {
@@ -131,7 +149,7 @@ export default function Turnos() {
     const doc = new jsPDF({ unit: 'mm', format: 'a4' })
     doc.setFillColor(91, 33, 182); doc.rect(0, 0, 210, 20, 'F')
     doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont(undefined, 'bold')
-    doc.text('Veterinaria Los Pinos — Agenda del día', 14, 9)
+    doc.text(`${clinicaActual().nombre} — Agenda del día`, 14, 9)
     doc.setFontSize(10); doc.setFont(undefined, 'normal')
     doc.text(fechaTxt.charAt(0).toUpperCase() + fechaTxt.slice(1), 14, 16)
     if (lista.length === 0) {
@@ -210,6 +228,16 @@ export default function Turnos() {
     }
   }
 
+  // Texto de trazabilidad para el tooltip del botón "Editar turno"
+  const tituloTrazabilidad = (cita) => {
+    if (!cita.creado_por && !cita.actualizado_por) return 'Editar turno'
+    let txt = `Agendado por ${cita.creado_por ?? '—'}`
+    if (cita.actualizado_por && cita.actualizado_por !== cita.creado_por) {
+      txt += ` · última edición: ${cita.actualizado_por}`
+    }
+    return txt
+  }
+
   // Agenda filtrada opcionalmente por doctor asignado
   const citasVisibles = filtroDoctor
     ? citas.filter(c => String(c.veterinario_id) === String(filtroDoctor))
@@ -278,6 +306,7 @@ export default function Turnos() {
     const d = new Date(cita.fecha_hora)
     const pad = (n) => String(n).padStart(2, '0')
     setEditId(cita.id)
+    setEditCita(cita)
     setForm({
       pacienteId:    String(cita.paciente_id),
       fecha:         `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
@@ -296,6 +325,7 @@ export default function Turnos() {
   const cerrarModal = () => {
     setModalAbierto(false)
     setEditId(null)
+    setEditCita(null)
     setForm(FORM_INICIAL)
     setPacSelLabel(''); setPacBusq(''); setPacResultados([])
     setErrorModal(null)
@@ -305,6 +335,10 @@ export default function Turnos() {
     e.preventDefault()
     if (!form.pacienteId || !form.fecha || !form.hora) {
       setErrorModal('Paciente, fecha y hora son obligatorios.')
+      return
+    }
+    if (avisoChoque) {
+      setErrorModal(avisoChoque)
       return
     }
     setGuardando(true)
@@ -324,8 +358,7 @@ export default function Turnos() {
       } else {
         await api.post('/api/citas/', { ...payload, paciente_id: parseInt(form.pacienteId, 10) })
       }
-      const nuevasCitas = await api.get('/api/citas/')
-      setCitas(nuevasCitas)
+      await cargar(true)
       cerrarModal()
     } catch (err) {
       setErrorModal(err.message)
@@ -359,6 +392,26 @@ export default function Turnos() {
       return fechaC === form.fecha && horaC === form.hora
     })
     return choca ? 'Este doctor ya tiene un turno a esa hora.' : null
+  })()
+
+  // Horas ya ocupadas de ese doctor ese día (ayuda a elegir un horario libre)
+  const horariosOcupados = (() => {
+    if (!form.veterinarioId || !form.fecha) return []
+    const pad = (n) => String(n).padStart(2, '0')
+    return citas
+      .filter(c => {
+        if (editId && c.id === editId) return false
+        if (String(c.veterinario_id) !== String(form.veterinarioId)) return false
+        if (c.estado === 'cancelada') return false
+        const d = new Date(c.fecha_hora)
+        const fechaC = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+        return fechaC === form.fecha
+      })
+      .map(c => {
+        const d = new Date(c.fecha_hora)
+        return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+      })
+      .sort()
   })()
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -550,7 +603,7 @@ export default function Turnos() {
                         <button
                           type="button"
                           onClick={() => abrirEditar(cita)}
-                          title="Editar turno"
+                          title={tituloTrazabilidad(cita)}
                           className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition shrink-0"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -660,7 +713,7 @@ export default function Turnos() {
                               <button
                                 type="button"
                                 onClick={() => abrirEditar(cita)}
-                                title="Editar turno"
+                                title={tituloTrazabilidad(cita)}
                                 className="flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -749,7 +802,7 @@ export default function Turnos() {
                           <button
                             type="button"
                             onClick={() => abrirEditar(cita)}
-                            title="Editar turno"
+                            title={tituloTrazabilidad(cita)}
                             className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition"
                           >
                             <Pencil className="w-4 h-4" />
@@ -793,11 +846,20 @@ export default function Turnos() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
 
             {/* Cabecera */}
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <p className="text-sm font-bold text-slate-800">{editId ? 'Editar Turno' : 'Nuevo Turno'}</p>
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">{editId ? 'Editar Turno' : 'Nuevo Turno'}</p>
+                {editCita && (editCita.creado_por || editCita.actualizado_por) && (
+                  <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                    Agendado por {editCita.creado_por ?? '—'}
+                    {editCita.actualizado_por && editCita.actualizado_por !== editCita.creado_por
+                      ? ` · última edición: ${editCita.actualizado_por}` : ''}
+                  </p>
+                )}
+              </div>
               <button
                 onClick={cerrarModal}
-                className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400"
+                className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400 shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -836,7 +898,13 @@ export default function Turnos() {
                           {pacBuscando ? (
                             <p className="text-xs text-slate-400 px-3 py-2">Buscando…</p>
                           ) : pacResultados.length === 0 ? (
-                            <p className="text-xs text-slate-400 px-3 py-2">Sin coincidencias.</p>
+                            <div className="px-3 py-2 flex flex-col gap-1">
+                              <p className="text-xs text-slate-400">Sin coincidencias.</p>
+                              <button type="button" onClick={() => navigate('/clientes')}
+                                className="text-xs text-purple-600 hover:text-purple-800 font-semibold text-left">
+                                ¿No está registrado? Ir a Clientes para registrarlo →
+                              </button>
+                            </div>
                           ) : (
                             pacResultados.map(op => (
                               <button key={op.id} type="button" onClick={() => elegirPaciente(op)}
@@ -848,6 +916,26 @@ export default function Turnos() {
                         </div>
                       )}
                     </div>
+                  )}
+                </div>
+
+                {/* Veterinario asignado — antes de fecha/hora para ver de una vez sus horarios ocupados */}
+                <div className="flex flex-col gap-1">
+                  <label className={labelCls}>Veterinario asignado</label>
+                  <select
+                    className={inputCls}
+                    value={form.veterinarioId}
+                    onChange={e => setForm(f => ({ ...f, veterinarioId: e.target.value }))}
+                  >
+                    <option value="">— Sin asignar —</option>
+                    {doctores.map(d => (
+                      <option key={d.id} value={d.id}>{d.nombre}</option>
+                    ))}
+                  </select>
+                  {avisoHorario && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1.5 rounded-lg">
+                      ⚠️ {avisoHorario}
+                    </p>
                   )}
                 </div>
 
@@ -877,6 +965,18 @@ export default function Turnos() {
                   </div>
                 </div>
 
+                {horariosOcupados.length > 0 && (
+                  <p className="text-xs text-slate-500 -mt-2">
+                    Horarios ya ocupados ese día: {' '}
+                    <span className="font-semibold text-slate-700">{horariosOcupados.join(', ')}</span>
+                  </p>
+                )}
+                {avisoChoque && (
+                  <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1.5 rounded-lg -mt-1">
+                    ⛔ {avisoChoque}
+                  </p>
+                )}
+
                 {/* Motivo */}
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>Motivo</label>
@@ -887,31 +987,6 @@ export default function Turnos() {
                     value={form.motivo}
                     onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
                   />
-                </div>
-
-                {/* Veterinario asignado */}
-                <div className="flex flex-col gap-1">
-                  <label className={labelCls}>Veterinario asignado</label>
-                  <select
-                    className={inputCls}
-                    value={form.veterinarioId}
-                    onChange={e => setForm(f => ({ ...f, veterinarioId: e.target.value }))}
-                  >
-                    <option value="">— Sin asignar —</option>
-                    {doctores.map(d => (
-                      <option key={d.id} value={d.id}>{d.nombre}</option>
-                    ))}
-                  </select>
-                  {avisoHorario && (
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1.5 rounded-lg">
-                      ⚠️ {avisoHorario}
-                    </p>
-                  )}
-                  {avisoChoque && (
-                    <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-2 py-1.5 rounded-lg">
-                      ⛔ {avisoChoque}
-                    </p>
-                  )}
                 </div>
 
                 {/* Estado */}
@@ -961,7 +1036,8 @@ export default function Turnos() {
                 </button>
                 <button
                   type="submit"
-                  disabled={guardando}
+                  disabled={guardando || !!avisoChoque}
+                  title={avisoChoque || undefined}
                   className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50"
                 >
                   {guardando ? 'Guardando...' : 'Guardar Turno'}

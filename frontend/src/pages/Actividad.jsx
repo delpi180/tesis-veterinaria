@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { History, RefreshCw, User, Stethoscope, Download, Filter } from 'lucide-react'
 import { api } from '../services/api'
+import Paginacion from '../components/Paginacion'
 
 const INTERVALO_MS = 15000  // auto-actualización cada 15 s
+const POR_PAGINA = 50
 
 function fmtFechaHora(iso) {
   if (!iso) return '—'
@@ -36,43 +38,83 @@ export default function Actividad() {
   const [ultima, setUltima] = useState(null)
   const [usuarios, setUsuarios] = useState([])
   const [filtros, setFiltros] = useState({ usuario: '', desde: '', hasta: '' })
+  const [pagina, setPagina] = useState(1)
+  const [total, setTotal] = useState(0)
   const timer = useRef(null)
 
-  const cargar = (silencioso = false, f = filtros) => {
+  const cargar = (silencioso = false, f = filtros, pag = pagina) => {
     if (!silencioso) setLoading(true)
-    const p = new URLSearchParams({ limite: '200' })
-    if (f.usuario) p.set('usuario', f.usuario)
-    if (f.desde)   p.set('desde', f.desde)
-    if (f.hasta)   p.set('hasta', f.hasta)
-    return api.get(`/api/actividad/?${p.toString()}`)
-      .then(d => { setItems(Array.isArray(d) ? d : []); setError(null); setUltima(new Date()) })
+    const p = new URLSearchParams({ limite: String(POR_PAGINA), skip: String((pag - 1) * POR_PAGINA) })
+    const pc = new URLSearchParams()
+    if (f.usuario) { p.set('usuario', f.usuario); pc.set('usuario', f.usuario) }
+    if (f.desde)   { p.set('desde', f.desde);     pc.set('desde', f.desde) }
+    if (f.hasta)   { p.set('hasta', f.hasta);     pc.set('hasta', f.hasta) }
+    return Promise.all([
+      api.get(`/api/actividad/?${p.toString()}`),
+      api.get(`/api/actividad/contar?${pc.toString()}`),
+    ])
+      .then(([d, c]) => {
+        setItems(Array.isArray(d) ? d : []); setTotal(c?.total ?? 0)
+        setError(null); setUltima(new Date())
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
+  }
+
+  const irPagina = (nueva) => { setPagina(nueva); cargar(false, filtros, nueva) }
+  const buscar = () => { setPagina(1); cargar(false, filtros, 1) }
+  const limpiar = () => {
+    const vacio = { usuario: '', desde: '', hasta: '' }
+    setFiltros(vacio); setPagina(1); cargar(false, vacio, 1)
   }
 
   useEffect(() => { cargar() }, [])
   useEffect(() => { api.get('/api/usuarios/').then(u => setUsuarios(Array.isArray(u) ? u : [])).catch(() => {}) }, [])
 
-  const exportarCSV = () => {
-    const cab = ['Fecha', 'Usuario', 'Rol', 'Accion', 'Detalle', 'Metodo', 'Ruta', 'Estado']
-    const filas = items.map(a => [
-      fmtFechaHora(a.fecha), a.usuario ?? '', a.rol ?? '', a.accion ?? '',
-      a.detalle ?? '', a.metodo ?? '', a.ruta ?? '', a.estado ?? '',
-    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
-    const csv = '﻿' + [cab.join(','), ...filas].join('\r\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = `actividad_${new Date().toISOString().slice(0, 10)}.csv`
-    a.click(); URL.revokeObjectURL(url)
+  const [exportando, setExportando] = useState(false)
+
+  // Exporta TODOS los eventos que cumplen el filtro (no solo la página actual),
+  // trayéndolos en lotes de 500 (tope del backend).
+  const exportarCSV = async () => {
+    setExportando(true)
+    try {
+      const LOTE = 500
+      let skip = 0, todos = []
+      while (true) {
+        const p = new URLSearchParams({ limite: String(LOTE), skip: String(skip) })
+        if (filtros.usuario) p.set('usuario', filtros.usuario)
+        if (filtros.desde)   p.set('desde', filtros.desde)
+        if (filtros.hasta)   p.set('hasta', filtros.hasta)
+        const lote = await api.get(`/api/actividad/?${p.toString()}`)
+        if (!Array.isArray(lote) || lote.length === 0) break
+        todos = todos.concat(lote)
+        if (lote.length < LOTE) break
+        skip += LOTE
+      }
+      if (todos.length === 0) return
+      const cab = ['Fecha', 'Usuario', 'Rol', 'Accion', 'Detalle', 'Metodo', 'Ruta', 'Estado']
+      const filas = todos.map(a => [
+        fmtFechaHora(a.fecha), a.usuario ?? '', a.rol ?? '', a.accion ?? '',
+        a.detalle ?? '', a.metodo ?? '', a.ruta ?? '', a.estado ?? '',
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      const csv = '﻿' + [cab.join(','), ...filas].join('\r\n')
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+      const a = document.createElement('a')
+      a.href = url; a.download = `actividad_${new Date().toISOString().slice(0, 10)}.csv`
+      a.click(); URL.revokeObjectURL(url)
+    } finally {
+      setExportando(false)
+    }
   }
 
-  // Auto-actualización (respeta los filtros vigentes)
+  // Auto-actualización (respeta los filtros y la página vigentes; si no,
+  // refrescaba con un closure viejo y regresaba a la página 1 sola).
   useEffect(() => {
     if (auto) {
-      timer.current = setInterval(() => cargar(true), INTERVALO_MS)
+      timer.current = setInterval(() => cargar(true, filtros, pagina), INTERVALO_MS)
       return () => clearInterval(timer.current)
     }
-  }, [auto, filtros])
+  }, [auto, filtros, pagina])
 
   const rolPill = (rol) => rol === 'recepcionista'
     ? 'bg-sky-100 text-sky-700'
@@ -93,9 +135,9 @@ export default function Actividad() {
               className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-300" />
             Auto-actualizar
           </label>
-          <button onClick={exportarCSV} disabled={items.length === 0}
+          <button onClick={exportarCSV} disabled={exportando || total === 0}
             className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition disabled:opacity-50">
-            <Download className="w-4 h-4" /> Exportar
+            <Download className={`w-4 h-4 ${exportando ? 'animate-spin' : ''}`} /> {exportando ? 'Exportando…' : 'Exportar'}
           </button>
           <button onClick={() => cargar()} disabled={loading}
             className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
@@ -121,10 +163,10 @@ export default function Actividad() {
             className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700" />
           <input type="date" value={filtros.hasta} onChange={e => setFiltros(f => ({ ...f, hasta: e.target.value }))}
             className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700" />
-          <button onClick={() => cargar()}
+          <button onClick={buscar}
             className="px-3 py-1.5 text-sm font-semibold text-white bg-purple-700 hover:bg-purple-600 rounded-lg transition">Buscar</button>
           {(filtros.usuario || filtros.desde || filtros.hasta) && (
-            <button onClick={() => { const vacio = { usuario: '', desde: '', hasta: '' }; setFiltros(vacio); cargar(false, vacio) }}
+            <button onClick={limpiar}
               className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
           )}
         </div>
@@ -133,7 +175,7 @@ export default function Actividad() {
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
             <History className="w-4 h-4 text-purple-500" />
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Últimas acciones</h2>
-            <span className="ml-auto text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{items.length}</span>
+            <span className="ml-auto text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{total}</span>
           </div>
 
           {loading && items.length === 0 ? (
@@ -161,6 +203,7 @@ export default function Actividad() {
               ))}
             </ul>
           )}
+          <Paginacion pagina={pagina} total={total} porPagina={POR_PAGINA} onCambiar={irPagina} etiqueta="eventos" />
         </section>
       </main>
     </div>

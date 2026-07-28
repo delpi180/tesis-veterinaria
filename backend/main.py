@@ -1,7 +1,9 @@
 import logging
+import os
 import re
+import time
 
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -9,12 +11,12 @@ from pydantic import BaseModel
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("vetlospinos")
 
-from database import SessionLocal
+from database import SessionLocal, engine
 import models  # registra todos los modelos en Base.metadata
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
-    busqueda, inventario, asistencia, mi_panel, actividad,
+    busqueda, inventario, asistencia, mi_panel, actividad, configuracion,
 )
 from core import ratelimit
 from core.config import settings
@@ -28,6 +30,20 @@ app = FastAPI(title="Veterinaria Los Pinos API")
 # Rutas accesibles sin token
 RUTAS_PUBLICAS = {"/api/auth/login", "/api/health"}
 
+# Rutas cuya LECTURA es pública, pero que siguen exigiendo sesión para escribir.
+# La pantalla de acceso muestra el nombre de la clínica antes de que nadie haya
+# entrado; modificar esos datos sigue siendo exclusivo de la administradora.
+RUTAS_PUBLICAS_LECTURA = {"/api/configuracion/"}
+
+# Identificador de la versión desplegada. Railway expone el SHA del commit;
+# antes esto era una cadena fija escrita a mano ("redeploy-2026-06-27"), que
+# quedaba desactualizada y hacía inútil el "confirmar qué versión está viva".
+_BUILD = (
+    os.environ.get("RAILWAY_GIT_COMMIT_SHA", "")[:7]
+    or os.environ.get("BUILD_ID", "")
+    or "dev"
+)
+
 
 def _clave_cliente(request: Request) -> str:
     """IP del cliente para el rate-limit (respeta el proxy de Railway/Vercel)."""
@@ -38,10 +54,12 @@ def _clave_cliente(request: Request) -> str:
 
 
 def _es_ruta_clinica(path: str) -> bool:
-    """Historias clínicas y pipeline IA: reservado al rol veterinario."""
+    """Historias clínicas, recetas y pipeline IA: reservado al rol veterinario
+    para escribir (la recepcionista puede leer, ver más abajo `lectura_historias`)."""
     return (
         "/historias" in path
-        or path in {"/api/procesar-historia", "/api/transcribe", "/api/process-soap"}
+        or "/recetas" in path
+        or path in {"/api/procesar-historia", "/api/transcribe"}
     )
 
 
@@ -59,8 +77,12 @@ _ACCIONES = {
     ("DELETE", "/api/pacientes/{id}"): "Eliminó una mascota",
     ("POST", "/api/pacientes/{id}/historias"): "Registró una historia clínica",
     ("PUT", "/api/pacientes/{id}/historias/{id}"): "Editó una historia clínica",
+    ("POST", "/api/pacientes/{id}/recetas"): "Emitió una receta",
+    ("PUT", "/api/pacientes/{id}/recetas/{id}"): "Editó una receta",
+    ("DELETE", "/api/pacientes/{id}/recetas/{id}"): "Eliminó una receta",
     ("POST", "/api/asistencia/ingreso"): "Marcó ingreso de asistencia",
     ("POST", "/api/asistencia/{id}/salida"): "Marcó salida de asistencia",
+    ("PUT", "/api/asistencia/{id}"): "Corrigió una marcación de asistencia",
     ("DELETE", "/api/asistencia/{id}"): "Eliminó una marcación",
     ("POST", "/api/ventas"): "Registró una venta",
     ("POST", "/api/usuarios"): "Creó un usuario",
@@ -74,12 +96,51 @@ _ACCIONES = {
     ("PUT", "/api/servicios/{id}"): "Editó un servicio",
     ("DELETE", "/api/servicios/{id}"): "Eliminó un servicio",
     ("POST", "/api/inventario/aplicar"): "Actualizó inventario por dictado",
+    ("PUT", "/api/configuracion"): "Actualizó los datos de la clínica",
 }
 
 
 def _describir_accion(metodo: str, path: str) -> str:
     p = re.sub(r"/\d+", "/{id}", path).rstrip("/")
     return _ACCIONES.get((metodo, p), f"{metodo} {p}")
+
+
+# ── Vigencia de la cuenta ────────────────────────────────────────────────────
+#
+# Comprobar en la BD si el usuario sigue activo en CADA petición sería una
+# consulta extra por request. Se cachea el resultado unos segundos: así
+# desactivar a alguien le corta el acceso en ~30 s (antes: hasta 12 h, lo que
+# durara su token) sin castigar el rendimiento. Sin Redis ni servicios pagos.
+_CACHE_CUENTAS: dict[str, tuple[float, bool]] = {}
+_CACHE_TTL_SEG = 30
+
+
+def _cuenta_habilitada(usuario: str) -> bool:
+    ahora = time.time()
+    entrada = _CACHE_CUENTAS.get(usuario)
+    if entrada and (ahora - entrada[0]) < _CACHE_TTL_SEG:
+        return entrada[1]
+
+    db = None
+    try:
+        db = SessionLocal()
+        activo = (
+            db.query(models.Usuario.activo)
+            .filter(models.Usuario.usuario == usuario)
+            .scalar()
+        )
+        habilitada = bool(activo)
+    except Exception as e:
+        # Si la BD falla, no dejamos a todo el mundo fuera por un blip: se
+        # confía en la firma del token (que ya se validó) y se registra.
+        logger.warning("No se pudo verificar la cuenta '%s': %s", usuario, e)
+        return True
+    finally:
+        if db is not None:
+            db.close()
+
+    _CACHE_CUENTAS[usuario] = (ahora, habilitada)
+    return habilitada
 
 
 def _registrar_actividad(usuario, rol, metodo, ruta, estado, detalle=None):
@@ -95,7 +156,7 @@ def _registrar_actividad(usuario, rol, metodo, ruta, estado, detalle=None):
         ))
         db.commit()
     except Exception as e:
-        print(f"[ACT] no se pudo registrar actividad: {e}")
+        logger.warning("No se pudo registrar la actividad: %s", e)
     finally:
         if db is not None:
             db.close()
@@ -106,9 +167,11 @@ def _registrar_actividad(usuario, rol, metodo, ruta, estado, detalle=None):
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
+    es_lectura_publica = request.method == "GET" and path in RUTAS_PUBLICAS_LECTURA
     if (
         path.startswith("/api/")
         and path not in RUTAS_PUBLICAS
+        and not es_lectura_publica
         and request.method != "OPTIONS"
     ):
         header = request.headers.get("Authorization", "")
@@ -121,10 +184,20 @@ async def auth_middleware(request: Request, call_next):
                 status_code=401,
                 content={"detail": "No autorizado. Inicia sesión para continuar."},
             )
-        # Control de rol: la recepcionista puede LEER (GET) la historia clínica del
-        # paciente (para ver su ficha completa), pero no crear/editar/eliminar
-        # consultas ni usar el pipeline de IA — eso queda reservado al veterinario.
-        lectura_historias = request.method == "GET" and "/historias" in path
+        # El token es válido por firma, pero además la cuenta debe seguir
+        # existiendo y activa: al desactivar a alguien (p. ej. personal que ya
+        # no trabaja aquí) su sesión debe cortarse de inmediato, no seguir
+        # abierta hasta que el token expire por su cuenta.
+        if not _cuenta_habilitada(sesion["usuario"]):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Tu cuenta fue desactivada. Contacta a la administradora."},
+            )
+        # Control de rol: la recepcionista puede LEER (GET) la historia clínica y
+        # las recetas del paciente (para ver su ficha completa), pero no
+        # crear/editar/eliminar consultas ni recetas ni usar el pipeline de IA
+        # — eso queda reservado al veterinario.
+        lectura_historias = request.method == "GET" and ("/historias" in path or "/recetas" in path)
         if (
             sesion["rol"] != "veterinario"
             and _es_ruta_clinica(path)
@@ -198,12 +271,42 @@ app.include_router(busqueda.router)
 app.include_router(asistencia.router)
 app.include_router(mi_panel.router)
 app.include_router(actividad.router)
+app.include_router(configuracion.router)
+
+
+_SECRETO_POR_DEFECTO = "vet-los-pinos-secreto-dev"
+_PASSWORD_POR_DEFECTO = "vetlospinos"
+
+
+def _avisar_secretos_por_defecto():
+    """Avisa fuerte si el sistema quedó con las claves de ejemplo.
+
+    AUTH_SECRET firma los tokens de sesión: si queda el valor por defecto (que
+    está en el repositorio, a la vista de cualquiera), alguien podría fabricar
+    un token de administradora válido. Es la diferencia entre un proyecto de
+    plantilla y uno listo para atender a una clínica real.
+    """
+    problemas = []
+    if settings.auth_secret == _SECRETO_POR_DEFECTO:
+        problemas.append("AUTH_SECRET tiene el valor de ejemplo del repositorio")
+    if settings.auth_password == _PASSWORD_POR_DEFECTO:
+        problemas.append("AUTH_PASSWORD tiene la contraseña de ejemplo")
+    if not problemas:
+        return
+
+    for p in problemas:
+        logger.critical("SEGURIDAD: %s. Cámbialo en las variables de entorno.", p)
+    logger.critical(
+        "SEGURIDAD: con estos valores por defecto cualquiera que vea el código "
+        "puede entrar como administradora. No uses esta configuración con datos reales."
+    )
 
 
 @app.on_event("startup")
 async def startup():
     # El esquema lo gestiona Alembic (ver prestart.py / Procfile). No usamos
     # create_all para evitar que la BD quede sin control de migraciones.
+    _avisar_secretos_por_defecto()
     _seed_admin()
 
     from routers.citas import poll_sse_events
@@ -235,7 +338,11 @@ def _seed_admin():
                 activo=True,
             ))
             db.commit()
-            print(f"[SEED] Usuarios iniciales creados: admin '{settings.auth_usuario}' (recepcionista) y 'doctor' (veterinario).")
+            logger.info(
+                "Usuarios iniciales creados: '%s' (recepcionista) y 'doctor' (veterinario). "
+                "Cambia ambas contraseñas antes de usar el sistema con datos reales.",
+                settings.auth_usuario,
+            )
     finally:
         db.close()
 
@@ -265,7 +372,32 @@ class ProcessHistoriaResponse(BaseModel):
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "message": "Veterinaria Los Pinos API funcionando", "build": "redeploy-2026-06-27"}
+    """Healthcheck que Railway usa para decidir si promueve un deploy.
+
+    Verifica de verdad la conexión a la base de datos: antes respondía "ok"
+    aunque la BD estuviera caída o mal configurada, así que un deploy roto
+    igual entraba a producción. Si la BD no responde, devuelve 503 y Railway
+    mantiene la versión anterior (que sí funciona).
+    """
+    from sqlalchemy import text
+    try:
+        with engine.connect() as cx:
+            cx.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.error("Healthcheck: la base de datos no responde: %s", e)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degradado",
+                "message": "La base de datos no responde.",
+                "build": _BUILD,
+            },
+        )
+    return {
+        "status": "ok",
+        "message": "Veterinaria Los Pinos API funcionando",
+        "build": _BUILD,
+    }
 
 
 @app.post("/api/transcribe", response_model=TranscribeResponse)

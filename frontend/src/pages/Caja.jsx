@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
+import { clinicaActual } from '../services/clinica'
 
 const fmtMoneda = (n) => `S/ ${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtHora = (iso) => new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
@@ -54,7 +55,7 @@ export default function Caja() {
     doc.setFillColor(...morado); doc.rect(0, 0, 210, 24, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(15); doc.setFont(undefined, 'bold')
-    doc.text('Veterinaria Los Pinos', 14, 11)
+    doc.text(clinicaActual().nombre, 14, 11)
     doc.setFontSize(9); doc.setFont(undefined, 'normal')
     doc.text(`Cierre de Caja — ${data.fecha}`, 14, 18)
 

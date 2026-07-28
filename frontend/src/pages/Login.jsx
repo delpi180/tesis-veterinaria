@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Lock, User, Eye, EyeOff, Stethoscope, UserCog, ChevronLeft } from 'lucide-react'
 import { api, setSesion } from '../services/api'
+import { useClinica } from '../services/clinica'
 
 const PawIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-10 h-10">
@@ -29,6 +30,7 @@ const ROLES = {
 
 export default function Login() {
   const navigate = useNavigate()
+  const { clinica } = useClinica()
   const [rolSel,   setRolSel]   = useState(null)   // 'admin' | 'veterinario' | null
   const [usuario,  setUsuario]  = useState('')
   const [password, setPassword] = useState('')
@@ -71,7 +73,7 @@ export default function Login() {
           <div className="bg-purple-700 rounded-2xl p-4 text-white shadow-lg mb-4">
             <PawIcon />
           </div>
-          <h1 className="text-2xl font-bold text-white">Veterinaria Los Pinos</h1>
+          <h1 className="text-2xl font-bold text-white">{clinica.nombre}</h1>
           <p className="text-purple-300 text-sm mt-1">Sistema de gestión clínica</p>
         </div>
 
@@ -168,7 +170,7 @@ export default function Login() {
         )}
 
         <p className="text-center text-purple-400 text-xs mt-6">
-          © {new Date().getFullYear()} Veterinaria Los Pinos
+          © {new Date().getFullYear()} {clinica.nombre}
         </p>
       </div>
     </div>

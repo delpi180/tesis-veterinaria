@@ -1,0 +1,364 @@
+import { useState, useEffect } from 'react'
+import { Plus, Trash2, Loader2, Pencil, Download, Pill, X } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { api, esVeterinario } from '../services/api'
+import { useToast } from './Toast'
+import { clinicaActual } from '../services/clinica'
+
+const ITEM_VACIO = { medicamento: '', dosis: '', via: '', frecuencia: '', duracion: '' }
+
+const hoyStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const fmtFecha = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-PE', {
+  day: '2-digit', month: 'short', year: 'numeric',
+})
+const fmtFechaHora = (iso) => iso ? new Date(iso).toLocaleString('es-PE', {
+  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+}) : '—'
+
+const FORM_INICIAL = { fecha: hoyStr(), diagnostico: '', indicaciones: '', items: [{ ...ITEM_VACIO }] }
+
+// ── PDF de la receta (clínica + paciente + dueño + medicamentos + firma) ────
+const _MORADO = [88, 28, 135]
+function generarPDF(paciente, cliente, receta) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const W = 210, M = 14
+
+  doc.setFillColor(..._MORADO)
+  doc.rect(0, 0, W, 24, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFontSize(15); doc.setFont(undefined, 'bold')
+  doc.text(clinicaActual().nombre, M, 11)
+  doc.setFontSize(9); doc.setFont(undefined, 'normal')
+  doc.text('Receta Médica Veterinaria', M, 18)
+  doc.text(`Fecha: ${fmtFecha(receta.fecha)}`, W - M, 11, { align: 'right' })
+  doc.text(`Receta N° ${receta.id}`, W - M, 18, { align: 'right' })
+
+  const edad = paciente?.edad != null ? `${paciente.edad} año${paciente.edad !== 1 ? 's' : ''}` : ''
+  autoTable(doc, {
+    startY: 30,
+    head: [[{ content: 'Datos del paciente', colSpan: 2 }]],
+    body: [
+      ['Nombre', paciente?.nombre ?? ''],
+      ['Especie / Raza', [paciente?.especie, paciente?.raza].filter(Boolean).join(' / ')],
+      ['Sexo / Edad', [paciente?.sexo, edad].filter(Boolean).join(' · ')],
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+    columnStyles: { 0: { cellWidth: 42, fontStyle: 'bold', textColor: [90, 90, 90] }, 1: { cellWidth: W - 2 * M - 42 } },
+    styles: { fontSize: 9, cellPadding: 2 },
+    margin: { left: M, right: M },
+  })
+  autoTable(doc, {
+    startY: doc.lastAutoTable.finalY + 3,
+    head: [[{ content: 'Propietario', colSpan: 2 }]],
+    body: [
+      ['Nombre', cliente?.nombre ?? ''],
+      ['Teléfono', cliente?.telefono ?? ''],
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+    columnStyles: { 0: { cellWidth: 42, fontStyle: 'bold', textColor: [90, 90, 90] }, 1: { cellWidth: W - 2 * M - 42 } },
+    styles: { fontSize: 9, cellPadding: 2 },
+    margin: { left: M, right: M },
+  })
+
+  if (receta.diagnostico) {
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 3,
+      head: [['Diagnóstico']],
+      body: [[receta.diagnostico]],
+      theme: 'grid',
+      headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+      styles: { fontSize: 9, cellPadding: 2 },
+      margin: { left: M, right: M },
+    })
+  }
+
+  autoTable(doc, {
+    startY: doc.lastAutoTable.finalY + 5,
+    head: [['Medicamento', 'Dosis', 'Vía', 'Frecuencia', 'Duración']],
+    body: (receta.items || []).map(i => [i.medicamento ?? '', i.dosis ?? '', i.via ?? '', i.frecuencia ?? '', i.duracion ?? '']),
+    theme: 'grid',
+    headStyles: { fillColor: _MORADO, fontSize: 9, textColor: 255 },
+    styles: { fontSize: 9, cellPadding: 2.5 },
+    margin: { left: M, right: M },
+  })
+
+  if (receta.indicaciones) {
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 5,
+      head: [['Indicaciones para el propietario']],
+      body: [[receta.indicaciones]],
+      theme: 'grid',
+      headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+      styles: { fontSize: 9, cellPadding: 2 },
+      margin: { left: M, right: M },
+    })
+  }
+
+  const y = Math.min(doc.lastAutoTable.finalY + 24, 280)
+  doc.setDrawColor(150); doc.setLineWidth(0.3)
+  doc.line(W - M - 70, y, W - M, y)
+  doc.setTextColor(110); doc.setFontSize(9)
+  doc.text(receta.veterinario_nombre || 'Médico Veterinario', W - M - 35, y + 5, { align: 'center' })
+  doc.text('Médico Veterinario', W - M - 35, y + 9, { align: 'center' })
+
+  doc.save(`Receta_${paciente?.nombre ?? 'paciente'}_${receta.fecha}.pdf`)
+}
+
+function ItemsEditor({ items, onChange }) {
+  const add    = () => onChange([...items, { ...ITEM_VACIO }])
+  const remove = (i) => onChange(items.filter((_, idx) => idx !== i))
+  const update = (i, campo, valor) => { const n = [...items]; n[i] = { ...n[i], [campo]: valor }; onChange(n) }
+  return (
+    <div className="flex flex-col gap-2">
+      {items.map((it, i) => (
+        <div key={i} className="grid grid-cols-1 sm:grid-cols-6 gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+          <input value={it.medicamento} onChange={e => update(i, 'medicamento', e.target.value)}
+            placeholder="Medicamento" className="sm:col-span-2 text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+          <input value={it.dosis} onChange={e => update(i, 'dosis', e.target.value)}
+            placeholder="Dosis (15 mg/kg)" className="text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+          <input value={it.via} onChange={e => update(i, 'via', e.target.value)}
+            placeholder="Vía (Oral)" className="text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+          <input value={it.frecuencia} onChange={e => update(i, 'frecuencia', e.target.value)}
+            placeholder="Frecuencia (c/12h)" className="text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+          <div className="flex items-center gap-1.5">
+            <input value={it.duracion} onChange={e => update(i, 'duracion', e.target.value)}
+              placeholder="Duración (5 días)" className="flex-1 text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            <button type="button" onClick={() => remove(i)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition shrink-0">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={add}
+        className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 border border-dashed border-purple-300 rounded-lg px-3 py-1.5 hover:bg-purple-50 transition w-fit">
+        <Plus className="w-3.5 h-3.5" /> Agregar medicamento
+      </button>
+    </div>
+  )
+}
+
+export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
+  const toast = useToast()
+  const puedeEscribir = esVeterinario()
+  const [recetas, setRecetas] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [formAbierto, setFormAbierto] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [form, setForm] = useState(FORM_INICIAL)
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState(null)
+
+  const cargar = async () => {
+    setCargando(true)
+    try {
+      setRecetas(await api.get(`/api/pacientes/${pacienteId}/recetas/`))
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setCargando(false)
+    }
+  }
+  useEffect(() => { if (pacienteId) cargar() }, [pacienteId])
+
+  const abrirNueva = () => {
+    setEditId(null); setForm(FORM_INICIAL); setError(null); setFormAbierto(true)
+  }
+  const abrirEditar = (r) => {
+    setEditId(r.id)
+    setForm({
+      fecha: r.fecha,
+      diagnostico: r.diagnostico ?? '',
+      indicaciones: r.indicaciones ?? '',
+      items: r.items?.length ? r.items.map(i => ({ ...ITEM_VACIO, ...i })) : [{ ...ITEM_VACIO }],
+    })
+    setError(null); setFormAbierto(true)
+  }
+  const cerrarForm = () => { setFormAbierto(false); setEditId(null); setForm(FORM_INICIAL); setError(null) }
+
+  const guardar = async (e) => {
+    e.preventDefault()
+    const items = form.items.filter(i => i.medicamento.trim())
+    if (items.length === 0) { setError('Agrega al menos un medicamento.'); return }
+    setGuardando(true); setError(null)
+    try {
+      const payload = {
+        fecha: form.fecha,
+        diagnostico: form.diagnostico.trim() || null,
+        indicaciones: form.indicaciones.trim() || null,
+        items,
+      }
+      if (editId) {
+        const actualizada = await api.put(`/api/pacientes/${pacienteId}/recetas/${editId}`, payload)
+        setRecetas(prev => prev.map(r => r.id === editId ? actualizada : r))
+        toast.success('Receta actualizada.')
+      } else {
+        const nueva = await api.post(`/api/pacientes/${pacienteId}/recetas/`, payload)
+        setRecetas(prev => [nueva, ...prev])
+        toast.success('Receta guardada.')
+      }
+      cerrarForm()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const eliminar = async (r) => {
+    if (!window.confirm(`¿Eliminar la receta del ${fmtFecha(r.fecha)}? Esta acción no se puede deshacer.`)) return
+    try {
+      await api.del(`/api/pacientes/${pacienteId}/recetas/${r.id}`)
+      setRecetas(prev => prev.filter(x => x.id !== r.id))
+      toast.success('Receta eliminada.')
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  return (
+    <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+        <Pill className="w-4 h-4 text-purple-500" />
+        <h2 className="text-sm font-semibold text-slate-700">Recetas</h2>
+        <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{recetas.length}</span>
+        {puedeEscribir && (
+          <button onClick={abrirNueva}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-purple-700 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg transition">
+            <Plus className="w-3.5 h-3.5" /> Nueva receta
+          </button>
+        )}
+      </div>
+
+      {!puedeEscribir && (
+        <p className="text-xs text-slate-400 px-4 pt-3">Solo el veterinario puede emitir o editar recetas; aquí puedes consultarlas.</p>
+      )}
+
+      {/* Formulario (crear/editar) — solo veterinario */}
+      {formAbierto && puedeEscribir && (
+        <form onSubmit={guardar} className="px-4 py-3 border-b border-slate-100 flex flex-col gap-3 bg-purple-50/30">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-slate-800">{editId ? 'Editar receta' : 'Nueva receta'}</p>
+            <button type="button" onClick={cerrarForm} className="p-1 rounded-lg hover:bg-slate-200 transition text-slate-400">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-slate-600">Fecha</label>
+              <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
+                className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            </div>
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <label className="text-xs font-semibold text-slate-600">Diagnóstico / motivo</label>
+              <input value={form.diagnostico} onChange={e => setForm(f => ({ ...f, diagnostico: e.target.value }))}
+                placeholder="Ej. Gastroenteritis leve"
+                className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">Medicamentos <span className="text-rose-500">*</span></label>
+            <ItemsEditor items={form.items} onChange={(items) => setForm(f => ({ ...f, items }))} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">Indicaciones para el propietario</label>
+            <textarea rows={2} value={form.indicaciones} onChange={e => setForm(f => ({ ...f, indicaciones: e.target.value }))}
+              placeholder="Ej. Dieta blanda por 3 días, control si no mejora…"
+              className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-300" />
+          </div>
+          {error && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={cerrarForm}
+              className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">Cancelar</button>
+            <button type="submit" disabled={guardando}
+              className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+              {guardando ? 'Guardando…' : editId ? 'Guardar cambios' : 'Guardar receta'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Lista */}
+      {cargando ? (
+        <p className="text-xs text-slate-400 text-center py-8">Cargando…</p>
+      ) : recetas.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+          <Pill className="w-7 h-7 mb-2 opacity-40" />
+          <p className="text-sm">Sin recetas registradas</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-50">
+          {recetas.map(r => (
+            <div key={r.id} className="px-4 py-3.5 flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div>
+                  <p className="text-sm font-bold text-slate-800">{fmtFecha(r.fecha)}</p>
+                  {r.diagnostico && <p className="text-xs text-slate-500">{r.diagnostico}</p>}
+                  {r.veterinario_nombre && (
+                    <p className="text-xs text-purple-700 font-medium mt-0.5">Dr(a). {r.veterinario_nombre}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => generarPDF(paciente, cliente, r)} title="Descargar PDF"
+                    className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition">
+                    <Download className="w-4 h-4" />
+                  </button>
+                  {puedeEscribir && (
+                    <>
+                      <button onClick={() => abrirEditar(r)} title="Editar receta"
+                        className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => eliminar(r)} title="Eliminar receta"
+                        className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-300 transition">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="overflow-x-auto"><table className="w-full text-xs">
+                <thead>
+                  <tr className="text-[10px] text-slate-400 uppercase tracking-wide border-b border-slate-100">
+                    <th className="text-left py-1.5 pr-3 font-semibold">Medicamento</th>
+                    <th className="text-left py-1.5 pr-3 font-semibold">Dosis</th>
+                    <th className="text-left py-1.5 pr-3 font-semibold">Vía</th>
+                    <th className="text-left py-1.5 pr-3 font-semibold">Frecuencia</th>
+                    <th className="text-left py-1.5 font-semibold">Duración</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(r.items || []).map((it, i) => (
+                    <tr key={i} className="border-b border-slate-50 last:border-0">
+                      <td className="py-1.5 pr-3 font-medium text-slate-700">{it.medicamento || '—'}</td>
+                      <td className="py-1.5 pr-3 text-slate-500">{it.dosis || '—'}</td>
+                      <td className="py-1.5 pr-3 text-slate-500">{it.via || '—'}</td>
+                      <td className="py-1.5 pr-3 text-slate-500">{it.frecuencia || '—'}</td>
+                      <td className="py-1.5 text-slate-500">{it.duracion || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table></div>
+              {r.indicaciones && (
+                <p className="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                  <span className="font-semibold text-slate-600">Indicaciones: </span>{r.indicaciones}
+                </p>
+              )}
+              {(r.actualizado_por) && (
+                <p className="text-[10px] text-slate-300">
+                  Última edición: {r.actualizado_por} · {fmtFechaHora(r.actualizado_en)}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}

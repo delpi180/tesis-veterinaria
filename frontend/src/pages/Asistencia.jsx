@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, LogIn, LogOut, Trash2, Stethoscope, Filter, BarChart3, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Clock, LogIn, LogOut, Trash2, Stethoscope, Filter, BarChart3, AlertTriangle, RefreshCw, Pencil, X } from 'lucide-react'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
 
@@ -26,6 +26,14 @@ function fmtHora(iso) {
   return new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
 }
 
+/** ISO → valor para <input type="datetime-local"> en hora local. */
+function aInputLocal(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
 function fmtFecha(f) {
   if (!f) return '—'
   // f viene como 'YYYY-MM-DD'; evitamos el desfase de zona horaria
@@ -50,6 +58,12 @@ export default function Asistencia() {
   const [refrescando, setRefrescando] = useState(false)
 
   const [filtros, setFiltros] = useState({ usuarioId: '', desde: haceUnaSemanaStr(), hasta: hoyStr() })
+
+  // Corrección manual de una marcación
+  const [editando,      setEditando]      = useState(null)
+  const [formEdit,      setFormEdit]      = useState({ hora_ingreso: '', hora_salida: '' })
+  const [guardandoEdit, setGuardandoEdit] = useState(false)
+  const [errorEdit,     setErrorEdit]     = useState(null)
 
   const cargarDoctores = async () => {
     const data = await api.get('/api/usuarios/doctores')
@@ -132,6 +146,39 @@ export default function Asistencia() {
       toast.success('Marcación eliminada')
     } catch (err) {
       toast.error(err.message)
+    }
+  }
+
+  // ── Corrección de horas ────────────────────────────────────────────────────
+  // Los horarios varían y no siempre se alcanza a marcar en el momento exacto,
+  // así que la recepción puede ajustar la hora real sin borrar el registro.
+  const abrirCorreccion = (reg) => {
+    setEditando(reg)
+    setFormEdit({
+      hora_ingreso: aInputLocal(reg.hora_ingreso),
+      hora_salida:  aInputLocal(reg.hora_salida),
+    })
+    setErrorEdit(null)
+  }
+
+  const guardarCorreccion = async (e) => {
+    e.preventDefault()
+    if (!formEdit.hora_ingreso) { setErrorEdit('La hora de ingreso es obligatoria.'); return }
+    if (formEdit.hora_salida && formEdit.hora_salida <= formEdit.hora_ingreso) {
+      setErrorEdit('La hora de salida debe ser posterior a la de ingreso.'); return
+    }
+    setGuardandoEdit(true); setErrorEdit(null)
+    try {
+      const payload = { hora_ingreso: new Date(formEdit.hora_ingreso).toISOString() }
+      payload.hora_salida = formEdit.hora_salida ? new Date(formEdit.hora_salida).toISOString() : null
+      await api.put(`/api/asistencia/${editando.id}`, payload)
+      toast.success('Marcación corregida')
+      setEditando(null)
+      await Promise.all([cargarHoy(), cargarReporte()])
+    } catch (err) {
+      setErrorEdit(err.message)
+    } finally {
+      setGuardandoEdit(false)
     }
   }
 
@@ -294,10 +341,16 @@ export default function Asistencia() {
                       {r.horas_trabajadas != null ? `${r.horas_trabajadas} h` : '—'}
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <button onClick={() => eliminar(r)} title="Eliminar"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => abrirCorreccion(r)} title="Corregir horas"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => eliminar(r)} title="Eliminar"
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -307,6 +360,64 @@ export default function Asistencia() {
         </section>
 
       </main>
+
+      {/* ── Corregir horas de una marcación ─────────────────────────────── */}
+      {editando && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setEditando(null) }}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">Corregir marcación</p>
+                <p className="text-xs text-slate-400 truncate">
+                  {editando.usuario_nombre ?? `#${editando.usuario_id}`} · {fmtFecha(editando.fecha)}
+                </p>
+              </div>
+              <button onClick={() => setEditando(null)}
+                className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400 shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={guardarCorreccion}>
+              <div className="px-5 py-4 flex flex-col gap-4">
+                <p className="text-xs text-slate-500">
+                  Ajusta la hora real de entrada y salida cuando el horario varíe o
+                  no se haya alcanzado a marcar en el momento.
+                </p>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-slate-600">
+                    Hora de ingreso <span className="text-rose-500">*</span>
+                  </label>
+                  <input type="datetime-local" className={inputCls} value={formEdit.hora_ingreso}
+                    onChange={e => setFormEdit(f => ({ ...f, hora_ingreso: e.target.value }))} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-slate-600">Hora de salida</label>
+                  <input type="datetime-local" className={inputCls} value={formEdit.hora_salida}
+                    onChange={e => setFormEdit(f => ({ ...f, hora_salida: e.target.value }))} />
+                  <span className="text-[11px] text-slate-400">
+                    Déjala vacía si el doctor sigue en turno.
+                  </span>
+                </div>
+                {errorEdit && (
+                  <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">{errorEdit}</p>
+                )}
+              </div>
+              <div className="px-5 py-4 border-t border-slate-100 flex gap-3 justify-end">
+                <button type="button" onClick={() => setEditando(null)}
+                  className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+                  Cancelar
+                </button>
+                <button type="submit" disabled={guardandoEdit}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+                  {guardandoEdit ? 'Guardando…' : 'Guardar corrección'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

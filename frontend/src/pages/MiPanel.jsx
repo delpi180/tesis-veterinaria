@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Calendar, PawPrint, Syringe, FileText, Clock, LogIn, LogOut, ClipboardList, RefreshCw,
+  Calendar, PawPrint, Syringe, FileText, Clock, LogIn, LogOut, ClipboardList, RefreshCw, IdCard,
 } from 'lucide-react'
 import { api, getNombre } from '../services/api'
-import { useToast } from '../components/Toast'
 
 const DIAS = [
   ['lun', 'Lun'], ['mar', 'Mar'], ['mie', 'Mié'], ['jue', 'Jue'],
@@ -42,7 +41,6 @@ function Card({ title, Icon, count, children }) {
 
 export default function MiPanel() {
   const navigate = useNavigate()
-  const toast = useToast()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refrescando, setRefrescando] = useState(false)
@@ -73,29 +71,8 @@ export default function MiPanel() {
 
   const refrescar = async () => { setRefrescando(true); await cargar(true); setRefrescando(false) }
 
-  const marcarIngreso = async () => {
-    try {
-      await api.post('/api/asistencia/ingreso', { usuario_id: data.doctor.id })
-      toast.success('Ingreso registrado con éxito.')
-      await cargar(true)
-    } catch (e) {
-      toast.error(e.message)
-    }
-  }
-
-  const marcarSalida = async () => {
-    if (!data.asistencia_hoy.id) {
-      toast.error('No se encontró la marcación activa.')
-      return
-    }
-    try {
-      await api.post(`/api/asistencia/${data.asistencia_hoy.id}/salida`)
-      toast.success('Salida registrada con éxito.')
-      await cargar(true)
-    } catch (e) {
-      toast.error(e.message)
-    }
-  }
+  // La marcación de asistencia la registra la recepción (es quien controla los
+  // horarios de ingreso/salida, que además varían). Aquí el doctor solo la consulta.
 
   const nombre = getNombre() || 'Doctor'
   const hoy = new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -109,10 +86,18 @@ export default function MiPanel() {
           <h1 className="text-xl font-bold text-slate-800">Mi panel — {nombre}</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{hoy}</p>
         </div>
-        <button onClick={refrescar} disabled={refrescando}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          {data?.doctor?.id && (
+            <button onClick={() => navigate(`/usuarios/${data.doctor.id}/perfil`)}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition">
+              <IdCard className="w-4 h-4" /> Ver mi perfil
+            </button>
+          )}
+          <button onClick={refrescar} disabled={refrescando}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+            <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 px-4 md:px-6 py-4 md:py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
@@ -152,31 +137,15 @@ export default function MiPanel() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  {/* Si no ha marcado ingreso */}
-                  {!data.asistencia_hoy.marcado && (
-                    <button
-                      onClick={marcarIngreso}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg text-sm transition shadow"
-                    >
-                      <LogIn className="w-4 h-4" /> Registrar Ingreso
-                    </button>
-                  )}
-                  {/* Si marcó ingreso y no ha marcado salida */}
-                  {data.asistencia_hoy.marcado && !data.asistencia_hoy.hora_salida && (
-                    <button
-                      onClick={marcarSalida}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg text-sm transition shadow"
-                    >
-                      <LogOut className="w-4 h-4" /> Registrar Salida
-                    </button>
-                  )}
-                  {/* Si ya marcó entrada y salida */}
-                  {data.asistencia_hoy.marcado && data.asistencia_hoy.hora_salida && (
-                    <div className="w-full sm:w-auto text-xs text-slate-400 font-semibold bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-center">
-                      Marcación del día completa
-                    </div>
-                  )}
+                {/* La marcación la registra la recepción, que es quien controla
+                    los horarios de ingreso y salida (y los ajusta cuando varían).
+                    Aquí el doctor solo consulta cómo quedó la suya. */}
+                <div className="w-full sm:w-auto text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  {data.asistencia_hoy.marcado && data.asistencia_hoy.hora_salida
+                    ? 'Marcación del día completa.'
+                    : data.asistencia_hoy.marcado
+                      ? 'Tu ingreso ya fue registrado por recepción.'
+                      : 'Recepción registra tu ingreso y salida.'}
                 </div>
               </div>
 

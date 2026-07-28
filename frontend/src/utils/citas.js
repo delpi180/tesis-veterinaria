@@ -1,4 +1,5 @@
 // Estilos y helpers compartidos para citas/turnos — usados por Turnos y el panel de mascota.
+import { clinicaActual } from '../services/clinica'
 
 export const ESTADO_CITA = {
   pendiente:  { pill: 'bg-amber-100 text-amber-700',     dot: 'bg-amber-500'   },
@@ -21,16 +22,18 @@ export function waRecordatorio(telefono, clienteNombre, mascotaNombre, cita) {
   const tel  = (telefono || '').replace(/\D/g, '')
   const intl = tel.length === 9 ? `51${tel}` : tel   // Perú: móvil de 9 dígitos
 
+  const clinica = clinicaActual().nombre
+
   let msg
   if (cita?.fecha_hora) {
     const f     = new Date(cita.fecha_hora)
     const fecha = f.toLocaleDateString('es-PE')
     const hora  = f.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
     msg = `Hola ${clienteNombre}, le recordamos que ${mascotaNombre} tiene una cita en ` +
-          `Veterinaria Los Pinos el ${fecha} a las ${hora}` +
+          `${clinica} el ${fecha} a las ${hora}` +
           `${cita.motivo ? ` (${cita.motivo})` : ''}. ¡Lo esperamos!`
   } else {
-    msg = `Hola ${clienteNombre}, le escribimos de Veterinaria Los Pinos para recordarle ` +
+    msg = `Hola ${clienteNombre}, le escribimos de ${clinica} para recordarle ` +
           `el control de ${mascotaNombre}. ¿Desea agendar una cita?`
   }
   return `https://wa.me/${intl}?text=${encodeURIComponent(msg)}`

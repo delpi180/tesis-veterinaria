@@ -3,8 +3,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Cell,
 } from 'recharts'
-import { CheckCircle, ClipboardList, BarChart3, Cpu, Check, RefreshCw, Sparkles, Zap, Timer, Clock, Target, Hand, Gauge, ShieldCheck, AlertTriangle, Sigma } from 'lucide-react'
+import { CheckCircle, ClipboardList, BarChart3, Cpu, Check, RefreshCw, Sparkles, Zap, Timer, Clock, Target, Hand, Gauge, ShieldCheck, AlertTriangle, Sigma, Download } from 'lucide-react'
 import { api } from '../services/api'
+import { exportarCSV } from '../utils/exportUtils'
 
 // Color del badge de Cronbach's alpha según fiabilidad
 const alphaColor = (a) =>
@@ -203,7 +204,21 @@ function TiemposPanel() {
         <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
           <Timer className="w-4 h-4 text-purple-500" />
           <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Historial de registros</h4>
-          <span className="ml-auto text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{d.recientes.length}</span>
+          <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{d.recientes.length}</span>
+          <button
+            onClick={() => {
+              if (d.recientes.length === 0) return
+              exportarCSV(
+                'Tiempos de documentacion manual vs IA',
+                ['ID', 'Fecha', 'Paciente', 'Metodo', 'Segundos'],
+                d.recientes.map(h => [h.id, h.fecha ? new Date(h.fecha).toISOString() : '', h.paciente, h.metodo === 'ia' ? 'IA' : 'Manual', h.segundos]),
+              )
+            }}
+            disabled={d.recientes.length === 0}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50"
+          >
+            <Download className="w-3.5 h-3.5" /> Excel
+          </button>
         </div>
         <div className="max-h-72 overflow-y-auto">
           <div className="overflow-x-auto"><table className="w-full text-sm">
@@ -893,19 +908,63 @@ export default function Mediciones() {
         {tabActiva === 'resultados' && (
           <div className="flex flex-col gap-5">
 
-            {/* Barra superior: título + botón actualizar */}
-            <div className="flex items-center justify-between">
+            {/* Barra superior: título + exportar + botón actualizar */}
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <p className="text-sm font-semibold text-slate-700">
                 Resultados de evaluación — SUS &amp; TAM
               </p>
-              <button
-                onClick={cargarResultados}
-                disabled={loadRes}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition disabled:opacity-50"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadRes ? 'animate-spin' : ''}`} />
-                Actualizar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (susList.length === 0) return
+                    exportarCSV(
+                      'Encuesta SUS - respuestas detalladas',
+                      ['ID', 'Evaluador', 'Rol', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'Puntaje SUS (0-100)', 'Fecha'],
+                      susList.map(s => [
+                        s.evaluador_id,
+                        evMap[s.evaluador_id]?.nombre ?? `Evaluador ${s.evaluador_id}`,
+                        evMap[s.evaluador_id]?.rol ?? '—',
+                        s.p1, s.p2, s.p3, s.p4, s.p5, s.p6, s.p7, s.p8, s.p9, s.p10,
+                        s.puntaje,
+                        s.creado_en ? new Date(s.creado_en).toISOString() : '',
+                      ]),
+                    )
+                  }}
+                  disabled={susList.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" /> SUS (Excel)
+                </button>
+                <button
+                  onClick={() => {
+                    if (tamList.length === 0) return
+                    exportarCSV(
+                      'Encuesta TAM - respuestas detalladas',
+                      ['ID', 'Evaluador', 'Rol', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8', 'p9', 'p10', 'p11', 'p12', 'Utilidad percibida', 'Facilidad de uso', 'Intencion de uso', 'Fecha'],
+                      tamList.map(t => [
+                        t.evaluador_id,
+                        evMap[t.evaluador_id]?.nombre ?? `Evaluador ${t.evaluador_id}`,
+                        evMap[t.evaluador_id]?.rol ?? '—',
+                        t.p1, t.p2, t.p3, t.p4, t.p5, t.p6, t.p7, t.p8, t.p9, t.p10, t.p11, t.p12,
+                        t.util_percibida, t.facilidad_uso, t.intencion_uso,
+                        t.creado_en ? new Date(t.creado_en).toISOString() : '',
+                      ]),
+                    )
+                  }}
+                  disabled={tamList.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-sky-700 border border-sky-200 rounded-lg hover:bg-sky-50 transition disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" /> TAM (Excel)
+                </button>
+                <button
+                  onClick={cargarResultados}
+                  disabled={loadRes}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-100 transition disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadRes ? 'animate-spin' : ''}`} />
+                  Actualizar
+                </button>
+              </div>
             </div>
 
             {/* Error global */}

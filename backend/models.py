@@ -16,6 +16,11 @@ class Usuario(Base):
     activo        = Column(Boolean, default=True)
     creado_en     = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    # Datos personales / de perfil
+    dni          = Column(String(15))
+    telefono     = Column(String(20))
+    especialidad = Column(String(100))    # solo aplica a veterinarios
+
     # Perfil laboral del doctor (lo asigna la administradora)
     hora_entrada   = Column(String(5))    # horario de ingreso pactado, "HH:MM"
     dias_laborales = Column(String(40))   # CSV de días: "lun,mar,mie,jue,vie"
@@ -77,6 +82,11 @@ class Paciente(Base):
         back_populates="paciente",
         cascade="all, delete-orphan",
     )
+    recetas = relationship(
+        "Receta",
+        back_populates="paciente",
+        cascade="all, delete-orphan",
+    )
 
 
 class DocumentoPaciente(Base):
@@ -90,6 +100,7 @@ class DocumentoPaciente(Base):
 
     id          = Column(Integer, primary_key=True)
     paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
+    registro_id = Column(Integer, ForeignKey("registros_clinicos.id"), nullable=True)
     nombre      = Column(String(255), nullable=False)   # nombre original del archivo
     categoria   = Column(String(30), default="otro")    # radiografia | analisis | receta | otro
     descripcion = Column(Text)
@@ -100,26 +111,60 @@ class DocumentoPaciente(Base):
     creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     paciente = relationship("Paciente", back_populates="documentos")
+    registro = relationship("RegistroClinico", back_populates="documentos")
 
 
 class RegistroClinico(Base):
-    """Registros complementarios simples por mascota: antiparasitarios y estética.
+    """Registros complementarios simples por mascota: antiparasitarios, estética
+    y métodos complementarios (radiografías, análisis, ecografías, etc.).
 
     Son eventos ligeros (fecha + producto/servicio + notas), separados de la
-    historia clínica formal. El campo `tipo` distingue la categoría.
+    historia clínica formal. El campo `tipo` distingue la categoría. Los de
+    tipo 'complementario' pueden llevar uno o más archivos adjuntos (el
+    estudio o informe correspondiente) vía `documentos`.
     """
     __tablename__ = "registros_clinicos"
 
     id          = Column(Integer, primary_key=True)
     paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
-    tipo        = Column(String(20), nullable=False)   # antiparasitario | estetica
+    tipo        = Column(String(20), nullable=False)   # antiparasitario | estetica | complementario
     fecha       = Column(Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
     producto    = Column(String(200))                  # producto aplicado / servicio realizado
     notas       = Column(Text)
     registrado_por = Column(String(50))
     creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    documentos = relationship("DocumentoPaciente", back_populates="registro")
+
     paciente = relationship("Paciente", back_populates="registros")
+
+
+class Receta(Base):
+    """Receta médica veterinaria: el tratamiento formal que el doctor indica
+    para un paciente (medicamentos, dosis, vía, frecuencia y duración),
+    separada de la historia clínica para poder imprimirse/entregarse sola.
+    """
+    __tablename__ = "recetas"
+
+    id           = Column(Integer, primary_key=True)
+    paciente_id  = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
+    fecha        = Column(Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
+    diagnostico  = Column(Text)          # motivo / diagnóstico que sustenta el tratamiento
+    indicaciones = Column(Text)          # indicaciones generales para el propietario
+    items        = Column(JSONB)         # [{medicamento, dosis, via, frecuencia, duracion}]
+    creado_en    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    # Trazabilidad: quién la emitió (siempre un veterinario) y último cambio
+    veterinario_id  = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    actualizado_por = Column(String(50))
+    actualizado_en  = Column(DateTime(timezone=True))
+
+    paciente    = relationship("Paciente", back_populates="recetas")
+    veterinario = relationship("Usuario")
+
+    @property
+    def veterinario_nombre(self):
+        return self.veterinario.nombre if self.veterinario else None
 
 
 class HistoriaClinica(Base):
@@ -198,6 +243,11 @@ class Cita(Base):
     estado      = Column(String(20), default="pendiente")
     notas       = Column(Text)
     creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    # Trazabilidad: quién agendó el turno y quién hizo el último cambio (usuario.usuario)
+    creado_por      = Column(String(50))
+    actualizado_por = Column(String(50))
+    actualizado_en  = Column(DateTime(timezone=True))
 
     # Doctor veterinario asignado al turno (opcional)
     veterinario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
@@ -449,4 +499,29 @@ class SseEvent(Base):
     id        = Column(Integer, primary_key=True)
     message   = Column(String(100), nullable=False)
     timestamp = Column(Float, nullable=False, index=True)
+
+
+class ConfiguracionClinica(Base):
+    """Datos de la clínica que usa el sistema (una sola fila, id=1).
+
+    Antes el nombre "Veterinaria Los Pinos" estaba escrito a mano en el login,
+    el menú, las boletas, las historias en PDF y hasta en los mensajes de
+    WhatsApp: instalar el sistema en otra clínica obligaba a editar el código.
+    Con esto, la misma versión sirve para cualquier clínica: se configura desde
+    la aplicación.
+    """
+    __tablename__ = "configuracion_clinica"
+
+    id        = Column(Integer, primary_key=True)
+    nombre    = Column(String(120), nullable=False, default="Mi Veterinaria")
+    # Datos que aparecen en boletas y comprobantes
+    ruc       = Column(String(20))
+    direccion = Column(String(200))
+    telefono  = Column(String(30))
+    email     = Column(String(120))
+    # Texto libre al pie de los comprobantes (ej. "Gracias por su preferencia")
+    pie_comprobante = Column(String(200))
+
+    actualizado_en  = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    actualizado_por = Column(String(50))
 

@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Asistencia, Usuario
-from schemas import AsistenciaIngresoReq, AsistenciaOut
-from core.deps import solo_admin, usuario_actual
+from schemas import AsistenciaIngresoReq, AsistenciaOut, AsistenciaUpdate
+from core.deps import solo_admin
 
 router = APIRouter(prefix="/api/asistencia", tags=["Asistencia"])
 
@@ -30,22 +30,11 @@ def marcar_ingreso(
     payload: AsistenciaIngresoReq,
     request: Request,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(usuario_actual),
 ):
-    user_rol = getattr(request.state, "rol", None)
-    if user_rol == "recepcionista":
-        pass
-    elif user_rol == "veterinario":
-        if not usuario or usuario.id != payload.usuario_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No está autorizado para registrar la asistencia de otro usuario.",
-            )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Rol no autorizado para registrar asistencia.",
-        )
+    # El control de asistencia lo lleva la recepción: es quien ve entrar y salir
+    # al personal y quien ajusta los horarios cuando varían. El doctor consulta
+    # su marcación en "Mi panel", pero no la registra él mismo.
+    solo_admin(request)
 
     doctor = db.get(Usuario, payload.usuario_id)
     if not doctor:
@@ -89,7 +78,6 @@ def marcar_salida(
     asistencia_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(usuario_actual),
 ):
     asistencia = db.get(Asistencia, asistencia_id)
     if not asistencia:
@@ -97,20 +85,8 @@ def marcar_salida(
     if asistencia.hora_salida is not None:
         raise HTTPException(status_code=409, detail="Esta marcación ya tiene salida registrada.")
 
-    user_rol = getattr(request.state, "rol", None)
-    if user_rol == "recepcionista":
-        pass
-    elif user_rol == "veterinario":
-        if not usuario or usuario.id != asistencia.usuario_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No está autorizado para registrar la salida de otro usuario.",
-            )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Rol no autorizado para registrar asistencia.",
-        )
+    # Igual que el ingreso: la salida la registra la recepción.
+    solo_admin(request)
 
     asistencia.hora_salida = _ahora_local()
     db.commit()
@@ -125,6 +101,8 @@ def listar_asistencia(
     usuario_id: Optional[int] = Query(None),
     desde: Optional[date] = Query(None, description="Fecha inicio YYYY-MM-DD"),
     hasta: Optional[date] = Query(None, description="Fecha fin YYYY-MM-DD"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(2000, ge=1, le=5000),
     db: Session = Depends(get_db),
 ):
     solo_admin(request)
@@ -136,7 +114,10 @@ def listar_asistencia(
         q = q.filter(Asistencia.fecha >= desde)
     if hasta:
         q = q.filter(Asistencia.fecha <= hasta)
-    return q.order_by(Asistencia.fecha.desc(), Asistencia.hora_ingreso.desc()).all()
+    return (
+        q.order_by(Asistencia.fecha.desc(), Asistencia.hora_ingreso.desc())
+        .offset(skip).limit(limit).all()
+    )
 
 
 @router.get("/resumen")
@@ -186,6 +167,51 @@ def resumen_asistencia(
     for a in salida:
         a["total_horas"] = round(a["total_horas"], 2)
     return salida
+
+
+@router.put("/{asistencia_id}", response_model=AsistenciaOut)
+def corregir_asistencia(
+    asistencia_id: int,
+    payload: AsistenciaUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Ajusta la hora real de ingreso/salida de una marcación.
+
+    Los horarios del personal varían y la recepción no siempre alcanza a marcar
+    en el momento exacto. Antes la única salida era borrar la marcación y
+    volver a crearla (perdiendo el registro); ahora se corrige.
+    """
+    solo_admin(request)
+    asistencia = db.get(Asistencia, asistencia_id)
+    if not asistencia:
+        raise HTTPException(status_code=404, detail="Marcación no encontrada")
+
+    datos = payload.model_dump(exclude_unset=True)
+
+    # Validar contra los valores que quedarán finalmente (uno puede venir en el
+    # payload y el otro ya estar guardado).
+    ingreso_final = datos.get("hora_ingreso", asistencia.hora_ingreso)
+    salida_final  = datos.get("hora_salida",  asistencia.hora_salida)
+    if ingreso_final and salida_final and salida_final <= ingreso_final:
+        raise HTTPException(
+            status_code=422,
+            detail="La hora de salida debe ser posterior a la de ingreso.",
+        )
+
+    for campo, valor in datos.items():
+        setattr(asistencia, campo, valor)
+    # La fecha laboral sigue a la hora de ingreso (hora de Perú)
+    if asistencia.hora_ingreso:
+        local = asistencia.hora_ingreso
+        if local.tzinfo is None:
+            local = local.replace(tzinfo=timezone.utc)
+        asistencia.fecha = local.astimezone(PERU_TZ).date()
+
+    db.commit()
+    db.refresh(asistencia)
+    request.state.actividad_detalle = asistencia.usuario.nombre if asistencia.usuario else None
+    return asistencia
 
 
 @router.delete("/{asistencia_id}", status_code=status.HTTP_204_NO_CONTENT)

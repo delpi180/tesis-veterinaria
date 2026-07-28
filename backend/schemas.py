@@ -237,10 +237,13 @@ class ClienteOut(ClienteBase):
 # Cita
 # ---------------------------------------------------------------------------
 
+ESTADO_CITA = Literal["pendiente", "confirmada", "atendida", "cancelada"]
+
+
 class CitaBase(BaseModel):
     fecha_hora: datetime
     motivo:     Optional[str] = None
-    estado:     str = "pendiente"
+    estado:     ESTADO_CITA = "pendiente"
     notas:      Optional[str] = None
 
 
@@ -252,7 +255,7 @@ class CitaCreate(CitaBase):
 class CitaUpdate(BaseModel):
     fecha_hora:     Optional[datetime] = None
     motivo:         Optional[str] = None
-    estado:         Optional[str] = None
+    estado:         Optional[ESTADO_CITA] = None
     notas:          Optional[str] = None
     veterinario_id: Optional[int] = None
 
@@ -261,6 +264,9 @@ class CitaResponse(CitaBase):
     id:                 int
     paciente_id:        int
     creado_en:          datetime
+    creado_por:         Optional[str] = None
+    actualizado_por:    Optional[str] = None
+    actualizado_en:     Optional[datetime] = None
     veterinario_id:     Optional[int] = None
     veterinario_nombre: Optional[str] = None
     paciente_nombre:    Optional[str] = None
@@ -636,14 +642,40 @@ class InventarioAplicarReq(BaseModel):
 # Usuarios / Autenticación
 # ---------------------------------------------------------------------------
 
+def _validar_dni_telefono(dni, telefono):
+    if dni is not None and dni.strip():
+        d = dni.strip()
+        if not (d.isdigit() and len(d) == 8):
+            raise ValueError("El DNI debe tener exactamente 8 dígitos")
+        dni = d
+    else:
+        dni = None
+    if telefono is not None and telefono.strip():
+        t = ''.join(ch for ch in telefono if ch.isdigit())
+        if not (6 <= len(t) <= 12):
+            raise ValueError("El teléfono debe tener entre 6 y 12 dígitos")
+        telefono = t
+    else:
+        telefono = None
+    return dni, telefono
+
+
 class UsuarioCreate(BaseModel):
     usuario:        str = Field(min_length=3, max_length=50)
     nombre:         str
     password:       str = Field(min_length=4)
     rol:            Literal['veterinario', 'recepcionista'] = 'veterinario'
     activo:         bool = True
+    dni:            Optional[str] = None
+    telefono:       Optional[str] = None
+    especialidad:   Optional[str] = None
     hora_entrada:   Optional[str] = None
     dias_laborales: Optional[str] = None
+
+    @model_validator(mode='after')
+    def _validar_contacto(self):
+        self.dni, self.telefono = _validar_dni_telefono(self.dni, self.telefono)
+        return self
 
 
 class UsuarioUpdate(BaseModel):
@@ -651,8 +683,16 @@ class UsuarioUpdate(BaseModel):
     password:       Optional[str] = Field(None, min_length=4)
     rol:            Optional[Literal['veterinario', 'recepcionista']] = None
     activo:         Optional[bool] = None
+    dni:            Optional[str] = None
+    telefono:       Optional[str] = None
+    especialidad:   Optional[str] = None
     hora_entrada:   Optional[str] = None
     dias_laborales: Optional[str] = None
+
+    @model_validator(mode='after')
+    def _validar_contacto(self):
+        self.dni, self.telefono = _validar_dni_telefono(self.dni, self.telefono)
+        return self
 
 
 class UsuarioOut(BaseModel):
@@ -662,6 +702,9 @@ class UsuarioOut(BaseModel):
     rol:            str
     activo:         bool
     creado_en:      datetime
+    dni:            Optional[str] = None
+    telefono:       Optional[str] = None
+    especialidad:   Optional[str] = None
     hora_entrada:   Optional[str] = None
     dias_laborales: Optional[str] = None
 
@@ -700,6 +743,7 @@ class DocumentoOut(BaseModel):
     """Metadatos del documento (sin los bytes; el contenido se baja aparte)."""
     id:           int
     paciente_id:  int
+    registro_id:  Optional[int] = None
     nombre:       str
     categoria:    str
     descripcion:  Optional[str] = None
@@ -731,6 +775,49 @@ class RegistroClinicoOut(BaseModel):
     notas:          Optional[str] = None
     registrado_por: Optional[str] = None
     creado_en:      datetime
+    documentos:     list[DocumentoOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Recetas (tratamiento formal que indica el veterinario)
+# ---------------------------------------------------------------------------
+
+class RecetaItem(BaseModel):
+    medicamento: Optional[str] = None
+    dosis:       Optional[str] = None
+    via:         Optional[str] = None
+    frecuencia:  Optional[str] = None
+    duracion:    Optional[str] = None
+
+
+class RecetaCreate(BaseModel):
+    fecha:        Optional[date] = None
+    diagnostico:  Optional[str] = None
+    indicaciones: Optional[str] = None
+    items:        list[RecetaItem] = []
+
+
+class RecetaUpdate(BaseModel):
+    fecha:        Optional[date] = None
+    diagnostico:  Optional[str] = None
+    indicaciones: Optional[str] = None
+    items:        Optional[list[RecetaItem]] = None
+
+
+class RecetaOut(BaseModel):
+    id:                 int
+    paciente_id:        int
+    fecha:              date
+    diagnostico:        Optional[str] = None
+    indicaciones:       Optional[str] = None
+    items:              list[RecetaItem] = []
+    veterinario_id:     Optional[int] = None
+    veterinario_nombre: Optional[str] = None
+    creado_en:          datetime
+    actualizado_por:    Optional[str] = None
+    actualizado_en:     Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -739,9 +826,69 @@ class RegistroClinicoOut(BaseModel):
 # Asistencia (control de marcaciones de personal)
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Configuración de la clínica (datos que salen en boletas y comprobantes)
+# ---------------------------------------------------------------------------
+
+class ConfiguracionOut(BaseModel):
+    nombre:          str
+    ruc:             Optional[str] = None
+    direccion:       Optional[str] = None
+    telefono:        Optional[str] = None
+    email:           Optional[str] = None
+    pie_comprobante: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConfiguracionUpdate(BaseModel):
+    nombre:          Optional[str] = Field(None, min_length=2, max_length=120)
+    ruc:             Optional[str] = None
+    direccion:       Optional[str] = None
+    telefono:        Optional[str] = None
+    email:           Optional[str] = None
+    pie_comprobante: Optional[str] = None
+
+    @model_validator(mode='after')
+    def _validar(self):
+        if self.ruc is not None and self.ruc.strip():
+            ruc = "".join(ch for ch in self.ruc if ch.isdigit())
+            # RUC peruano: 11 dígitos
+            if len(ruc) != 11:
+                raise ValueError("El RUC debe tener 11 dígitos")
+            self.ruc = ruc
+        else:
+            self.ruc = None
+        if self.email is not None and self.email.strip():
+            if "@" not in self.email or "." not in self.email.split("@")[-1]:
+                raise ValueError("El correo no tiene un formato válido")
+            self.email = self.email.strip()
+        else:
+            self.email = None
+        return self
+
+
 class AsistenciaIngresoReq(BaseModel):
     usuario_id: int
     notas:      Optional[str] = None
+
+
+class AsistenciaUpdate(BaseModel):
+    """Corrección manual de una marcación (solo la recepción).
+
+    Los horarios del personal varían y no siempre se alcanza a marcar en el
+    momento exacto: esto permite ajustar la hora real de ingreso o salida sin
+    tener que borrar el registro y volver a crearlo.
+    """
+    hora_ingreso: Optional[datetime] = None
+    hora_salida:  Optional[datetime] = None
+    notas:        Optional[str] = None
+
+    @model_validator(mode='after')
+    def _validar_orden(self):
+        if self.hora_ingreso and self.hora_salida and self.hora_salida <= self.hora_ingreso:
+            raise ValueError("La hora de salida debe ser posterior a la de ingreso")
+        return self
 
 
 class AsistenciaOut(BaseModel):

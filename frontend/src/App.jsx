@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import { ToastProvider } from './components/Toast'
+import { ClinicaProvider } from './services/clinica'
 import Login from './pages/Login'
 import Inicio from './pages/Inicio'
 import MiPanel from './pages/MiPanel'
@@ -14,6 +15,7 @@ import Servicios from './pages/Servicios'
 import Ventas from './pages/Ventas'
 import Caja from './pages/Caja'
 import Usuarios from './pages/Usuarios'
+import PerfilDoctor from './pages/PerfilDoctor'
 import Asistencia from './pages/Asistencia'
 import Actividad from './pages/Actividad'
 import Reportes from './pages/Reportes'
@@ -66,6 +68,7 @@ function AppProtegida() {
           <Route path="/recepcion"              element={<SoloAdmin><PanelRecepcion /></SoloAdmin>} />
           <Route path="/vacunacion"             element={<SoloAdmin><Vacunacion /></SoloAdmin>} />
           <Route path="/usuarios"               element={<SoloAdmin><Usuarios /></SoloAdmin>} />
+          <Route path="/usuarios/:usuarioId/perfil" element={<PerfilDoctor />} />
           <Route path="/mediciones"             element={<Mediciones />} />
           <Route path="*"                       element={<Navigate to="/" replace />} />
         </Routes>
@@ -77,12 +80,14 @@ function AppProtegida() {
 export default function App() {
   return (
     <BrowserRouter>
-      <ToastProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/*"     element={<AppProtegida />} />
-        </Routes>
-      </ToastProvider>
+      <ClinicaProvider>
+        <ToastProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/*"     element={<AppProtegida />} />
+          </Routes>
+        </ToastProvider>
+      </ClinicaProvider>
     </BrowserRouter>
   )
 }

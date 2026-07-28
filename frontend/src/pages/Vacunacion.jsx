@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Syringe, Search, AlertTriangle, Clock, CheckCircle2, MessageCircle, Download, RefreshCw } from 'lucide-react'
 import { api } from '../services/api'
+import Paginacion from '../components/Paginacion'
+import { clinicaActual } from '../services/clinica'
+
+const POR_PAGINA = 50
 
 const fmtFecha = (iso) => {
   if (!iso) return '—'
@@ -26,7 +30,7 @@ const FILTROS = [
 const waLink = (tel, propietario, paciente, vacuna) => {
   const num = (tel || '').replace(/\D/g, '')
   const intl = num.length === 9 ? `51${num}` : num
-  const msg = `Hola ${propietario || ''}, le recordamos que ${paciente || 'su mascota'} tiene pendiente la vacuna *${vacuna}* en Veterinaria Los Pinos. ¡Le esperamos!`
+  const msg = `Hola ${propietario || ''}, le recordamos que ${paciente || 'su mascota'} tiene pendiente la vacuna *${vacuna}* en ${clinicaActual().nombre}. ¡Le esperamos!`
   return `https://wa.me/${intl}?text=${encodeURIComponent(msg)}`
 }
 
@@ -45,6 +49,7 @@ export default function Vacunacion() {
   const [refrescando, setRefrescando] = useState(false)
   const [filtro, setFiltro] = useState('todas')
   const [busq, setBusq] = useState('')
+  const [pagina, setPagina] = useState(1)
 
   const cargar = (silencioso = false) => {
     if (!silencioso) setLoading(true)
@@ -67,6 +72,11 @@ export default function Vacunacion() {
     }
     return true
   })
+
+  // Reinicia a la página 1 cuando cambia el filtro o la búsqueda
+  useEffect(() => { setPagina(1) }, [filtro, busq])
+  const inicio = (pagina - 1) * POR_PAGINA
+  const paginados = filtrados.slice(inicio, inicio + POR_PAGINA)
 
   const vencidas = items.filter(v => v.estado === 'vencida').length
   const proximas = items.filter(v => v.estado === 'proxima').length
@@ -168,7 +178,7 @@ export default function Vacunacion() {
                 </tr>
               </thead>
               <tbody>
-                {filtrados.map((v, i) => {
+                {paginados.map((v, i) => {
                   const est = ESTADO[v.estado] ?? ESTADO.null
                   return (
                     <tr key={i} className={`border-b border-slate-50 hover:bg-slate-50/60 transition ${i % 2 ? 'bg-slate-50/30' : ''}`}>
@@ -203,6 +213,7 @@ export default function Vacunacion() {
               </tbody>
             </table></div>
           )}
+          <Paginacion pagina={pagina} total={filtrados.length} porPagina={POR_PAGINA} onCambiar={setPagina} etiqueta="registros" />
         </section>
       </main>
     </div>

@@ -1,8 +1,10 @@
 import asyncio
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
@@ -69,8 +71,20 @@ async def poll_sse_events():
     except Exception as e:
         print(f"[SSE] Error de pruning inicial: {e}")
 
+    ultima_purga = last_timestamp
+
     while True:
         await asyncio.sleep(1.0)
+
+        # Si nadie está viendo la agenda, no hay a quién notificar: no se
+        # consulta la BD. Antes este bucle hacía ~86.400 consultas al día aun
+        # con el sistema vacío, gastando cuota del plan gratuito sin motivo.
+        # Se adelanta la marca de tiempo para que, al reconectarse alguien, no
+        # le llegue de golpe una ráfaga de avisos viejos.
+        if not manager.active_connections:
+            last_timestamp = time.time()
+            continue
+
         try:
             with SessionLocal() as db:
                 # Consultar eventos más nuevos que el último marca de tiempo registrado
@@ -85,10 +99,38 @@ async def poll_sse_events():
                         # Broadcast local
                         manager._local_broadcast(event.message)
                         last_timestamp = max(last_timestamp, event.timestamp)
-        except Exception as e:
+
+                # Purga periódica (cada 5 min). Antes solo se purgaba una vez,
+                # al arrancar: en un proceso de larga vida la tabla crecía sin
+                # tope hasta el siguiente reinicio.
+                ahora = time.time()
+                if ahora - ultima_purga > 300:
+                    db.execute(delete(SseEvent).where(SseEvent.timestamp < ahora - 60.0))
+                    db.commit()
+                    ultima_purga = ahora
+        except Exception:
             # Silenciar errores de BD temporales para evitar caída de la tarea
             pass
 
+
+
+def _verificar_choque(db: Session, veterinario_id: Optional[int], fecha_hora, excluir_id: Optional[int] = None):
+    """Control real (no solo aviso en el frontend): un mismo doctor no puede
+    tener dos turnos activos (no cancelados) a la misma fecha y hora exacta."""
+    if not veterinario_id:
+        return
+    q = db.query(Cita).filter(
+        Cita.veterinario_id == veterinario_id,
+        Cita.fecha_hora == fecha_hora,
+        Cita.estado != "cancelada",
+    )
+    if excluir_id is not None:
+        q = q.filter(Cita.id != excluir_id)
+    if q.first() is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Este doctor ya tiene un turno activo a esa misma fecha y hora.",
+        )
 
 
 @router.post("/", response_model=CitaResponse, status_code=status.HTTP_201_CREATED)
@@ -106,7 +148,10 @@ def crear_cita(
     # a él automáticamente → así el turno SIEMPRE aparece en su "Mi panel".
     if datos.get("veterinario_id") is None and usuario and usuario.rol == "veterinario":
         datos["veterinario_id"] = usuario.id
-    cita = Cita(**datos)
+    _verificar_choque(db, datos.get("veterinario_id"), datos["fecha_hora"])
+    ahora = datetime.now(timezone.utc)
+    quien = usuario.usuario if usuario else None
+    cita = Cita(**datos, creado_por=quien, actualizado_por=quien, actualizado_en=ahora)
     db.add(cita)
     db.commit()
     db.refresh(cita)
@@ -115,24 +160,52 @@ def crear_cita(
     return cita
 
 
-@router.get("/", response_model=list[CitaResponse])
-def listar_citas(
-    paciente_id: Optional[int] = Query(None),
-    estado: Optional[str] = Query(None),
-    veterinario_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db),
-):
-    q = db.query(Cita).options(
-        joinedload(Cita.paciente).joinedload(Paciente.cliente),
-        joinedload(Cita.veterinario),
-    )
+def _filtrar_citas(q, paciente_id, estado, veterinario_id, desde, hasta):
     if paciente_id is not None:
         q = q.filter(Cita.paciente_id == paciente_id)
     if estado is not None:
         q = q.filter(Cita.estado == estado)
     if veterinario_id is not None:
         q = q.filter(Cita.veterinario_id == veterinario_id)
-    return q.order_by(Cita.fecha_hora).all()
+    if desde is not None:
+        q = q.filter(Cita.fecha_hora >= datetime.combine(desde, time.min))
+    if hasta is not None:
+        q = q.filter(Cita.fecha_hora < datetime.combine(hasta, time.min) + timedelta(days=1))
+    return q
+
+
+@router.get("/", response_model=list[CitaResponse])
+def listar_citas(
+    paciente_id: Optional[int] = Query(None),
+    estado: Optional[str] = Query(None),
+    veterinario_id: Optional[int] = Query(None),
+    desde: Optional[date] = Query(None, description="Fecha inicial (inclusive)"),
+    hasta: Optional[date] = Query(None, description="Fecha final (inclusive)"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(1000, ge=1, le=2000),
+    db: Session = Depends(get_db),
+):
+    q = db.query(Cita).options(
+        joinedload(Cita.paciente).joinedload(Paciente.cliente),
+        joinedload(Cita.veterinario),
+    )
+    q = _filtrar_citas(q, paciente_id, estado, veterinario_id, desde, hasta)
+    return q.order_by(Cita.fecha_hora).offset(skip).limit(limit).all()
+
+
+@router.get("/contar")
+def contar_citas(
+    paciente_id: Optional[int] = Query(None),
+    estado: Optional[str] = Query(None),
+    veterinario_id: Optional[int] = Query(None),
+    desde: Optional[date] = Query(None),
+    hasta: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Total de citas que cumplen el filtro, para la paginación."""
+    q = db.query(func.count(Cita.id))
+    q = _filtrar_citas(q, paciente_id, estado, veterinario_id, desde, hasta)
+    return {"total": q.scalar()}
 
 
 @router.get("/stream")
@@ -164,24 +237,49 @@ def obtener_cita(cita_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{cita_id}", response_model=CitaResponse)
-def actualizar_cita(cita_id: int, payload: CitaUpdate, request: Request, db: Session = Depends(get_db)):
+def actualizar_cita(
+    cita_id: int,
+    payload: CitaUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
     cita = db.get(Cita, cita_id)
     if not cita:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
-    for campo, valor in payload.model_dump(exclude_unset=True).items():
+
+    datos = payload.model_dump(exclude_unset=True)
+    nueva_fecha = datos.get("fecha_hora", cita.fecha_hora)
+    nuevo_vet   = datos.get("veterinario_id", cita.veterinario_id)
+    if "fecha_hora" in datos or "veterinario_id" in datos:
+        _verificar_choque(db, nuevo_vet, nueva_fecha, excluir_id=cita.id)
+
+    estado_anterior = cita.estado
+    for campo, valor in datos.items():
         setattr(cita, campo, valor)
+    cita.actualizado_por = usuario.usuario if usuario else None
+    cita.actualizado_en = datetime.now(timezone.utc)
     db.commit()
     db.refresh(cita)
-    request.state.actividad_detalle = cita.paciente.nombre if cita.paciente else None
+
+    # Trazabilidad legible en la bitácora: paciente y, si cambió, el estado.
+    nombre = cita.paciente.nombre if cita.paciente else None
+    if "estado" in datos and datos["estado"] != estado_anterior:
+        request.state.actividad_detalle = f"{nombre} — estado: {estado_anterior} → {cita.estado}"
+    else:
+        request.state.actividad_detalle = nombre
     manager.broadcast("citas_updated")
     return cita
 
 
 @router.delete("/{cita_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_cita(cita_id: int, db: Session = Depends(get_db)):
+def eliminar_cita(cita_id: int, request: Request, db: Session = Depends(get_db)):
     cita = db.get(Cita, cita_id)
     if not cita:
         raise HTTPException(status_code=404, detail="Cita no encontrada")
+    nombre = cita.paciente.nombre if cita.paciente else None
+    fecha_txt = cita.fecha_hora.strftime("%d/%m/%Y %H:%M") if cita.fecha_hora else ""
     db.delete(cita)
     db.commit()
+    request.state.actividad_detalle = f"{nombre} — {fecha_txt}" if nombre else fecha_txt
     manager.broadcast("citas_updated")

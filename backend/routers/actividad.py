@@ -3,6 +3,7 @@ from datetime import datetime, time, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -23,17 +24,7 @@ def _a_fecha(s: str | None):
         return None
 
 
-@router.get("/", response_model=list[ActividadOut])
-def listar_actividad(
-    request: Request,
-    usuario: Optional[str] = Query(None),
-    desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    limite: int = Query(100, ge=1, le=500),
-    db: Session = Depends(get_db),
-):
-    solo_admin(request)
-    q = db.query(Actividad)
+def _filtrar_actividad(q, usuario, desde, hasta):
     if usuario:
         q = q.filter(Actividad.usuario == usuario)
     d_desde = _a_fecha(desde)
@@ -42,4 +33,33 @@ def listar_actividad(
         q = q.filter(Actividad.fecha >= datetime.combine(d_desde, time.min, tzinfo=timezone.utc))
     if d_hasta:
         q = q.filter(Actividad.fecha <= datetime.combine(d_hasta, time.max, tzinfo=timezone.utc))
-    return q.order_by(Actividad.fecha.desc()).limit(limite).all()
+    return q
+
+
+@router.get("/", response_model=list[ActividadOut])
+def listar_actividad(
+    request: Request,
+    usuario: Optional[str] = Query(None),
+    desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    skip: int = Query(0, ge=0),
+    limite: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    solo_admin(request)
+    q = _filtrar_actividad(db.query(Actividad), usuario, desde, hasta)
+    return q.order_by(Actividad.fecha.desc()).offset(skip).limit(limite).all()
+
+
+@router.get("/contar")
+def contar_actividad(
+    request: Request,
+    usuario: Optional[str] = Query(None),
+    desde: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    hasta: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    db: Session = Depends(get_db),
+):
+    """Total de eventos que cumplen el filtro, para la paginación."""
+    solo_admin(request)
+    q = _filtrar_actividad(db.query(func.count(Actividad.id)), usuario, desde, hasta)
+    return {"total": q.scalar()}

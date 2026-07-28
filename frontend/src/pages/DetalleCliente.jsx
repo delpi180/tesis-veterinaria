@@ -178,11 +178,16 @@ function AgendarCitaModal({ paciente, onClose, onCreated }) {
     api.get('/api/usuarios/doctores')
       .then(setDoctores)
       .catch(err => console.error('Error al obtener doctores:', err))
-    // Se necesitan las citas existentes para poder avisar de un choque de horario.
-    api.get('/api/citas/')
+  }, [])
+
+  // Se necesitan las citas de ESE día para poder avisar de un choque de horario
+  // (antes se traían todas las citas de la historia del sistema).
+  useEffect(() => {
+    if (!form.fecha) { setCitas([]); return }
+    api.get(`/api/citas/?desde=${form.fecha}&hasta=${form.fecha}`)
       .then(setCitas)
       .catch(err => console.error('Error al obtener citas:', err))
-  }, [])
+  }, [form.fecha])
 
   // Aviso si el doctor asignado no labora ese día (según su perfil) — misma lógica que Turnos.jsx
   const avisoHorario = (() => {

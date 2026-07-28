@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { clinicaActual } from '../services/clinica'
 
 // Colores e info de tamaño
 const _PDF_W = 210, _PDF_M = 14, _PDF_MORADO = [88, 28, 135];
@@ -139,7 +140,7 @@ export function generarPDF(paciente, historias) {
   doc.rect(0, 0, _PDF_W, 24, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(15); doc.setFont(undefined, "bold");
-  doc.text("Veterinaria Los Pinos", _PDF_M, 11);
+  doc.text(clinicaActual().nombre, _PDF_M, 11);
   doc.setFontSize(9); doc.setFont(undefined, "normal");
   doc.text("Historia Clínica Completa", _PDF_M, 18);
   doc.text(`${(historias || []).length} consulta(s)`, _PDF_W - _PDF_M, 18, { align: "right" });

@@ -564,48 +564,88 @@ def test_venta_con_descuento(client, admin):
         db.commit(); db.close()
 
 
-def test_asistencia_doctor_autorizacion(client, doctor, admin):
-    """Verifica que un doctor pueda registrar su ingreso/salida y no el de otros."""
-    # 1. Obtener ID del doctor desde el login
+def test_asistencia_la_registra_recepcion_no_el_doctor(client, doctor, admin):
+    """El control de asistencia es de la recepción; el doctor solo la consulta.
+
+    Cambio de regla de negocio: antes el doctor marcaba su propio ingreso/salida.
+    Ahora lo hace la recepción, que es quien controla los horarios de entrada y
+    salida del personal (y los ajusta cuando varían). El doctor sigue viendo su
+    marcación en "Mi panel", pero no puede crearla ni cerrarla.
+    """
     me = client.get("/api/mi-panel/", headers=doctor).json()
     my_id = me["doctor"]["id"]
 
-    # Asegurar que no hay marcación activa
     db = SessionLocal()
     db.execute(text("DELETE FROM asistencias WHERE usuario_id = :u"), {"u": my_id})
     db.commit()
 
     try:
-        # 2. Registrar ingreso para sí mismo (debe pasar con 201)
+        # El doctor NO puede registrar su propio ingreso
         r = client.post("/api/asistencia/ingreso", json={"usuario_id": my_id}, headers=doctor)
-        assert r.status_code == 201
-        asis = r.json()
-        assert asis["usuario_id"] == my_id
-        assert asis["hora_ingreso"] is not None
+        assert r.status_code == 403, "El doctor no debe poder marcar su propia asistencia"
 
-        # 3. Comprobar que en su panel se refleja el ID de asistencia de hoy
+        # La recepción sí lo registra
+        r_admin = client.post("/api/asistencia/ingreso", json={"usuario_id": my_id}, headers=admin)
+        assert r_admin.status_code == 201
+        asis = r_admin.json()
+        assert asis["usuario_id"] == my_id and asis["hora_ingreso"] is not None
+
+        # …y el doctor la ve reflejada en su panel (solo lectura)
         me_after = client.get("/api/mi-panel/", headers=doctor).json()
         assert me_after["asistencia_hoy"]["marcado"] is True
         assert me_after["asistencia_hoy"]["id"] == asis["id"]
 
-        # 4. Intentar marcar salida para otro doctor o con token ajeno (debe fallar con 403 si intentamos cruzar)
-        # Para probar la protección cruzada, creamos otro doctor temporal
-        db.execute(text("INSERT INTO usuarios (usuario, nombre, password_hash, rol, activo) "
-                        "VALUES ('qa_doc2', 'QA Doc2', 'hash', 'veterinario', true)"))
-        db.commit()
-        doc2_id = db.execute(text("SELECT id FROM usuarios WHERE usuario = 'qa_doc2'")).scalar()
-        
-        # Doctor intenta ingresar para doctor 2 -> 403
-        r_cross = client.post("/api/asistencia/ingreso", json={"usuario_id": doc2_id}, headers=doctor)
-        assert r_cross.status_code == 403
+        # El doctor tampoco puede cerrar la marcación
+        assert client.post(f"/api/asistencia/{asis['id']}/salida", headers=doctor).status_code == 403
 
-        # 5. Registrar salida para sí mismo (debe pasar con 200)
-        r_out = client.post(f"/api/asistencia/{asis['id']}/salida", headers=doctor)
+        # La recepción sí registra la salida
+        r_out = client.post(f"/api/asistencia/{asis['id']}/salida", headers=admin)
         assert r_out.status_code == 200
-        asis_out = r_out.json()
-        assert asis_out["hora_salida"] is not None
+        assert r_out.json()["hora_salida"] is not None
     finally:
         db.execute(text("DELETE FROM asistencias WHERE usuario_id = :u"), {"u": my_id})
-        db.execute(text("DELETE FROM usuarios WHERE usuario = 'qa_doc2'"))
+        db.commit(); db.close()
+
+
+def test_recepcion_corrige_horas_de_una_marcacion(client, doctor, admin):
+    """La recepción puede ajustar la hora real de ingreso/salida.
+
+    Los horarios varían y no siempre se alcanza a marcar en el momento exacto;
+    antes la única salida era borrar el registro y volver a crearlo.
+    """
+    my_id = client.get("/api/mi-panel/", headers=doctor).json()["doctor"]["id"]
+    db = SessionLocal()
+    db.execute(text("DELETE FROM asistencias WHERE usuario_id = :u"), {"u": my_id})
+    db.commit()
+
+    try:
+        asis = client.post("/api/asistencia/ingreso", json={"usuario_id": my_id}, headers=admin).json()
+
+        # Corregir a un horario concreto (llegó 08:00, salió 13:30)
+        r = client.put(
+            f"/api/asistencia/{asis['id']}",
+            json={"hora_ingreso": "2026-07-27T08:00:00-05:00",
+                  "hora_salida":  "2026-07-27T13:30:00-05:00"},
+            headers=admin,
+        )
+        assert r.status_code == 200
+        assert r.json()["horas_trabajadas"] == 5.5
+
+        # Una salida anterior al ingreso se rechaza
+        malo = client.put(
+            f"/api/asistencia/{asis['id']}",
+            json={"hora_salida": "2026-07-27T07:00:00-05:00"},
+            headers=admin,
+        )
+        assert malo.status_code == 422
+
+        # El doctor no puede corregir su propia marcación
+        assert client.put(
+            f"/api/asistencia/{asis['id']}",
+            json={"hora_ingreso": "2026-07-27T06:00:00-05:00"},
+            headers=doctor,
+        ).status_code == 403
+    finally:
+        db.execute(text("DELETE FROM asistencias WHERE usuario_id = :u"), {"u": my_id})
         db.commit(); db.close()
 

@@ -366,6 +366,7 @@ def vacunas(db: Session = Depends(get_db)):
         .options(joinedload(HistoriaClinica.paciente).joinedload(Paciente.cliente))
         .filter(HistoriaClinica.vacunas_items.isnot(None))
         .order_by(HistoriaClinica.fecha.desc())
+        .limit(5000)  # tope defensivo; ya se ordena por fecha desc (las más recientes primero)
         .all()
     )
     out: list[dict] = []

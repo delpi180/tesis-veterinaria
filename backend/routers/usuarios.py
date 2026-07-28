@@ -1,13 +1,17 @@
+from datetime import datetime, timezone, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Usuario
+from models import Usuario, Asistencia, HistoriaClinica, Paciente
 from schemas import UsuarioCreate, UsuarioUpdate, UsuarioOut, DoctorOut
 from core.security import hash_password
-from core.deps import solo_admin
+from core.deps import solo_admin, usuario_actual
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
+
+PERU_TZ = timezone(timedelta(hours=-5))
 
 
 @router.get("/doctores", response_model=list[DoctorOut])
@@ -38,6 +42,9 @@ def crear_usuario(payload: UsuarioCreate, request: Request, db: Session = Depend
         password_hash=hash_password(payload.password),
         rol=payload.rol,
         activo=payload.activo,
+        dni=payload.dni,
+        telefono=payload.telefono,
+        especialidad=payload.especialidad,
         hora_entrada=payload.hora_entrada,
         dias_laborales=payload.dias_laborales,
     )
@@ -80,3 +87,117 @@ def eliminar_usuario(usuario_id: int, request: Request, db: Session = Depends(ge
             raise HTTPException(status_code=409, detail="No puedes eliminar al único veterinario activo.")
     db.delete(u)
     db.commit()
+
+
+def _paciente_resumen(pac):
+    if not pac:
+        return {"paciente_id": None, "paciente": "—", "especie": "—", "propietario": "—", "cliente_id": None}
+    return {
+        "paciente_id": pac.id,
+        "paciente": pac.nombre,
+        "especie": pac.especie,
+        "propietario": pac.cliente.nombre if pac.cliente else "—",
+        "cliente_id": pac.cliente_id,
+    }
+
+
+@router.get("/{usuario_id}/perfil")
+def perfil_usuario(
+    usuario_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    quien: Usuario = Depends(usuario_actual),
+):
+    """Perfil completo de un usuario: datos personales, asistencia, pacientes
+    tratados y en seguimiento (estos dos últimos solo aplican a veterinarios).
+    Accesible a la administradora para cualquier usuario, o al propio usuario
+    para verse a sí mismo."""
+    es_admin = getattr(request.state, "rol", None) == "recepcionista"
+    if not es_admin and (not quien or quien.id != usuario_id):
+        raise HTTPException(status_code=403, detail="No autorizado para ver este perfil.")
+
+    u = db.get(Usuario, usuario_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # ── Asistencia: totales + últimas marcaciones ────────────────────────────
+    marcaciones = (
+        db.query(Asistencia)
+        .filter(Asistencia.usuario_id == usuario_id)
+        .order_by(Asistencia.fecha.desc(), Asistencia.hora_ingreso.desc())
+        .all()
+    )
+    total_horas, tardanzas = 0.0, 0
+    for r in marcaciones:
+        if r.hora_ingreso and r.hora_salida:
+            seg = (r.hora_salida - r.hora_ingreso).total_seconds()
+            if seg > 0:
+                total_horas += seg / 3600
+        if r.hora_ingreso and u.hora_entrada:
+            try:
+                sh, sm = (int(x) for x in u.hora_entrada.split(":"))
+                local_dt = r.hora_ingreso
+                if local_dt.tzinfo is None:
+                    local_dt = local_dt.replace(tzinfo=timezone.utc)
+                local_dt = local_dt.astimezone(PERU_TZ)
+                if (local_dt.hour * 60 + local_dt.minute) - (sh * 60 + sm) > 0:
+                    tardanzas += 1
+            except (ValueError, AttributeError):
+                pass
+    asistencia = {
+        "total_dias": len(marcaciones),
+        "total_horas": round(total_horas, 2),
+        "tardanzas": tardanzas,
+        "recientes": [
+            {
+                "id": a.id, "fecha": a.fecha,
+                "hora_ingreso": a.hora_ingreso, "hora_salida": a.hora_salida,
+            }
+            for a in marcaciones[:10]
+        ],
+    }
+
+    # ── Pacientes tratados y en seguimiento (solo veterinarios) ──────────────
+    pacientes_tratados, seguimiento = [], []
+    total_historias = 0
+    if u.rol == "veterinario":
+        total_historias = (
+            db.query(HistoriaClinica)
+            .filter(HistoriaClinica.veterinario_id == usuario_id)
+            .count()
+        )
+        # Se limita a las mas recientes para listar pacientes/seguimiento sin
+        # cargar un historial potencialmente enorme en un solo perfil.
+        historias = (
+            db.query(HistoriaClinica)
+            .options(joinedload(HistoriaClinica.paciente).joinedload(Paciente.cliente))
+            .filter(HistoriaClinica.veterinario_id == usuario_id)
+            .order_by(HistoriaClinica.creado_en.desc())
+            .limit(500)
+            .all()
+        )
+        vistos = set()
+        for h in historias:
+            if h.paciente_id in vistos:
+                continue
+            vistos.add(h.paciente_id)
+            pacientes_tratados.append({
+                "ultima_atencion": h.fecha or h.creado_en,
+                **_paciente_resumen(h.paciente),
+            })
+
+        ahora = datetime.now(timezone.utc)
+        vistos_seg = set()
+        for h in historias:
+            if h.proxima_cita and h.proxima_cita >= ahora and h.paciente_id not in vistos_seg:
+                vistos_seg.add(h.paciente_id)
+                seguimiento.append({"proxima_cita": h.proxima_cita, **_paciente_resumen(h.paciente)})
+        seguimiento.sort(key=lambda x: x["proxima_cita"])
+
+    return {
+        "usuario": UsuarioOut.model_validate(u),
+        "asistencia": asistencia,
+        "pacientes_tratados": {"total": len(pacientes_tratados), "lista": pacientes_tratados},
+        "total_historias": total_historias,
+        "seguimiento": seguimiento,
+    }
