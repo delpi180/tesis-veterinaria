@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronDown, Plus, Trash2, Download, Save, Check,
-  ArrowLeft, Mic, StopCircle, AlertTriangle, Loader2, FileText,
+  ArrowLeft, Mic, StopCircle, AlertTriangle, Loader2, FileText, Paperclip,
 } from "lucide-react";
 import { generarPDF } from "../utils/pdfGenerator";
 import { api, authHeaders } from "../services/api";
@@ -438,6 +438,11 @@ function HistoriaCard({ h, onEdit, onDelete }) {
           {h.tipo_consulta && (
             <span className="text-xs bg-white/20 px-2 py-0.5 rounded">
               {getLabel("tipo_consulta", h.tipo_consulta)}
+            </span>
+          )}
+          {h.documentos_count > 0 && (
+            <span className="flex items-center gap-1 text-xs bg-white/20 px-2 py-0.5 rounded" title="Archivos adjuntos a esta consulta">
+              <Paperclip className="w-3 h-3" /> {h.documentos_count}
             </span>
           )}
           <button onClick={() => onEdit(h)}
@@ -1037,8 +1042,14 @@ export default function HistoriasClinicas() {
           </button>
         </div>
 
-        {/* ── Documentos complementarios (radiografías, análisis, etc.) ──────── */}
-        {id && <DocumentosPaciente pacienteId={id} />}
+        {/* ── Documentos: si se está editando una consulta puntual, se acotan a
+            ella (radiografía/análisis de ESA visita); si no, quedan a nivel
+            de la mascota (p. ej. la libreta de vacunación escaneada). ────── */}
+        {id && (
+          editandoId
+            ? <DocumentosPaciente pacienteId={id} historiaId={editandoId} titulo="Documentos de esta consulta" />
+            : <DocumentosPaciente pacienteId={id} />
+        )}
 
         {/* ── Historial ────────────────────────────────────────────────────── */}
         <div className="space-y-2">

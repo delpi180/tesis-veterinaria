@@ -261,13 +261,15 @@ async def subir_documento(
 
 
 @router.get("/{paciente_id}/documentos/", response_model=list[DocumentoOut])
-def listar_documentos(paciente_id: int, db: Session = Depends(get_db)):
-    return (
-        db.query(DocumentoPaciente)
-        .filter(DocumentoPaciente.paciente_id == paciente_id)
-        .order_by(DocumentoPaciente.creado_en.desc())
-        .all()
-    )
+def listar_documentos(
+    paciente_id: int,
+    historia_id: Optional[int] = Query(None, description="Filtra los adjuntos de una consulta puntual"),
+    db: Session = Depends(get_db),
+):
+    q = db.query(DocumentoPaciente).filter(DocumentoPaciente.paciente_id == paciente_id)
+    if historia_id is not None:
+        q = q.filter(DocumentoPaciente.historia_id == historia_id)
+    return q.order_by(DocumentoPaciente.creado_en.desc()).all()
 
 
 @router.get("/{paciente_id}/documentos/{documento_id}/descargar")
@@ -299,6 +301,48 @@ def eliminar_documento(
     request.state.actividad_detalle = f"{doc.paciente.nombre if doc.paciente else paciente_id} — {doc.nombre}"
     db.delete(doc)
     db.commit()
+
+
+@router.post(
+    "/{paciente_id}/historias/{historia_id}/documento",
+    response_model=DocumentoOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def adjuntar_documento_historia(
+    paciente_id: int,
+    historia_id: int,
+    request: Request,
+    archivo: UploadFile = File(...),
+    categoria: str = Form("otro"),
+    descripcion: str = Form(""),
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Adjunta un archivo (radiografía, análisis, etc.) a la consulta puntual
+    donde el veterinario lo solicitó, en vez de dejarlo suelto a nivel de la
+    mascota sin saber a qué visita corresponde."""
+    historia = db.get(HistoriaClinica, historia_id)
+    if not historia or historia.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Historia clínica no encontrada")
+
+    cat = categoria if categoria in CATEGORIAS_DOC else "otro"
+    contenido = await _validar_y_leer_archivo(archivo)
+    doc = DocumentoPaciente(
+        paciente_id=paciente_id,
+        historia_id=historia_id,
+        nombre=archivo.filename or "documento",
+        categoria=cat,
+        descripcion=(descripcion or "").strip() or None,
+        mime_type=archivo.content_type,
+        tamano_bytes=len(contenido),
+        contenido=contenido,
+        subido_por=usuario.usuario if usuario else None,
+    )
+    db.add(doc)
+    request.state.actividad_detalle = f"{historia.paciente.nombre if historia.paciente else paciente_id} — {doc.nombre}"
+    db.commit()
+    db.refresh(doc)
+    return doc
 
 
 # ── Registros complementarios (antiparasitarios / estética) ───────────────────

@@ -25,7 +25,15 @@ const fmtFecha = (iso) => new Date(iso).toLocaleDateString('es-PE', {
 
 const esImagen = (mime) => (mime || '').startsWith('image/')
 
-export default function DocumentosPaciente({ pacienteId }) {
+/**
+ * Documentos complementarios de una mascota.
+ *
+ * Sin `historiaId`: documentos generales del paciente (uso en la ficha del
+ * cliente). Con `historiaId`: se acotan a esa consulta puntual — así una
+ * radiografía o análisis queda ligado a la visita donde se pidió, en vez de
+ * quedar suelto a nivel de la mascota sin saber a qué consulta corresponde.
+ */
+export default function DocumentosPaciente({ pacienteId, historiaId = null, titulo = 'Documentos complementarios' }) {
   const toast = useToast()
   const [docs, setDocs]       = useState([])
   const [cargando, setCargando] = useState(true)
@@ -35,17 +43,24 @@ export default function DocumentosPaciente({ pacienteId }) {
   const [subiendo, setSubiendo] = useState(false)
   const [abriendoId, setAbriendoId] = useState(null)
 
+  const urlListado = historiaId
+    ? `/api/pacientes/${pacienteId}/documentos/?historia_id=${historiaId}`
+    : `/api/pacientes/${pacienteId}/documentos/`
+  const urlSubida = historiaId
+    ? `${BASE_URL}/api/pacientes/${pacienteId}/historias/${historiaId}/documento`
+    : `${BASE_URL}/api/pacientes/${pacienteId}/documentos/`
+
   const cargar = async () => {
     setCargando(true)
     try {
-      setDocs(await api.get(`/api/pacientes/${pacienteId}/documentos/`))
+      setDocs(await api.get(urlListado))
     } catch (e) {
       toast.error(e.message)
     } finally {
       setCargando(false)
     }
   }
-  useEffect(() => { if (pacienteId) cargar() }, [pacienteId])
+  useEffect(() => { if (pacienteId) cargar() }, [pacienteId, historiaId])
 
   const subir = async (e) => {
     e.preventDefault()
@@ -56,7 +71,7 @@ export default function DocumentosPaciente({ pacienteId }) {
       fd.append('archivo', archivo)
       fd.append('categoria', categoria)
       fd.append('descripcion', descripcion)
-      const res = await fetch(`${BASE_URL}/api/pacientes/${pacienteId}/documentos/`, {
+      const res = await fetch(urlSubida, {
         method: 'POST', body: fd, headers: authHeaders(),
       })
       if (!res.ok) {
@@ -110,7 +125,7 @@ export default function DocumentosPaciente({ pacienteId }) {
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
         <Paperclip className="w-4 h-4 text-purple-500" />
-        <h2 className="text-sm font-semibold text-slate-700">Documentos complementarios</h2>
+        <h2 className="text-sm font-semibold text-slate-700">{titulo}</h2>
         <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
           {docs.length}
         </span>
@@ -160,7 +175,7 @@ export default function DocumentosPaciente({ pacienteId }) {
       ) : docs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-slate-400">
           <Paperclip className="w-7 h-7 mb-2 opacity-40" />
-          <p className="text-sm">Aún no hay documentos para esta mascota</p>
+          <p className="text-sm">{historiaId ? 'Aún no hay documentos en esta consulta' : 'Aún no hay documentos para esta mascota'}</p>
         </div>
       ) : (
         <ul className="divide-y divide-slate-50">

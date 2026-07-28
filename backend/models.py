@@ -101,6 +101,7 @@ class DocumentoPaciente(Base):
     id          = Column(Integer, primary_key=True)
     paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
     registro_id = Column(Integer, ForeignKey("registros_clinicos.id"), nullable=True)
+    historia_id = Column(Integer, ForeignKey("historias_clinicas.id", ondelete="CASCADE"), nullable=True)
     nombre      = Column(String(255), nullable=False)   # nombre original del archivo
     categoria   = Column(String(30), default="otro")    # radiografia | analisis | receta | otro
     descripcion = Column(Text)
@@ -112,6 +113,7 @@ class DocumentoPaciente(Base):
 
     paciente = relationship("Paciente", back_populates="documentos")
     registro = relationship("RegistroClinico", back_populates="documentos")
+    historia = relationship("HistoriaClinica", back_populates="documentos")
 
 
 class RegistroClinico(Base):
@@ -227,6 +229,7 @@ class HistoriaClinica(Base):
 
     paciente    = relationship("Paciente", back_populates="historias")
     veterinario = relationship("Usuario")
+    documentos  = relationship("DocumentoPaciente", back_populates="historia", cascade="all, delete-orphan")
 
     @property
     def veterinario_nombre(self):

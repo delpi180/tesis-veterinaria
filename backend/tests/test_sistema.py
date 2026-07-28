@@ -267,6 +267,58 @@ def test_documentos_paciente_flujo(client, admin, doctor):
         db.commit(); db.close()
 
 
+def test_documento_adjunto_a_historia_puntual(client, admin, doctor):
+    """Un documento (radiografía/análisis) se puede ligar a UNA consulta puntual,
+    no solo a la mascota en general: filtrado, permisos y borrado en cascada.
+    """
+    cli = client.post("/api/clientes/", json={"nombre": "QA Dueño Historia Doc", "dni": "55667722"}, headers=admin).json()
+    pac = client.post(f"/api/clientes/{cli['id']}/pacientes/",
+                      json={"nombre": "QA Firulais", "especie": "Canino"}, headers=admin).json()
+    try:
+        hist = client.post(f"/api/pacientes/{pac['id']}/historias/",
+                           json={"motivo_consulta": "Control"}, headers=doctor).json()
+        assert hist["documentos_count"] == 0
+
+        # La recepción NO puede adjuntar documentos a una historia (solo el veterinario)
+        r_admin = client.post(
+            f"/api/pacientes/{pac['id']}/historias/{hist['id']}/documento",
+            files={"archivo": ("hemograma.pdf", io.BytesIO(b"%PDF-1.4 fake"), "application/pdf")},
+            headers=admin,
+        )
+        assert r_admin.status_code == 403
+
+        # El veterinario sí puede
+        contenido = b"%PDF-1.4 hemograma de control"
+        r = client.post(
+            f"/api/pacientes/{pac['id']}/historias/{hist['id']}/documento",
+            files={"archivo": ("hemograma.pdf", io.BytesIO(contenido), "application/pdf")},
+            data={"categoria": "analisis", "descripcion": "Hemograma"},
+            headers=doctor,
+        )
+        assert r.status_code == 201
+        doc = r.json()
+        assert doc["historia_id"] == hist["id"]
+
+        # La historia refleja el conteo actualizado
+        hist2 = client.get(f"/api/pacientes/{pac['id']}/historias/{hist['id']}", headers=doctor).json()
+        assert hist2["documentos_count"] == 1
+
+        # El listado general lo incluye; el filtrado por historia_id también
+        general = client.get(f"/api/pacientes/{pac['id']}/documentos/", headers=doctor).json()
+        assert any(d["id"] == doc["id"] for d in general)
+        filtrado = client.get(f"/api/pacientes/{pac['id']}/documentos/?historia_id={hist['id']}", headers=doctor).json()
+        assert [d["id"] for d in filtrado] == [doc["id"]]
+
+        # Borrar la historia borra en cascada su documento adjunto (no queda huérfano)
+        assert client.delete(f"/api/pacientes/{pac['id']}/historias/{hist['id']}", headers=doctor).status_code == 204
+        assert client.get(f"/api/pacientes/{pac['id']}/documentos/{doc['id']}/descargar", headers=doctor).status_code == 404
+    finally:
+        client.delete(f"/api/pacientes/{pac['id']}", headers=admin)
+        db = SessionLocal()
+        db.execute(text("DELETE FROM clientes WHERE id=:c"), {"c": cli["id"]})
+        db.commit(); db.close()
+
+
 def test_registros_clinicos_flujo(client, admin, doctor):
     """Antiparasitarios/estética: crear, listar por tipo y eliminar."""
     cli = client.post("/api/clientes/", json={"nombre": "QA Dueño4", "dni": "55667711"}, headers=admin).json()

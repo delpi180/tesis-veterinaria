@@ -140,6 +140,16 @@ class HistoriaClinicaOut(BaseModel):
     veterinario_id:     Optional[int] = None
     veterinario_nombre: Optional[str] = None
 
+    # Adjuntos de esta consulta puntual (radiografías, análisis…). Solo el
+    # conteo: la lista completa se pide aparte con /documentos/?historia_id=
+    # para no cargar metadatos de archivos en cada listado de historias.
+    documentos: list = Field(default=[], exclude=True)
+
+    @computed_field
+    @property
+    def documentos_count(self) -> int:
+        return len(self.documentos)
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -744,6 +754,7 @@ class DocumentoOut(BaseModel):
     id:           int
     paciente_id:  int
     registro_id:  Optional[int] = None
+    historia_id:  Optional[int] = None
     nombre:       str
     categoria:    str
     descripcion:  Optional[str] = None
