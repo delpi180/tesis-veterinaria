@@ -23,6 +23,7 @@ from core.config import settings
 from core.security import verificar_token, hash_password
 from services.transcription import transcribe_audio
 from services.historia_extractor import extraer_historia
+from services.receta_extractor import extraer_receta
 from services.soap_processor import process_soap  # léxico, para comparativa de tesis
 
 app = FastAPI(title="Veterinaria Los Pinos API")
@@ -59,7 +60,7 @@ def _es_ruta_clinica(path: str) -> bool:
     return (
         "/historias" in path
         or "/recetas" in path
-        or path in {"/api/procesar-historia", "/api/transcribe"}
+        or path in {"/api/procesar-historia", "/api/procesar-receta", "/api/transcribe"}
     )
 
 
@@ -366,6 +367,17 @@ class ProcessHistoriaResponse(BaseModel):
     transcripcion: str
 
 
+class ProcesarRecetaRequest(BaseModel):
+    texto: str
+
+
+class ProcesarRecetaResponse(BaseModel):
+    diagnostico:   str | None = None
+    indicaciones:  str | None = None
+    items:         list[dict] = []
+    transcripcion: str
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -455,9 +467,6 @@ def procesar_historia_endpoint(body: ProcessHistoriaRequest, request: Request):
     de la historia clínica estructurados por GPT-4o-mini.
 
     Respuesta: { "datos": { ...campos clínicos... }, "transcripcion": "..." }
-
-    NOTA: el frontend aún llama a /api/process-soap (nombre viejo).
-    Actualizar la ruta en HistoriasClinicas.jsx en la fase de rediseño de frontend.
     """
     clave = _clave_cliente(request)
     if not ratelimit.permitido(f"ia_{clave}", maximo=15, ventana=300):
@@ -472,6 +481,33 @@ def procesar_historia_endpoint(body: ProcessHistoriaRequest, request: Request):
 
     try:
         resultado = extraer_historia(body.texto)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en extracción IA: {str(e)}")
+
+    return resultado
+
+
+@app.post("/api/procesar-receta", response_model=ProcesarRecetaResponse)
+def procesar_receta_endpoint(body: ProcesarRecetaRequest, request: Request):
+    """
+    Recibe la transcripción de una receta dictada por el veterinario y
+    devuelve diagnóstico, indicaciones y la lista de medicamentos
+    estructurados por IA (mismo pipeline que /api/procesar-historia, mismo
+    cupo compartido de 15 peticiones de IA / 5 min por IP).
+    """
+    clave = _clave_cliente(request)
+    if not ratelimit.permitido(f"ia_{clave}", maximo=15, ventana=300):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiadas peticiones de IA. Espera unos minutos.",
+        )
+    ratelimit.registrar_fallo(f"ia_{clave}")
+
+    if not body.texto.strip():
+        raise HTTPException(status_code=400, detail="El campo 'texto' no puede estar vacío.")
+
+    try:
+        resultado = extraer_receta(body.texto)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en extracción IA: {str(e)}")
 

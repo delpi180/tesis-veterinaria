@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, Loader2, Pencil, Download, Pill, X } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, esVeterinario } from '../services/api'
 import { useToast } from './Toast'
 import { clinicaActual } from '../services/clinica'
+import { nombresSimilares } from '../utils/similitud'
+import VoiceTextProcessor from './VoiceTextProcessor'
 
 const ITEM_VACIO = { medicamento: '', dosis: '', via: '', frecuencia: '', duracion: '' }
 
@@ -154,6 +156,7 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
   const [form, setForm] = useState(FORM_INICIAL)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState(null)
+  const guardandoRef = useRef(false)   // guard extra contra doble envío (doble clic, Enter repetido)
 
   const cargar = async () => {
     setCargando(true)
@@ -182,10 +185,55 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
   }
   const cerrarForm = () => { setFormAbierto(false); setEditId(null); setForm(FORM_INICIAL); setError(null) }
 
+  // ── Volcar lo dictado por voz (o pegado como texto) al formulario ───────────
+  // Si el veterinario ya tenía datos cargados (por ejemplo, está editando una
+  // receta existente y dicta un ajuste), esto FUSIONA en vez de reemplazar:
+  // un medicamento ya en la lista se actualiza por nombre similar (no se
+  // duplica); el texto de diagnóstico/indicaciones se completa o se amplía,
+  // sin repetir literalmente lo que ya estaba escrito.
+  const fusionarTexto = (actual, nuevo) => {
+    const previo = (actual || '').trim()
+    const entrante = (nuevo || '').trim()
+    if (!entrante) return previo
+    if (!previo) return entrante
+    if (previo.toLowerCase().includes(entrante.toLowerCase())) return previo
+    return `${previo}. ${entrante}`
+  }
+
+  const applyDictado = ({ diagnostico, indicaciones, items }) => {
+    setForm(prev => {
+      const itemsPrevios = prev.items.filter(i => i.medicamento.trim())
+      const itemsFusionados = [...itemsPrevios]
+      ;(items || []).forEach(nuevo => {
+        if (!nuevo.medicamento?.trim()) return
+        const idx = itemsFusionados.findIndex(i => nombresSimilares(i.medicamento, nuevo.medicamento))
+        if (idx > -1) {
+          itemsFusionados[idx] = {
+            medicamento: nuevo.medicamento || itemsFusionados[idx].medicamento,
+            dosis:       nuevo.dosis      || itemsFusionados[idx].dosis,
+            via:         nuevo.via        || itemsFusionados[idx].via,
+            frecuencia:  nuevo.frecuencia || itemsFusionados[idx].frecuencia,
+            duracion:    nuevo.duracion   || itemsFusionados[idx].duracion,
+          }
+        } else {
+          itemsFusionados.push({ ...ITEM_VACIO, ...nuevo })
+        }
+      })
+      return {
+        ...prev,
+        diagnostico: fusionarTexto(prev.diagnostico, diagnostico),
+        indicaciones: fusionarTexto(prev.indicaciones, indicaciones),
+        items: itemsFusionados.length ? itemsFusionados : [{ ...ITEM_VACIO }],
+      }
+    })
+  }
+
   const guardar = async (e) => {
     e.preventDefault()
+    if (guardandoRef.current) return
     const items = form.items.filter(i => i.medicamento.trim())
     if (items.length === 0) { setError('Agrega al menos un medicamento.'); return }
+    guardandoRef.current = true
     setGuardando(true); setError(null)
     try {
       const payload = {
@@ -207,6 +255,7 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
     } catch (err) {
       setError(err.message)
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }
@@ -249,6 +298,13 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
               <X className="w-4 h-4" />
             </button>
           </div>
+          <VoiceTextProcessor
+            endpoint="/api/procesar-receta"
+            labelGrabar="Dictar receta"
+            placeholderTexto="Escriba o pegue lo que va a recetar (medicamento, dosis, vía, frecuencia, duración)…"
+            onResult={({ diagnostico, indicaciones, items }) => applyDictado({ diagnostico, indicaciones, items })}
+          />
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-slate-600">Fecha</label>

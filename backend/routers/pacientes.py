@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
 from fastapi import (
@@ -436,11 +436,31 @@ def crear_receta(
             status_code=422,
             detail="La receta debe incluir al menos un medicamento.",
         )
+    diagnostico = (payload.diagnostico or "").strip() or None
+
+    # Guarda contra un doble envío accidental (doble clic, reintento de red
+    # tras un timeout): si el mismo veterinario acaba de crear una receta
+    # idéntica para este paciente hace unos segundos, se devuelve esa en vez
+    # de crear un duplicado.
+    ventana = datetime.now(timezone.utc) - timedelta(seconds=15)
+    reciente = (
+        db.query(Receta)
+        .filter(
+            Receta.paciente_id == paciente_id,
+            Receta.veterinario_id == (usuario.id if usuario else None),
+            Receta.creado_en >= ventana,
+        )
+        .order_by(Receta.creado_en.desc())
+        .first()
+    )
+    if reciente and reciente.items == items and reciente.diagnostico == diagnostico:
+        return reciente
+
     ahora = datetime.now(timezone.utc)
     receta = Receta(
         paciente_id=paciente_id,
         fecha=payload.fecha or ahora.date(),
-        diagnostico=(payload.diagnostico or "").strip() or None,
+        diagnostico=diagnostico,
         indicaciones=(payload.indicaciones or "").strip() or None,
         items=items,
         veterinario_id=usuario.id if usuario else None,

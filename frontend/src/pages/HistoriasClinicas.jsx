@@ -8,6 +8,7 @@ import { generarPDF } from "../utils/pdfGenerator";
 import { api, authHeaders } from "../services/api";
 import VoiceTextProcessor from "../components/VoiceTextProcessor";
 import DocumentosPaciente from "../components/DocumentosPaciente";
+import { nombresSimilares } from "../utils/similitud";
 
 // ── Catálogos ────────────────────────────────────────────────────────────────
 
@@ -668,17 +669,6 @@ export default function HistoriasClinicas() {
   // ── Volcar datos de IA al formulario
   const applyIA = (datos, inferencias, alertasRango = {}) => {
     usoIA.current = true;   // este registro se asistió con IA (voz o texto)
-    const nombresSimilares = (a, b) => {
-      if (!a || !b) return false;
-      const normalize = (s) => String(s).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s]/g, "");
-      const na = normalize(a);
-      const nb = normalize(b);
-      if (na === nb) return true;
-      if (na.length > 4 && nb.length > 4) {
-        if (na.includes(nb) || nb.includes(na)) return true;
-      }
-      return false;
-    };
 
     setForm(prev => {
       const next = { ...prev };

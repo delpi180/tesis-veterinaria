@@ -5,7 +5,13 @@ import { api, authHeaders } from "../services/api";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
-export default function VoiceTextProcessor({ onResult, onStateChange }) {
+export default function VoiceTextProcessor({
+  onResult,
+  onStateChange,
+  endpoint = "/api/procesar-historia",
+  labelGrabar = "Grabar consulta",
+  placeholderTexto = "Pegue la transcripción o escriba el resumen de la consulta para que la IA extraiga los campos…",
+}) {
   const [modoTexto, setModoTexto] = useState(false);
   const [textoManual, setTextoManual] = useState("");
   const [transcripcionIA, setTranscripcionIA] = useState("");
@@ -14,6 +20,10 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
   const [avisoLimite, setAvisoLimite] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);   // último audio grabado (para reintentar/descargar)
   const limiteRef = useRef(false);   // evita que el auto-corte se dispare más de una vez
+  // Guarda extra contra re-entradas (además del `disabled` de los botones):
+  // evita que dos llamadas a procesarAudio/handleProcesarTexto corran a la vez
+  // si algo dispara el flujo dos veces (doble evento, reintento apurado).
+  const procesandoRef = useRef(false);
 
   const { isRecording, seconds, micError, start, stop } = useAudioRecorder();
 
@@ -39,11 +49,13 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
   // Transcribe + estructura un blob de audio. Se reutiliza para reintentar sin
   // tener que volver a grabar la consulta si la transcripción falla.
   const procesarAudio = async (blob) => {
+    if (procesandoRef.current) return;   // ya hay un procesamiento en curso
     if (!blob) {
       setAiError("No se capturó audio.");
       updateAiState("error");
       return;
     }
+    procesandoRef.current = true;
     setAudioBlob(blob);
     updateAiState("transcribing");
     setAiError(null);
@@ -65,15 +77,15 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
 
       // 2. Extraer con GPT
       updateAiState("processing");
-      const { datos, inferencias, alertas_rango } = await api.post("/api/procesar-historia", {
-        texto: transcripcion,
-      });
+      const resultado = await api.post(endpoint, { texto: transcripcion });
 
-      onResult?.({ datos, inferencias, alertas_rango, transcripcion });
+      onResult?.({ ...resultado, transcripcion });
       updateAiState("done");
     } catch (e) {
       setAiError(e.message);
       updateAiState("error");
+    } finally {
+      procesandoRef.current = false;
     }
   };
 
@@ -105,19 +117,21 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
   };
 
   const handleProcesarTexto = async () => {
+    if (procesandoRef.current) return;
     if (!textoManual.trim()) return;
+    procesandoRef.current = true;
     updateAiState("processing");
     setAiError(null);
     try {
-      const { datos, inferencias, transcripcion, alertas_rango } = await api.post("/api/procesar-historia", {
-        texto: textoManual,
-      });
-      setTranscripcionIA(transcripcion);
-      onResult?.({ datos, inferencias, alertas_rango, transcripcion });
+      const resultado = await api.post(endpoint, { texto: textoManual });
+      setTranscripcionIA(resultado.transcripcion);
+      onResult?.(resultado);
       updateAiState("done");
     } catch (e) {
       setAiError(e.message);
       updateAiState("error");
+    } finally {
+      procesandoRef.current = false;
     }
   };
 
@@ -186,7 +200,7 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
                 </>
               ) : (
                 <>
-                  <Mic size={15} /> Grabar consulta
+                  <Mic size={15} /> {labelGrabar}
                 </>
               )}
             </button>
@@ -233,7 +247,7 @@ export default function VoiceTextProcessor({ onResult, onStateChange }) {
               value={textoManual}
               onChange={(e) => setTextoManual(e.target.value)}
               rows={4}
-              placeholder="Pegue la transcripción o escriba el resumen de la consulta para que la IA extraiga los campos…"
+              placeholder={placeholderTexto}
               className={`${hlInput} resize-y`}
             />
           </div>
