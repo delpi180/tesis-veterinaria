@@ -1,15 +1,27 @@
 name: Respaldo diario de la base de datos
 
-# Antes el único respaldo era correr backend/scripts/backup_db.py a mano.
-# Si nadie se acordaba, no había nada que restaurar tras una falla. Esto usa
-# minutos de Actions gratuitos (unos segundos por corrida) para generar un
-# volcado diario de Postgres y guardarlo como artefacto del repositorio, sin
-# contratar ningún servicio nuevo.
+# Genera un volcado diario de la base de producción y lo guarda como artefacto
+# del repositorio. Usa minutos de Actions gratuitos (unos segundos por corrida),
+# sin contratar ningún servicio nuevo.
 #
-# Requiere un secreto del repositorio llamado PROD_DATABASE_URL con la cadena
-# de conexión de la base de producción (Settings → Secrets and variables →
-# Actions → New repository secret). Mientras no exista, el job se salta solo
-# en vez de fallar en rojo todos los días.
+# Requiere un secreto del repositorio llamado PROD_DATABASE_URL con la cadena de
+# conexión de producción (Settings → Secrets and variables → Actions → New
+# repository secret).
+#
+# IMPORTANTE: si el secreto falta, o el volcado sale vacío o corrupto, el job
+# falla EN ROJO a propósito. Un respaldo que falla en silencio es peor que no
+# tenerlo: se ve verde todos los días y no hay nada que restaurar.
+#
+# ── CÓMO RESTAURAR (leer antes de necesitarlo) ────────────────────────────────
+# 1. Actions → "Respaldo diario de la base de datos" → abrir la corrida del día
+#    que se quiere recuperar → descargar el artefacto "backup-db-…".
+# 2. Descomprimir el .zip: adentro está el archivo backup_AAAAMMDD_HHMMSS.dump.
+# 3. Restaurar sobre la base (¡REEMPLAZA su contenido actual!):
+#
+#      pg_restore --clean --if-exists --no-owner -d "<DATABASE_URL>" backup_XXXX.dump
+#
+#    Conviene probarlo primero contra una base vacía de prueba, no directo sobre
+#    producción. Los artefactos se guardan 30 días.
 
 on:
   schedule:
@@ -20,31 +32,95 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Verificar que el secreto esté configurado
-        id: check
-        run: |
-          if [ -z "${{ secrets.PROD_DATABASE_URL }}" ]; then
-            echo "configurado=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Falta el secreto PROD_DATABASE_URL — no se generó respaldo."
-          else
-            echo "configurado=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Generar el volcado con pg_dump
-        if: steps.check.outputs.configurado == 'true'
+      - name: Preparar la conexión y detectar la versión del servidor
+        id: prep
         env:
           DB_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: |
+          if [ -z "$DB_URL" ]; then
+            echo "::error::Falta el secreto PROD_DATABASE_URL: NO se está respaldando nada."
+            echo "Configúralo en Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+
+          # La URL puede venir en formato SQLAlchemy (postgresql+psycopg://) o
+          # con el esquema corto de Railway (postgres://); libpq solo entiende
+          # postgresql://.
+          URL_LIBPQ=$(printf '%s' "$DB_URL" \
+            | sed -e 's|^postgresql+psycopg://|postgresql://|' \
+                  -e 's|^postgres://|postgresql://|')
+          echo "::add-mask::$URL_LIBPQ"
+          echo "url=$URL_LIBPQ" >> "$GITHUB_OUTPUT"
+
+          # pg_dump se NIEGA a respaldar un servidor más nuevo que él, así que la
+          # imagen tiene que seguir a la versión real del servidor (Railway la
+          # actualiza por su cuenta). Se detecta en cada corrida en vez de fijarla
+          # a mano y que un día deje de funcionar sin que nadie lo note.
+          MAJOR=$(docker run --rm postgres:18 \
+            psql "$URL_LIBPQ" -tAc "SHOW server_version_num" | cut -c1-2)
+          if ! [ "$MAJOR" -ge 12 ] 2>/dev/null; then
+            echo "::error::No se pudo leer la versión del servidor. ¿La URL es correcta y acepta conexiones externas?"
+            exit 1
+          fi
+          echo "Servidor PostgreSQL detectado: $MAJOR"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+
+      - name: Generar el volcado con pg_dump
+        env:
+          URL_LIBPQ: ${{ steps.prep.outputs.url }}
+          MAJOR: ${{ steps.prep.outputs.major }}
+        run: |
           # Formato "custom" (-Fc): ya viene comprimido y permite restaurar
           # tablas sueltas con pg_restore si algún día hace falta.
-          docker run --rm postgres:16 pg_dump "$DB_URL" -Fc > "backup_$(date +%Y%m%d_%H%M%S).dump"
-          ls -lh backup_*.dump
+          ARCHIVO="backup_$(date +%Y%m%d_%H%M%S).dump"
+          docker run --rm "postgres:${MAJOR}" pg_dump "$URL_LIBPQ" -Fc > "$ARCHIVO"
+          echo "ARCHIVO=$ARCHIVO" >> "$GITHUB_ENV"
+          ls -lh "$ARCHIVO"
+
+      - name: Comprobar que el respaldo sirve para restaurar
+        env:
+          MAJOR: ${{ steps.prep.outputs.major }}
+        run: |
+          # Un volcado puede "salir bien" y estar vacío (URL apuntando a otra
+          # base, permisos insuficientes). Sin esta comprobación se acumularían
+          # archivos inservibles durante meses y nadie se enteraría hasta el día
+          # que hicieran falta.
+          TAM=$(stat -c%s "$ARCHIVO")
+          if [ "$TAM" -lt 10240 ]; then
+            echo "::error::El respaldo pesa solo ${TAM} bytes: está vacío o incompleto."
+            exit 1
+          fi
+
+          # pg_restore --list falla si el archivo está corrupto y, de paso, lista
+          # su contenido.
+          docker run --rm -i "postgres:${MAJOR}" pg_restore --list < "$ARCHIVO" > contenido.txt
+
+          # 1) Las tablas que sostienen la clínica tienen que estar en el volcado.
+          #    Se comprueba su presencia (no que tengan filas): en una clínica
+          #    recién instalada, historias y recetas están legítimamente vacías y
+          #    el respaldo no debe fallar por eso.
+          for TABLA in clientes pacientes historias_clinicas recetas usuarios; do
+            if ! grep -qE "TABLE (DATA )?public $TABLA " contenido.txt; then
+              echo "::error::El respaldo no incluye la tabla '$TABLA': no sirve para restaurar."
+              exit 1
+            fi
+          done
+
+          # 2) Y tiene que traer DATOS, no solo el esquema vacío. 'usuarios' nunca
+          #    está vacía (el arranque siembra la cuenta de la administradora),
+          #    así que sirve de testigo para detectar un volcado sin contenido.
+          if ! grep -q "TABLE DATA public usuarios " contenido.txt; then
+            echo "::error::El respaldo trae el esquema pero no los datos."
+            exit 1
+          fi
+
+          echo "Respaldo verificado ($(numfmt --to=iec "$TAM")): tablas críticas y datos presentes."
 
       - name: Subir el respaldo como artefacto
-        if: steps.check.outputs.configurado == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: backup-db-${{ github.run_id }}
-          path: backup_*.dump
+          path: ${{ env.ARCHIVO }}
           retention-days: 30
           compression-level: 0   # el dump de pg_dump -Fc ya está comprimido
+          if-no-files-found: error
