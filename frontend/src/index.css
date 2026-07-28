@@ -18,6 +18,27 @@
   --text-xs--line-height: 1.125rem;
   --text-sm: 0.9375rem;        /* 15 px (antes 14) */
   --text-sm--line-height: 1.375rem;
+
+  /* ── Contraste de los grises secundarios ──────────────────────────────────
+     Medido sobre fondo blanco con la fórmula de WCAG (mínimo exigido: 4.5:1
+     para texto normal, 3:1 para iconos y elementos gráficos):
+
+        slate-400 original  #94a3b8 → 2.56:1   se usa en 272 lugares, casi
+                                               todos texto: no llegaba ni a la
+                                               mitad del mínimo
+        slate-300 original  #cbd5e1 → 1.48:1   prácticamente invisible
+
+     El slate-500 cumplía sobre blanco (4.76:1) pero no sobre las tarjetas con
+     fondo teñido que usa la app (4.43:1 sobre purple-50, 4.34:1 sobre
+     slate-100), y ahí es donde viven las etiquetas de los formularios.
+
+     Se corrigen aquí, en el token, para arreglar los ~296 usos a la vez sin
+     tocar componente por componente (y sin riesgo de romper diagramaciones).
+     slate-400 queda igual que el slate-500 original: era un escalón que no se
+     podía usar para texto, así que se pierde poco y se gana legibilidad. */
+  --color-slate-500: #5f6f85;  /* peor caso 4.68:1 — apto para texto */
+  --color-slate-400: #64748b;  /* 4.76:1 sobre blanco — apto para texto */
+  --color-slate-300: #8493a9;  /* 3.12:1 — apto para iconos y separadores */
 }
 
 :root {

@@ -129,12 +129,15 @@ export default function MiPanel() {
                   </div>
                   <div>
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mi asistencia de hoy</h3>
+                    {/* El ámbar 500 sobre blanco da 2.15:1: no alcanza el
+                        mínimo de 4.5:1 y este es justamente el estado que el
+                        doctor tiene que poder leer de un vistazo. */}
                     <p className={`text-base font-bold mt-0.5 ${
                       data.asistencia_hoy.marcado
                         ? data.asistencia_hoy.hora_salida
                           ? 'text-slate-600'
-                          : 'text-emerald-600'
-                        : 'text-amber-500'
+                          : 'text-emerald-700'
+                        : 'text-amber-700'
                     }`}>
                       {data.asistencia_hoy.marcado
                         ? data.asistencia_hoy.hora_salida
@@ -172,9 +175,16 @@ export default function MiPanel() {
                     {DIAS.map(([code, lbl]) => {
                       const activo = (data.asistencia_hoy.dias_laborales || '').split(',').includes(code)
                       return (
-                        <span key={code} className={`px-1 rounded text-[9px] font-bold ${
-                          activo ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-slate-100 text-slate-300'
-                        }`}>{lbl}</span>
+                        // 9 px con gris claro daba 1.36:1 de contraste: los días
+                        // eran ilegibles. Sube el tamaño y, sobre todo, el día
+                        // que NO se trabaja se distingue por forma (fondo hueco
+                        // y tachado), no solo por un color más pálido.
+                        <span key={code} title={activo ? `${lbl}: trabaja` : `${lbl}: no trabaja`}
+                          className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                            activo
+                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              : 'bg-white text-slate-500 border border-slate-200 line-through'
+                          }`}>{lbl}</span>
                       )
                     })}
                   </div>
