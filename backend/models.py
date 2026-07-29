@@ -284,6 +284,38 @@ class Cita(Base):
         return self.paciente.cliente.telefono if self.paciente and self.paciente.cliente else None
 
 
+class ErrorRegistrado(Base):
+    """Errores del sistema, guardados para poder dar soporte.
+
+    Antes, cuando algo fallaba en la clínica, el error del navegador moría en
+    la consola del usuario (a quien además se le pedía "revisa la consola",
+    consejo inútil para una recepcionista) y el del servidor quedaba suelto en
+    los logs de Railway, sin aviso. El resultado era una llamada diciendo "no
+    funciona" y cero información para saber qué pasó.
+
+    Guardar el error con su contexto (quién, en qué pantalla, qué acción)
+    convierte esa llamada en algo diagnosticable sin depender del relato del
+    usuario ni de contratar un servicio de monitoreo.
+    """
+    __tablename__ = "errores"
+
+    id       = Column(Integer, primary_key=True)
+    origen   = Column(String(10), nullable=False)   # 'frontend' | 'backend'
+    mensaje  = Column(String(500), nullable=False)
+    detalle  = Column(Text)                          # traceback o componentStack
+    # Dónde ocurrió: la ruta del navegador (frontend) o el endpoint (backend)
+    ruta     = Column(String(300))
+    usuario  = Column(String(50))                    # puede ser null: un error en el login no tiene sesión
+    rol      = Column(String(20))
+    navegador = Column(String(300))                  # user-agent, para reproducir el caso
+    fecha    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    # Para no repetir el mismo error mil veces: se agrupan los idénticos y se
+    # lleva la cuenta, en vez de llenar la tabla con copias.
+    huella   = Column(String(64), index=True)        # hash de origen+mensaje+ruta
+    veces    = Column(Integer, default=1)
+    visto    = Column(Boolean, default=False)        # marcado como revisado
+
+
 class Actividad(Base):
     """Bitácora de auditoría: registra cada acción que modifica datos."""
     __tablename__ = "actividades"

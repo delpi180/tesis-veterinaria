@@ -1,4 +1,5 @@
 import { Component } from 'react'
+import { reportarError } from '../services/reportarError'
 
 export class ErrorBoundary extends Component {
   constructor(props) {
@@ -12,6 +13,9 @@ export class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('[ErrorBoundary]', error, info.componentStack)
+    // Además de la consola, se avisa al servidor: quien da soporte no tiene
+    // forma de ver la consola del navegador de la clínica.
+    reportarError(error, info.componentStack)
   }
 
   render() {
@@ -25,11 +29,15 @@ export class ErrorBoundary extends Component {
               </svg>
             </div>
             <h2 className="text-lg font-bold text-slate-800 mb-2">Ocurrió un error inesperado</h2>
-            <p className="text-sm text-slate-500 mb-1 font-mono bg-slate-50 rounded px-3 py-2 text-left break-all">
-              {this.state.error.message}
+            {/* Antes acá decía "revisa la consola del navegador": un consejo
+                inútil para quien atiende en el mostrador. Ahora el fallo se
+                reporta solo y se le dice a la persona qué hacer de verdad. */}
+            <p className="text-sm text-slate-600 mb-3">
+              Ya avisamos al soporte técnico automáticamente. Vuelve a cargar la
+              aplicación; si el problema sigue, avisa qué estabas haciendo.
             </p>
-            <p className="text-xs text-slate-400 mt-3 mb-5">
-              Revisa la consola del navegador para más detalles.
+            <p className="text-xs text-slate-500 mb-5 font-mono bg-slate-50 rounded px-3 py-2 text-left break-all">
+              {this.state.error.message}
             </p>
             <button
               onClick={() => {

@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, Activity, LogOut, Wallet, UserCog,
-  Clock, ClipboardList, History, PieChart, ConciergeBell, Syringe, Menu, X,
+  Clock, ClipboardList, History, PieChart, ConciergeBell, Syringe, Menu, X, Bug,
 } from 'lucide-react'
 import { getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
 import GlobalSearch from './GlobalSearch'
@@ -33,6 +33,7 @@ const SECCION_ADMIN = [
   { label: 'Asistencia',        to: '/asistencia', Icon: Clock,    admin: true },
   { label: 'Actividad',         to: '/actividad',  Icon: History,  admin: true },
   { label: 'Usuarios',          to: '/usuarios',   Icon: UserCog,  admin: true },
+  { label: 'Errores',           to: '/errores',    Icon: Bug,      admin: true },
 ]
 const SECCION_TESIS = [
   { label: 'Mediciones', to: '/mediciones', Icon: Activity },

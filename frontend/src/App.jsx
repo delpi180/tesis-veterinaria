@@ -33,6 +33,7 @@ const Reportes          = lazy(() => import('./pages/Reportes'))
 const PanelRecepcion    = lazy(() => import('./pages/PanelRecepcion'))
 const Vacunacion        = lazy(() => import('./pages/Vacunacion'))
 const Mediciones        = lazy(() => import('./pages/Mediciones'))
+const Errores           = lazy(() => import('./pages/Errores'))
 
 function CargandoPantalla() {
   return (
@@ -90,6 +91,7 @@ function AppProtegida() {
           <Route path="/recepcion"              element={<SoloAdmin><PanelRecepcion /></SoloAdmin>} />
           <Route path="/vacunacion"             element={<SoloAdmin><Vacunacion /></SoloAdmin>} />
           <Route path="/usuarios"               element={<SoloAdmin><Usuarios /></SoloAdmin>} />
+          <Route path="/errores"                element={<SoloAdmin><Errores /></SoloAdmin>} />
           <Route path="/usuarios/:usuarioId/perfil" element={<PerfilDoctor />} />
           <Route path="/mediciones"             element={<Mediciones />} />
           <Route path="*"                       element={<Navigate to="/" replace />} />

@@ -16,7 +16,7 @@ import models  # registra todos los modelos en Base.metadata
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
-    busqueda, inventario, asistencia, mi_panel, actividad, configuracion,
+    busqueda, inventario, asistencia, mi_panel, actividad, configuracion, errores,
 )
 from core import ratelimit
 from core.config import settings
@@ -30,6 +30,12 @@ app = FastAPI(title="Veterinaria Los Pinos API")
 
 # Rutas accesibles sin token
 RUTAS_PUBLICAS = {"/api/auth/login", "/api/health"}
+
+# Rutas donde solo el ENVÍO (POST) es público, pero leerlas exige sesión.
+# Reportar un error del navegador no puede depender de tener sesión: si la app
+# se rompe en la pantalla de acceso, ese es justamente el error que hay que
+# poder ver. Consultarlos sigue siendo exclusivo de la administradora.
+RUTAS_PUBLICAS_ESCRITURA = {"/api/errores/"}
 
 # Rutas cuya LECTURA es pública, pero que siguen exigiendo sesión para escribir.
 # La pantalla de acceso muestra el nombre de la clínica antes de que nadie haya
@@ -169,10 +175,12 @@ def _registrar_actividad(usuario, rol, metodo, ruta, estado, detalle=None):
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
     es_lectura_publica = request.method == "GET" and path in RUTAS_PUBLICAS_LECTURA
+    es_reporte_publico = request.method == "POST" and path in RUTAS_PUBLICAS_ESCRITURA
     if (
         path.startswith("/api/")
         and path not in RUTAS_PUBLICAS
         and not es_lectura_publica
+        and not es_reporte_publico
         and request.method != "OPTIONS"
     ):
         header = request.headers.get("Authorization", "")
@@ -248,6 +256,29 @@ async def _error_no_controlado(request: Request, exc: Exception):
     traceback) y devolvemos un 500 limpio, sin filtrar detalles internos al
     cliente. Las HTTPException (401/404/422, etc.) siguen su flujo normal."""
     logger.exception("Error no controlado en %s %s", request.method, request.url.path)
+
+    # Además del log, se guarda en la base: los logs de Railway hay que ir a
+    # buscarlos y rotan, así que un fallo de hace una semana ya no está cuando
+    # el cliente llama para reportarlo.
+    try:
+        import traceback
+        from routers.errores import registrar_error
+        db = SessionLocal()
+        try:
+            registrar_error(
+                db,
+                origen="backend",
+                mensaje=f"{type(exc).__name__}: {exc}",
+                detalle=traceback.format_exc(),
+                ruta=f"{request.method} {request.url.path}",
+                usuario=getattr(request.state, "usuario", None),
+                rol=getattr(request.state, "rol", None),
+            )
+        finally:
+            db.close()
+    except Exception:
+        logger.warning("No se pudo guardar el error en la bitácora de errores.")
+
     return JSONResponse(
         status_code=500,
         content={"detail": "Error interno del servidor. Vuelve a intentarlo."},
@@ -273,6 +304,7 @@ app.include_router(asistencia.router)
 app.include_router(mi_panel.router)
 app.include_router(actividad.router)
 app.include_router(configuracion.router)
+app.include_router(errores.router)
 
 
 _SECRETO_POR_DEFECTO = "vet-los-pinos-secreto-dev"
