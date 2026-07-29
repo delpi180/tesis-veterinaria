@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import {
   Stethoscope, Users, Coins, AlertTriangle,
-  Clock, PawPrint, ChevronRight, TrendingUp, Syringe, MessageCircle, Package,
+  Clock, PawPrint, ChevronRight, TrendingUp, Syringe, MessageCircle, Package, Check,
 } from 'lucide-react'
 import { api, getUsuario } from '../services/api'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
@@ -39,6 +39,7 @@ export default function Inicio() {
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
+  const [avisando, setAvisando] = useState(null)   // clave del item en proceso, evita doble clic
 
   useEffect(() => {
     api.get('/api/dashboard/resumen')
@@ -46,6 +47,28 @@ export default function Inicio() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
+
+  // Registra que ya se contactó al dueño: el recordatorio deja de aparecer
+  // acá (Vacunación conserva el historial completo). Optimista: desaparece
+  // de inmediato y, si falla, se restaura.
+  const marcarAvisado = async (v) => {
+    const clave = `${v.paciente_id}|${v.vacuna}|${v.proxima_dosis}`
+    if (avisando) return
+    setAvisando(clave)
+    setData(prev => ({
+      ...prev,
+      vacunas_proximas: prev.vacunas_proximas.filter(x => x !== v),
+    }))
+    try {
+      await api.post('/api/dashboard/vacunas/avisar', {
+        paciente_id: v.paciente_id, vacuna: v.vacuna, proxima_dosis: v.proxima_dosis,
+      })
+    } catch {
+      setData(prev => ({ ...prev, vacunas_proximas: [...prev.vacunas_proximas, v] }))
+    } finally {
+      setAvisando(null)
+    }
+  }
 
   const today = new Date().toLocaleDateString('es-MX', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -320,16 +343,25 @@ export default function Inicio() {
                       </button>
                       <p className="text-xs text-slate-400 mt-0.5">Próxima dosis: {v.proxima_dosis}</p>
                     </div>
-                    {v.telefono && (
-                      <a
-                        href={waRecordatorio(v.telefono, v.propietario, v.paciente, null)}
-                        target="_blank" rel="noopener noreferrer"
-                        title="Recordatorio por WhatsApp"
-                        className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-600 hover:bg-green-500 text-white transition shrink-0"
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {v.telefono && (
+                        <a
+                          href={waRecordatorio(v.telefono, v.propietario, v.paciente, null)}
+                          target="_blank" rel="noopener noreferrer"
+                          title="Recordatorio por WhatsApp"
+                          className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-600 hover:bg-green-500 text-white transition"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => marcarAvisado(v)}
+                        title="Marcar como ya avisado"
+                        className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 transition"
                       >
-                        <MessageCircle className="w-4 h-4" />
-                      </a>
-                    )}
+                        <Check className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

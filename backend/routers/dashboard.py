@@ -1,17 +1,28 @@
 from datetime import datetime, date, time, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import (
     Asistencia, Cita, Cliente, HistoriaClinica, Paciente, Producto, Venta,
-    VentaItem, Usuario,
+    VentaItem, Usuario, VacunaAvisada,
 )
+from core.deps import usuario_actual
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+
+
+def _avisos_existentes(db: Session) -> set[tuple[int, str, str]]:
+    """Claves (paciente_id, vacuna en minúscula, próxima_dosis) ya avisadas."""
+    return {
+        (a.paciente_id, a.vacuna.lower(), a.proxima_dosis)
+        for a in db.query(VacunaAvisada).all()
+    }
 
 METODOS_PAGO = ["efectivo", "tarjeta", "yape", "plin"]
 
@@ -208,6 +219,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         .order_by(HistoriaClinica.fecha.desc())
         .all()
     )
+    avisadas = _avisos_existentes(db)
     vacunas: list[dict] = []
     vistos: set[tuple[int, str]] = set()  # (paciente_id, vacuna) — solo el registro más reciente
     for h in historias_vacunas:
@@ -220,6 +232,11 @@ def resumen_dashboard(db: Session = Depends(get_db)):
             if clave in vistos:
                 continue
             vistos.add(clave)
+            # Este es el panel de "por hacer" de la recepción: una vez avisado
+            # el dueño, desaparece de aquí (Vacunación conserva el historial
+            # completo, avisadas incluidas).
+            if (h.paciente_id, nombre_vac.lower(), prox) in avisadas:
+                continue
             fecha = _parse_fecha_libre(prox)
             pac = h.paciente
             vacunas.append({
@@ -377,6 +394,7 @@ def vacunas(db: Session = Depends(get_db)):
         .limit(5000)  # tope defensivo; ya se ordena por fecha desc (las más recientes primero)
         .all()
     )
+    avisadas = _avisos_existentes(db)
     out: list[dict] = []
     vistos: set[tuple[int, str]] = set()
     for h in historias:
@@ -411,7 +429,55 @@ def vacunas(db: Session = Depends(get_db)):
                 "proxima_dosis": prox,
                 "fecha_proxima": fprox.isoformat() if fprox else None,
                 "estado": estado,
+                "avisado": bool(prox) and (h.paciente_id, nombre.lower(), prox) in avisadas,
             })
     orden = {"vencida": 0, "proxima": 1, "programada": 2, None: 3}
     out.sort(key=lambda v: (orden.get(v["estado"], 3), v["fecha_proxima"] or "9999-99-99"))
     return out
+
+
+class VacunaAvisoRequest(BaseModel):
+    paciente_id: int
+    vacuna: str
+    proxima_dosis: str
+
+
+@router.post("/vacunas/avisar", status_code=201)
+def marcar_vacuna_avisada(
+    payload: VacunaAvisoRequest,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Registra que ya se contactó al dueño por esta vacuna pendiente, para que
+    deje de aparecer en el panel de recordatorios de la portada."""
+    if not db.get(Paciente, payload.paciente_id):
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    aviso = VacunaAvisada(
+        paciente_id=payload.paciente_id,
+        vacuna=payload.vacuna.strip(),
+        proxima_dosis=payload.proxima_dosis,
+        avisado_por=usuario.usuario if usuario else None,
+    )
+    db.add(aviso)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Ya estaba marcado (doble clic, dos pestañas): no es un error real.
+        db.rollback()
+    return {"ok": True}
+
+
+@router.delete("/vacunas/avisar", status_code=204)
+def deshacer_vacuna_avisada(
+    paciente_id: int = Query(...),
+    vacuna: str = Query(...),
+    proxima_dosis: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    """Deshace el aviso, por si se marcó por error."""
+    db.query(VacunaAvisada).filter(
+        VacunaAvisada.paciente_id == paciente_id,
+        VacunaAvisada.vacuna == vacuna.strip(),
+        VacunaAvisada.proxima_dosis == proxima_dosis,
+    ).delete()
+    db.commit()

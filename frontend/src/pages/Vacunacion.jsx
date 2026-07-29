@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Syringe, Search, AlertTriangle, Clock, CheckCircle2, MessageCircle, Download, RefreshCw } from 'lucide-react'
+import { Syringe, Search, AlertTriangle, Clock, CheckCircle2, MessageCircle, Download, RefreshCw, Check } from 'lucide-react'
 import { api } from '../services/api'
 import Paginacion from '../components/Paginacion'
 import { clinicaActual } from '../services/clinica'
@@ -60,6 +60,18 @@ export default function Vacunacion() {
   }
   useEffect(() => { cargar() }, [])
   const refrescar = async () => { setRefrescando(true); await cargar(true); setRefrescando(false) }
+
+  // Optimista: cambia la fila a "Avisado" de inmediato; si falla, se revierte.
+  const marcarAvisado = async (v) => {
+    setItems(prev => prev.map(x => x === v ? { ...x, avisado: true } : x))
+    try {
+      await api.post('/api/dashboard/vacunas/avisar', {
+        paciente_id: v.paciente_id, vacuna: v.vacuna, proxima_dosis: v.proxima_dosis,
+      })
+    } catch {
+      setItems(prev => prev.map(x => x === v ? { ...x, avisado: false } : x))
+    }
+  }
 
   const term = busq.trim().toLowerCase()
   const filtrados = items.filter(v => {
@@ -198,14 +210,28 @@ export default function Vacunacion() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-slate-500">{v.propietario}</td>
-                      <td className="px-5 py-3 text-right">
-                        {v.telefono && (
-                          <a href={waLink(v.telefono, v.propietario, v.paciente, v.vacuna)} target="_blank" rel="noopener noreferrer"
-                            title="Recordar por WhatsApp"
-                            className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-green-600 hover:bg-green-500 text-white transition">
-                            <MessageCircle className="w-3.5 h-3.5" />
-                          </a>
-                        )}
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {v.avisado ? (
+                            <span title="Ya se avisó al dueño"
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                              <Check className="w-3 h-3" /> Avisado
+                            </span>
+                          ) : (
+                            <button onClick={() => marcarAvisado(v)}
+                              title="Marcar como ya avisado"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 text-slate-400 hover:text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 transition">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {v.telefono && (
+                            <a href={waLink(v.telefono, v.propietario, v.paciente, v.vacuna)} target="_blank" rel="noopener noreferrer"
+                              title="Recordar por WhatsApp"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-green-600 hover:bg-green-500 text-white transition">
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )

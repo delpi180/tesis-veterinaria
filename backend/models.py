@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import Column, Boolean, Date, Float, Integer, LargeBinary, Numeric, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Boolean, Date, Float, Integer, LargeBinary, Numeric, String, Text, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from database import Base
@@ -527,4 +527,31 @@ class ConfiguracionClinica(Base):
 
     actualizado_en  = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     actualizado_por = Column(String(50))
+
+
+class VacunaAvisada(Base):
+    """Marca que ya se avisó al dueño sobre una vacuna pendiente.
+
+    Los recordatorios de vacuna NO son una tabla propia: se calculan al vuelo
+    a partir de `vacunas_items` (JSONB) dentro de cada historia clínica. Sin
+    este registro aparte, no había forma de anotar "ya le avisé" sin editar la
+    historia — así que la misma vacuna vencida volvía a aparecer todos los
+    días para siempre, aunque la recepcionista ya hubiera contactado al dueño.
+
+    Se identifica por (paciente_id, vacuna, proxima_dosis) y no solo por
+    (paciente_id, vacuna): si el veterinario aplica la vacuna y registra una
+    nueva fecha, es un recordatorio distinto y debe volver a aparecer.
+    """
+    __tablename__ = "vacunas_avisadas"
+
+    id            = Column(Integer, primary_key=True)
+    paciente_id   = Column(Integer, ForeignKey("pacientes.id", ondelete="CASCADE"), nullable=False)
+    vacuna        = Column(String(150), nullable=False)
+    proxima_dosis = Column(String(60), nullable=False)   # tal cual viene del item (fecha ISO o texto libre)
+    avisado_en    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    avisado_por   = Column(String(50))
+
+    __table_args__ = (
+        UniqueConstraint("paciente_id", "vacuna", "proxima_dosis", name="uq_vacuna_avisada"),
+    )
 
