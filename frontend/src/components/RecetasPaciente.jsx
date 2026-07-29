@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Loader2, Pencil, Download, Pill, X } from 'lucide-react'
+import { Plus, Trash2, Loader2, Pencil, Download, Pill, X, Send } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, esVeterinario } from '../services/api'
@@ -24,8 +24,13 @@ const fmtFechaHora = (iso) => iso ? new Date(iso).toLocaleString('es-PE', {
 const FORM_INICIAL = { fecha: hoyStr(), diagnostico: '', indicaciones: '', items: [{ ...ITEM_VACIO }] }
 
 // ── PDF de la receta (clínica + paciente + dueño + medicamentos + firma) ────
+// Construye el documento sin guardarlo: cada botón decide qué hacer con él
+// (descargarlo directo, o compartirlo por WhatsApp).
 const _MORADO = [88, 28, 135]
-function generarPDF(paciente, cliente, receta) {
+function nombreArchivoReceta(paciente, receta) {
+  return `Receta_${paciente?.nombre ?? 'paciente'}_${receta.fecha}.pdf`
+}
+function construirPDF(paciente, cliente, receta) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const W = 210, M = 14
 
@@ -109,7 +114,65 @@ function generarPDF(paciente, cliente, receta) {
   doc.text(receta.veterinario_nombre || 'Médico Veterinario', W - M - 35, y + 5, { align: 'center' })
   doc.text('Médico Veterinario', W - M - 35, y + 9, { align: 'center' })
 
-  doc.save(`Receta_${paciente?.nombre ?? 'paciente'}_${receta.fecha}.pdf`)
+  return doc
+}
+
+function descargarPDF(paciente, cliente, receta) {
+  construirPDF(paciente, cliente, receta).save(nombreArchivoReceta(paciente, receta))
+}
+
+// Normaliza un teléfono peruano al formato que espera wa.me (mismo criterio
+// que ya usan los recordatorios de turnos y vacunas en el resto de la app).
+function telefonoWhatsApp(tel) {
+  const num = (tel || '').replace(/\D/g, '')
+  return num.length === 9 ? `51${num}` : num
+}
+
+/**
+ * Envía la receta al dueño por WhatsApp.
+ *
+ * WhatsApp no tiene forma de adjuntar un archivo a través de un simple enlace
+ * (wa.me solo prellena texto): eso es una limitación de WhatsApp, no algo que
+ * se pueda resolver gratis desde el navegador. Dos caminos, según lo que
+ * soporte el dispositivo:
+ *
+ *   1. Si el navegador soporta compartir ARCHIVOS (Web Share API — celulares
+ *      con Chrome/Safari recientes, y algunos navegadores de escritorio),
+ *      se abre el panel nativo de "Compartir" con el PDF ya adjunto: el
+ *      usuario elige WhatsApp ahí mismo y el archivo real viaja con el mensaje.
+ *   2. Si no (la mayoría de PCs de escritorio hoy), se descarga el PDF y se
+ *      abre WhatsApp con un mensaje explicando que hay que adjuntarlo a mano.
+ *      Es una limitación real de la plataforma, no un paso de más inventado.
+ */
+async function enviarReceta(paciente, cliente, receta, toast) {
+  if (!cliente?.telefono) {
+    toast.error('Este cliente no tiene un teléfono registrado.')
+    return
+  }
+  const doc = construirPDF(paciente, cliente, receta)
+  const archivo = nombreArchivoReceta(paciente, receta)
+  const texto = `Receta de ${paciente?.nombre ?? 'su mascota'} — ${clinicaActual().nombre}`
+
+  const blob = doc.output('blob')
+  const file = new File([blob], archivo, { type: 'application/pdf' })
+
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: texto, text: texto })
+      return   // el usuario eligió WhatsApp (u otra app) desde el panel nativo
+    } catch (err) {
+      if (err?.name === 'AbortError') return   // canceló el panel de compartir, no es un error
+      // si falla por otro motivo, cae al plan B de abajo
+    }
+  }
+
+  doc.save(archivo)
+  const mensaje =
+    `Hola ${cliente.nombre}, le enviamos la receta de ${paciente?.nombre ?? 'su mascota'} ` +
+    `del ${fmtFecha(receta.fecha)} (${clinicaActual().nombre}). ` +
+    `Se descargó el PDF a su computadora: adjúntelo aquí antes de enviar. ¡Gracias!`
+  window.open(`https://wa.me/${telefonoWhatsApp(cliente.telefono)}?text=${encodeURIComponent(mensaje)}`, '_blank', 'noopener')
+  toast.success('PDF descargado. Se abrió WhatsApp para que lo adjuntes al mensaje.')
 }
 
 function ItemsEditor({ items, onChange }) {
@@ -156,7 +219,19 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
   const [form, setForm] = useState(FORM_INICIAL)
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState(null)
+  const [enviandoId, setEnviandoId] = useState(null)   // id de la receta que se está compartiendo
   const guardandoRef = useRef(false)   // guard extra contra doble envío (doble clic, Enter repetido)
+
+  const handleEnviar = async (r) => {
+    setEnviandoId(r.id)
+    try {
+      await enviarReceta(paciente, cliente, r, toast)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setEnviandoId(null)
+    }
+  }
 
   const cargar = async () => {
     setCargando(true)
@@ -365,9 +440,14 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => generarPDF(paciente, cliente, r)} title="Descargar PDF"
+                  <button onClick={() => descargarPDF(paciente, cliente, r)} title="Descargar PDF"
                     className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition">
                     <Download className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleEnviar(r)}
+                    disabled={enviandoId === r.id} title="Enviar al cliente por WhatsApp"
+                    className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-emerald-700 hover:border-emerald-300 transition disabled:opacity-50">
+                    {enviandoId === r.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>
                   {puedeEscribir && (
                     <>
