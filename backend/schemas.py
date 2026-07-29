@@ -564,6 +564,12 @@ class VentaItemOut(BaseModel):
         return v
 
 
+class VentaAnular(BaseModel):
+    """Anular exige un motivo: queda como constancia de por qué se dejó sin
+    efecto un comprobante ya emitido."""
+    motivo: str = Field(..., min_length=3, max_length=200)
+
+
 class VentaOut(BaseModel):
     id:            int
     cliente_id:    int
@@ -572,6 +578,12 @@ class VentaOut(BaseModel):
     descuento_pct: float = 0
     metodo_pago:   Optional[str] = None
     items:         list[VentaItemOut] = []
+
+    # Anulación (una venta anulada sigue existiendo, fuera de los totales)
+    anulada:          bool = False
+    anulada_en:       Optional[datetime] = None
+    anulada_por:      Optional[str] = None
+    motivo_anulacion: Optional[str] = None
 
     @computed_field
     @property

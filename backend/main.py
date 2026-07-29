@@ -92,6 +92,8 @@ _ACCIONES = {
     ("PUT", "/api/asistencia/{id}"): "Corrigió una marcación de asistencia",
     ("DELETE", "/api/asistencia/{id}"): "Eliminó una marcación",
     ("POST", "/api/ventas"): "Registró una venta",
+    ("POST", "/api/ventas/{id}/anular"): "Anuló una venta",
+    ("POST", "/api/dashboard/cierre-caja"): "Cerró la caja del día",
     ("POST", "/api/usuarios"): "Creó un usuario",
     ("PUT", "/api/usuarios/{id}"): "Editó un usuario",
     ("DELETE", "/api/usuarios/{id}"): "Eliminó un usuario",

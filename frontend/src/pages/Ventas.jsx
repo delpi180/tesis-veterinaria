@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingCart, Package, CreditCard,
-  Receipt, Plus, Minus, Trash2, X, FileText, Search, Stethoscope, Tag, Download,
+  Receipt, Plus, Minus, Trash2, X, FileText, Search, Stethoscope, Tag, Download, Ban,
 } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { clinicaActual } from '../services/clinica'
 import { api } from '../services/api'
 import { exportarCSV } from '../utils/exportUtils'
+import { useToast } from '../components/Toast'
 
 const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -209,6 +210,7 @@ export default function Ventas() {
   const { state } = useLocation()
   const navigate  = useNavigate()
   const [ventas,    setVentas]    = useState([])
+  const [anulando,  setAnulando]  = useState(null)   // venta que se está por anular
   const [clientes,  setClientes]  = useState([])
   const [productos, setProductos] = useState([])
   const [servicios, setServicios] = useState([])
@@ -632,9 +634,16 @@ export default function Ventas() {
               </thead>
               <tbody>
                 {ventas.map((v, i) => (
-                  <tr key={v.id} className={`border-b border-slate-50 hover:bg-slate-50/60 transition ${i % 2 ? 'bg-slate-50/30' : ''}`}>
+                  // Una venta anulada se atenúa pero NO se oculta: el número de
+                  // comprobante tiene que seguir siendo rastreable.
+                  <tr key={v.id} className={`border-b border-slate-50 hover:bg-slate-50/60 transition ${i % 2 ? 'bg-slate-50/30' : ''} ${v.anulada ? 'opacity-60' : ''}`}>
                     <td className="px-5 py-3.5">
-                      <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{nroBoleta(v.id)}</span>
+                      <span className={`text-xs font-mono px-2 py-0.5 rounded ${v.anulada ? 'bg-rose-100 text-rose-700 line-through' : 'bg-slate-100 text-slate-600'}`}>
+                        {nroBoleta(v.id)}
+                      </span>
+                      {v.anulada && (
+                        <span className="block text-[10px] font-bold text-rose-700 mt-1">ANULADA</span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="text-xs font-medium text-slate-700">{fmtFecha(v.fecha)}</p>
@@ -651,15 +660,34 @@ export default function Ventas() {
                         {metodoLabel(v.metodo_pago)}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-right font-bold text-slate-800">{fmtMoneda(v.total)}</td>
-                    <td className="px-5 py-3.5 text-center">
-                      <button
-                        onClick={() => generarBoleta(v, clienteMap[v.cliente_id])}
-                        title="Generar boleta PDF"
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg px-2.5 py-1 hover:bg-purple-50 transition"
-                      >
-                        <FileText className="w-3.5 h-3.5" /> PDF
-                      </button>
+                    <td className={`px-5 py-3.5 text-right font-bold ${v.anulada ? 'text-slate-500 line-through' : 'text-slate-800'}`}>
+                      {fmtMoneda(v.total)}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => generarBoleta(v, clienteMap[v.cliente_id])}
+                          title="Generar boleta PDF"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg px-2.5 py-1 hover:bg-purple-50 transition"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> PDF
+                        </button>
+                        {!v.anulada && (
+                          <button
+                            onClick={() => setAnulando(v)}
+                            title="Anular esta venta"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 border border-rose-200 rounded-lg px-2.5 py-1 hover:bg-rose-50 transition"
+                          >
+                            <Ban className="w-3.5 h-3.5" /> Anular
+                          </button>
+                        )}
+                      </div>
+                      {v.anulada && v.motivo_anulacion && (
+                        <p className="text-[10px] text-slate-500 text-center mt-1 max-w-[180px] mx-auto">
+                          {v.motivo_anulacion}
+                          {v.anulada_por && <span className="block text-slate-400">por {v.anulada_por}</span>}
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -990,6 +1018,96 @@ export default function Ventas() {
         </div>
       )}
 
+      {/* ── Anular venta ──────────────────────────────────────────────────────
+          Se pide motivo obligatorio: la venta no se borra, queda como
+          constancia de qué pasó, así que el motivo es parte del registro. */}
+      {anulando && (
+        <DialogoAnular
+          venta={anulando}
+          cliente={clienteMap[anulando.cliente_id]}
+          onCerrar={() => setAnulando(null)}
+          onAnulada={(actualizada) => {
+            setVentas(prev => prev.map(x => x.id === actualizada.id ? actualizada : x))
+            setAnulando(null)
+          }}
+        />
+      )}
+
+    </div>
+  )
+}
+
+function DialogoAnular({ venta, cliente, onCerrar, onAnulada }) {
+  const toast = useToast()
+  const [motivo, setMotivo] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  const confirmar = async () => {
+    if (motivo.trim().length < 3) {
+      toast.error('Escribe el motivo de la anulación.')
+      return
+    }
+    setGuardando(true)
+    try {
+      const actualizada = await api.post(`/api/ventas/${venta.id}/anular`, { motivo: motivo.trim() })
+      toast.success('Venta anulada. El stock volvió al inventario.')
+      onAnulada(actualizada)
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onCerrar() }}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <Ban className="w-5 h-5 text-rose-600 shrink-0" />
+            <p className="text-sm font-bold text-slate-800">Anular {nroBoleta(venta.id)}</p>
+          </div>
+          <button onClick={onCerrar} className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-500 shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 flex flex-col gap-3">
+          <div className="text-sm text-slate-700 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+            <p><span className="text-slate-500">Cliente:</span> {cliente?.nombre ?? `#${venta.cliente_id}`}</p>
+            <p><span className="text-slate-500">Total:</span> <strong>{fmtMoneda(venta.total)}</strong></p>
+          </div>
+
+          <p className="text-xs text-slate-600">
+            La venta no se borra: queda registrada como anulada, deja de sumar en
+            la caja y los productos vuelven al inventario.
+          </p>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">
+              Motivo <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text" value={motivo} onChange={e => setMotivo(e.target.value)}
+              placeholder="Ej. cobro duplicado, cliente devolvió el producto"
+              autoFocus
+              className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-rose-300"
+            />
+          </div>
+        </div>
+
+        <div className="px-5 py-4 border-t border-slate-100 flex justify-end gap-3">
+          <button onClick={onCerrar}
+            className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
+            Cancelar
+          </button>
+          <button onClick={confirmar} disabled={guardando}
+            className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 rounded-lg hover:bg-rose-700 transition disabled:opacity-50">
+            {guardando ? 'Anulando…' : 'Anular venta'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

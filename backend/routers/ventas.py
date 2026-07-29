@@ -1,13 +1,17 @@
 from collections import defaultdict
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session, selectinload, joinedload
 
 from database import get_db
-from models import Cliente, MovimientoInventario, Producto, Servicio, Venta, VentaItem
-from schemas import VentaCreate, VentaOut
+from models import (
+    CierreCaja, Cliente, MovimientoInventario, Producto, Servicio, Usuario,
+    Venta, VentaItem,
+)
+from schemas import VentaAnular, VentaCreate, VentaOut
+from core.deps import usuario_actual, solo_admin
 
 router = APIRouter(prefix="/api/ventas", tags=["Ventas"])
 
@@ -127,6 +131,91 @@ def crear_venta(payload: VentaCreate, db: Session = Depends(get_db)):
 
     # Recargar con relaciones completas para la respuesta
     return _cargar_venta(db, venta.id)
+
+
+# ── Anular una venta ─────────────────────────────────────────────────────────
+
+@router.post("/{venta_id}/anular", response_model=VentaOut)
+def anular_venta(
+    venta_id: int,
+    payload: VentaAnular,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Anula una venta mal hecha y devuelve el stock al inventario.
+
+    NO borra la venta: el comprobante ya se entregó y su número tiene que
+    seguir existiendo. Queda marcada como anulada, fuera de los totales de
+    caja, y con constancia de quién la anuló y por qué.
+
+    Devolver el stock es la mitad del asunto: al vender se descontó, así que
+    sin esta reversión un error de cobro se convertiría además en un error de
+    inventario.
+    """
+    # Anular mueve dinero e inventario: queda reservado a la administradora,
+    # igual que el cierre de caja.
+    solo_admin(request)
+
+    venta = _cargar_venta(db, venta_id)
+    if not venta:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    if venta.anulada:
+        raise HTTPException(status_code=409, detail="Esta venta ya estaba anulada.")
+
+    motivo = (payload.motivo or "").strip()
+    if len(motivo) < 3:
+        raise HTTPException(
+            status_code=422,
+            detail="Indica el motivo de la anulación (queda como constancia).",
+        )
+
+    # Si el día ya fue cerrado, anular cambiaría un arqueo firmado: se bloquea
+    # para que el cierre siga siendo una constancia y no algo que se mueve solo.
+    dia_venta = venta.fecha.astimezone(timezone.utc).date() if venta.fecha else None
+    if dia_venta and db.query(CierreCaja).filter(CierreCaja.fecha == dia_venta).first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"La caja del {dia_venta.isoformat()} ya fue cerrada; esa venta no se puede anular.",
+        )
+
+    try:
+        ahora = datetime.now(timezone.utc)
+        venta.anulada = True
+        venta.anulada_en = ahora
+        venta.anulada_por = usuario.usuario if usuario else None
+        venta.motivo_anulacion = motivo[:200]
+
+        # Devolver al inventario lo que se había descontado
+        referencia = f"Anulación B-{venta.id:06d}"
+        devueltos: dict[int, int] = defaultdict(int)
+        for item in venta.items:
+            if item.producto_id:
+                devueltos[item.producto_id] += item.cantidad
+
+        for pid, qty in devueltos.items():
+            p = db.get(Producto, pid)
+            if not p:
+                continue          # el producto fue eliminado: no hay stock que devolver
+            p.stock += qty
+            db.add(MovimientoInventario(
+                producto_id=pid,
+                tipo="entrada",
+                cantidad=qty,
+                stock_resultante=p.stock,
+                motivo=f"Devolución por anulación: {motivo[:120]}",
+                referencia=referencia,
+            ))
+
+        request.state.actividad_detalle = f"Venta B-{venta.id:06d} — {motivo[:80]}"
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception:
+        db.rollback()
+        raise
+
+    return _cargar_venta(db, venta_id)
 
 
 # ── Consultas ─────────────────────────────────────────────────────────────────

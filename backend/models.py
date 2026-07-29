@@ -485,8 +485,47 @@ class Venta(Base):
     descuento_pct = Column(Numeric(5, 2), default=0)         # % de descuento aplicado a la venta
     metodo_pago   = Column(String(20), default="efectivo")  # efectivo | tarjeta | yape | plin
 
+    # ── Anulación ────────────────────────────────────────────────────────────
+    # Una venta mal hecha se ANULA, no se borra: el comprobante ya se entregó y
+    # su número tiene que seguir existiendo. Anularla devuelve el stock y la
+    # deja fuera de los totales de caja, pero el registro queda como constancia
+    # de qué pasó y quién lo hizo.
+    anulada          = Column(Boolean, default=False, nullable=False)
+    anulada_en       = Column(DateTime(timezone=True))
+    anulada_por      = Column(String(50))
+    motivo_anulacion = Column(String(200))
+
     cliente = relationship("Cliente")
     items   = relationship("VentaItem", back_populates="venta", cascade="all, delete-orphan")
+
+
+class CierreCaja(Base):
+    """Arqueo del día: lo que dice el sistema contra lo que hay en el cajón.
+
+    Antes el "cierre de caja" era solo un listado de ventas que se podía
+    generar mil veces y no dejaba rastro. Lo que le da sentido a un cierre es
+    justamente esto: contar el efectivo físico, compararlo con lo esperado y
+    dejar registrado quién cerró y si cuadró.
+
+    Con varias personas manejando efectivo, esa constancia protege a las dos
+    partes: a la dueña le da trazabilidad y a la recepcionista honesta le da
+    respaldo de que su caja cuadró ese día.
+
+    Solo se arquea el EFECTIVO: lo cobrado por tarjeta/Yape/Plin no pasa por
+    el cajón, así que no tiene sentido contarlo a mano.
+    """
+    __tablename__ = "cierres_caja"
+
+    id                = Column(Integer, primary_key=True)
+    fecha             = Column(Date, nullable=False, unique=True)   # un cierre por día
+    efectivo_esperado = Column(Numeric(10, 2), nullable=False)      # según el sistema
+    efectivo_contado  = Column(Numeric(10, 2), nullable=False)      # lo que había en el cajón
+    diferencia        = Column(Numeric(10, 2), nullable=False)      # contado - esperado (negativo = falta)
+    total_dia         = Column(Numeric(10, 2), nullable=False)      # todos los métodos, para referencia
+    num_ventas        = Column(Integer, nullable=False, default=0)
+    notas             = Column(String(300))                         # explicación de la diferencia
+    cerrado_por       = Column(String(50))
+    cerrado_en        = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class MovimientoInventario(Base):

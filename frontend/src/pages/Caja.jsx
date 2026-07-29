@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Wallet, Banknote, CreditCard, Smartphone, FileText } from 'lucide-react'
+import { Wallet, Banknote, CreditCard, Smartphone, FileText, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api } from '../services/api'
@@ -29,6 +29,152 @@ const Spinner = () => (
   </svg>
 )
 
+/**
+ * Arqueo del día: cuánto efectivo hay realmente en el cajón.
+ *
+ * Antes esta pantalla solo listaba ventas. Lo que le da sentido a un cierre es
+ * comparar el conteo físico con lo que dice el sistema y dejar constancia de
+ * quién cerró: con varias personas manejando efectivo, eso protege tanto a la
+ * dueña como a quien contó la caja.
+ */
+function ArqueoCaja({ fecha, esperado, cierre, onCerrado }) {
+  const toast = useToast()
+  const [contado, setContado] = useState('')
+  const [notas, setNotas] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  // Diferencia en vivo, para que se vea antes de confirmar
+  const contadoNum = parseFloat(contado)
+  const hayNumero = contado !== '' && !Number.isNaN(contadoNum)
+  const diferencia = hayNumero ? Math.round((contadoNum - esperado) * 100) / 100 : null
+
+  const registrar = async () => {
+    if (!hayNumero || contadoNum < 0) {
+      toast.error('Escribe cuánto efectivo contaste en el cajón.')
+      return
+    }
+    if (diferencia !== 0 && !notas.trim()) {
+      toast.error('La caja no cuadra: explica brevemente la diferencia antes de cerrar.')
+      return
+    }
+    setGuardando(true)
+    try {
+      await api.post('/api/dashboard/cierre-caja', {
+        fecha, efectivo_contado: contadoNum, notas: notas.trim() || null,
+      })
+      toast.success('Caja cerrada.')
+      setContado(''); setNotas('')
+      onCerrado?.()
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  // Ya cerrada: se muestra el resultado, no el formulario
+  if (cierre) {
+    const dif = cierre.diferencia
+    const cuadro = dif === 0
+    return (
+      <section className={`rounded-xl border shadow-sm overflow-hidden ${cuadro ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+        <div className="px-5 py-4 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex items-center gap-2">
+            {cuadro
+              ? <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
+              : <AlertTriangle className="w-5 h-5 text-amber-700 shrink-0" />}
+            <span className={`text-sm font-bold ${cuadro ? 'text-emerald-900' : 'text-amber-900'}`}>
+              {cuadro ? 'Caja cerrada y cuadrada' : 'Caja cerrada con diferencia'}
+            </span>
+          </div>
+          <div className="text-sm text-slate-700">
+            Esperado <strong>{fmtMoneda(cierre.efectivo_esperado)}</strong>
+            {' · '}Contado <strong>{fmtMoneda(cierre.efectivo_contado)}</strong>
+            {!cuadro && (
+              <> {' · '}<strong className={dif < 0 ? 'text-rose-700' : 'text-sky-700'}>
+                {dif < 0 ? 'Faltó' : 'Sobró'} {fmtMoneda(Math.abs(dif))}
+              </strong></>
+            )}
+          </div>
+          <span className="text-xs text-slate-600 ml-auto">
+            {cierre.cerrado_por} · {cierre.cerrado_en ? fmtHora(cierre.cerrado_en) : ''}
+          </span>
+        </div>
+        {cierre.notas && (
+          <p className="px-5 pb-4 text-xs text-slate-700">
+            <span className="font-semibold">Nota:</span> {cierre.notas}
+          </p>
+        )}
+      </section>
+    )
+  }
+
+  return (
+    <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+        <Banknote className="w-4 h-4 text-emerald-600" />
+        <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Arqueo de caja</h2>
+      </div>
+      <div className="px-5 py-4 flex flex-col gap-3">
+        <p className="text-xs text-slate-600">
+          Cuenta el efectivo del cajón y anótalo acá. Solo se cuenta efectivo:
+          lo cobrado por tarjeta, Yape o Plin no pasa por caja.
+        </p>
+
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <p className="text-xs font-semibold text-slate-600 mb-1">Según el sistema</p>
+            <p className="text-xl font-bold text-slate-800 tabular-nums">{fmtMoneda(esperado)}</p>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">Contado en el cajón</label>
+            <input
+              type="number" step="0.01" min="0" value={contado}
+              onChange={e => setContado(e.target.value)}
+              placeholder="0.00"
+              className="w-36 text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white tabular-nums focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+          {diferencia !== null && (
+            <div>
+              <p className="text-xs font-semibold text-slate-600 mb-1">Diferencia</p>
+              <p className={`text-xl font-bold tabular-nums ${
+                diferencia === 0 ? 'text-emerald-700' : diferencia < 0 ? 'text-rose-700' : 'text-sky-700'
+              }`}>
+                {diferencia === 0 ? 'Cuadra' : `${diferencia > 0 ? '+' : ''}${fmtMoneda(diferencia)}`}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {diferencia !== null && diferencia !== 0 && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-600">
+              ¿Por qué la diferencia? <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text" value={notas} onChange={e => setNotas(e.target.value)}
+              placeholder="Ej. se dio un vuelto de más en la mañana"
+              className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-[11px] text-slate-500">
+            Una vez cerrada, la caja de este día no se puede volver a cerrar ni
+            se pueden anular sus ventas.
+          </p>
+          <button onClick={registrar} disabled={guardando || !hayNumero}
+            className="px-4 py-2 text-sm font-semibold text-white bg-emerald-700 rounded-lg hover:bg-emerald-800 transition disabled:opacity-50">
+            {guardando ? 'Cerrando…' : 'Cerrar caja del día'}
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function Caja() {
   const toast = useToast()
   const hoy = fechaLocal()
@@ -36,13 +182,16 @@ export default function Caja() {
   const [data,    setData]    = useState(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    setLoading(true)
-    api.get(`/api/dashboard/cierre-caja?fecha=${fecha}`)
+  // Se extrae para poder recargar tras registrar el arqueo, sin duplicar la
+  // llamada ni depender de que el efecto se vuelva a disparar.
+  const cargar = (silencioso = false) => {
+    if (!silencioso) setLoading(true)
+    return api.get(`/api/dashboard/cierre-caja?fecha=${fecha}`)
       .then(setData)
       .catch(e => toast.error(e.message))
       .finally(() => setLoading(false))
-  }, [fecha])
+  }
+  useEffect(() => { cargar() }, [fecha])
 
   const today = new Date().toLocaleDateString('es-MX', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -142,6 +291,17 @@ export default function Caja() {
                 )
               })}
             </div>
+
+            {/* ── Arqueo: contar el efectivo del cajón ──────────────────────
+                Es lo que convierte este reporte en un cierre de verdad. Solo
+                se cuenta el efectivo: lo cobrado por tarjeta/Yape/Plin no pasa
+                por el cajón. */}
+            <ArqueoCaja
+              fecha={fecha}
+              esperado={data.efectivo_esperado ?? 0}
+              cierre={data.cierre}
+              onCerrado={() => cargar()}
+            />
 
             {/* Detalle de ventas */}
             <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

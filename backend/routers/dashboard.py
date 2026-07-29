@@ -1,18 +1,18 @@
 from datetime import datetime, date, time, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import (
-    Asistencia, Cita, Cliente, HistoriaClinica, Paciente, Producto, Venta,
-    VentaItem, Usuario, VacunaAvisada,
+    Asistencia, CierreCaja, Cita, Cliente, HistoriaClinica, Paciente, Producto,
+    Venta, VentaItem, Usuario, VacunaAvisada,
 )
-from core.deps import usuario_actual
+from core.deps import usuario_actual, solo_admin
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
@@ -137,17 +137,23 @@ def resumen_dashboard(db: Session = Depends(get_db)):
     consultas_hoy = conteo[hoy.weekday()]
 
     # ── Ventas: ingresos del día y del mes ────────────────────────────────────
+    # Las anuladas quedan fuera de TODOS los totales: si siguieran sumando,
+    # anularlas no serviría de nada y la caja nunca cuadraría.
     ingresos_dia = (
         db.query(func.coalesce(func.sum(Venta.total), 0))
-        .filter(Venta.fecha >= hoy_ini, Venta.fecha < hoy_fin)
+        .filter(Venta.fecha >= hoy_ini, Venta.fecha < hoy_fin, Venta.anulada.is_(False))
         .scalar()
     )
     ingresos_mes = (
         db.query(func.coalesce(func.sum(Venta.total), 0))
-        .filter(Venta.fecha >= mes_ini)
+        .filter(Venta.fecha >= mes_ini, Venta.anulada.is_(False))
         .scalar()
     )
-    ventas_mes = db.query(func.count(Venta.id)).filter(Venta.fecha >= mes_ini).scalar()
+    ventas_mes = (
+        db.query(func.count(Venta.id))
+        .filter(Venta.fecha >= mes_ini, Venta.anulada.is_(False))
+        .scalar()
+    )
 
     # ── Inventario: stock bajo ────────────────────────────────────────────────
     stock_bajo = (
@@ -186,7 +192,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
     sem_fin = _rango_local(lunes + timedelta(days=6))[1]
     ventas_semana = (
         db.query(Venta.fecha, Venta.total)
-        .filter(Venta.fecha >= sem_ini, Venta.fecha < sem_fin)
+        .filter(Venta.fecha >= sem_ini, Venta.fecha < sem_fin, Venta.anulada.is_(False))
         .all()
     )
     limites = [_rango_local(lunes + timedelta(days=i)) for i in range(7)]
@@ -202,7 +208,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
     # ── Métodos de pago del mes ───────────────────────────────────────────────
     metodos_rows = (
         db.query(Venta.metodo_pago, func.count(Venta.id), func.coalesce(func.sum(Venta.total), 0))
-        .filter(Venta.fecha >= mes_ini)
+        .filter(Venta.fecha >= mes_ini, Venta.anulada.is_(False))
         .group_by(Venta.metodo_pago)
         .all()
     )
@@ -278,17 +284,23 @@ def cierre_caja(
     fecha: Optional[date] = Query(None, description="Día a cerrar (por defecto hoy)"),
     db: Session = Depends(get_db),
 ):
-    """Arqueo del día: total e importes desglosados por método de pago."""
+    """Arqueo del día: lo cobrado por método de pago y el estado del cierre.
+
+    Las anuladas no suman a los totales, pero se listan igual: si desaparecieran
+    de la vista, quien revisa la caja no entendería por qué falta un número de
+    comprobante.
+    """
     dia = fecha or date.today()
     ini, fin = _rango_local(dia)
 
-    ventas = (
+    todas = (
         db.query(Venta)
         .options(joinedload(Venta.cliente))
         .filter(Venta.fecha >= ini, Venta.fecha < fin)
         .order_by(Venta.fecha)
         .all()
     )
+    ventas = [v for v in todas if not v.anulada]
 
     por_metodo = {m: {"total": 0.0, "cantidad": 0} for m in METODOS_PAGO}
     total = 0.0
@@ -298,10 +310,18 @@ def cierre_caja(
         por_metodo[m]["cantidad"] += 1
         total += float(v.total)
 
+    # Solo el efectivo se cuenta a mano: lo cobrado por tarjeta/Yape/Plin no
+    # pasa por el cajón.
+    efectivo_esperado = round(por_metodo["efectivo"]["total"], 2)
+
+    cierre = db.query(CierreCaja).filter(CierreCaja.fecha == dia).first()
+
     return {
         "fecha": dia.isoformat(),
         "total": round(total, 2),
         "num_ventas": len(ventas),
+        "efectivo_esperado": efectivo_esperado,
+        "num_anuladas": len(todas) - len(ventas),
         "por_metodo": [
             {"metodo": m, "total": round(por_metodo[m]["total"], 2), "cantidad": por_metodo[m]["cantidad"]}
             for m in METODOS_PAGO
@@ -313,9 +333,86 @@ def cierre_caja(
                 "cliente": v.cliente.nombre if v.cliente else f"Cliente #{v.cliente_id}",
                 "metodo_pago": v.metodo_pago,
                 "total": float(v.total),
+                "anulada": bool(v.anulada),
+                "motivo_anulacion": v.motivo_anulacion,
             }
-            for v in ventas
+            for v in todas
         ],
+        "cierre": None if not cierre else {
+            "efectivo_contado": float(cierre.efectivo_contado),
+            "efectivo_esperado": float(cierre.efectivo_esperado),
+            "diferencia": float(cierre.diferencia),
+            "notas": cierre.notas,
+            "cerrado_por": cierre.cerrado_por,
+            "cerrado_en": cierre.cerrado_en,
+        },
+    }
+
+
+class CierreCajaRequest(BaseModel):
+    fecha: Optional[date] = None
+    efectivo_contado: float = Field(..., ge=0, description="Lo que había en el cajón")
+    notas: Optional[str] = Field(None, max_length=300)
+
+
+@router.post("/cierre-caja", status_code=201)
+def registrar_cierre_caja(
+    payload: CierreCajaRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Registra el arqueo del día: cuánto efectivo había realmente.
+
+    Guardar esto es lo que convierte el reporte en un cierre: queda constancia
+    de quién contó, cuándo y si cuadró. Con varias personas manejando efectivo,
+    esa constancia protege tanto a la dueña como a quien cerró la caja.
+    """
+    solo_admin(request)
+    dia = payload.fecha or date.today()
+
+    if dia > date.today():
+        raise HTTPException(status_code=422, detail="No se puede cerrar la caja de un día futuro.")
+    if db.query(CierreCaja).filter(CierreCaja.fecha == dia).first():
+        raise HTTPException(
+            status_code=409,
+            detail=f"La caja del {dia.isoformat()} ya fue cerrada.",
+        )
+
+    ini, fin = _rango_local(dia)
+    ventas = (
+        db.query(Venta)
+        .filter(Venta.fecha >= ini, Venta.fecha < fin, Venta.anulada.is_(False))
+        .all()
+    )
+    efectivo_esperado = round(
+        sum(float(v.total) for v in ventas if (v.metodo_pago or "efectivo") == "efectivo"), 2
+    )
+    total_dia = round(sum(float(v.total) for v in ventas), 2)
+    contado = round(float(payload.efectivo_contado), 2)
+
+    cierre = CierreCaja(
+        fecha=dia,
+        efectivo_esperado=efectivo_esperado,
+        efectivo_contado=contado,
+        diferencia=round(contado - efectivo_esperado, 2),   # negativo = falta plata
+        total_dia=total_dia,
+        num_ventas=len(ventas),
+        notas=(payload.notas or "").strip() or None,
+        cerrado_por=usuario.usuario if usuario else None,
+    )
+    db.add(cierre)
+    request.state.actividad_detalle = f"{dia.isoformat()} — diferencia S/ {cierre.diferencia}"
+    db.commit()
+    db.refresh(cierre)
+
+    return {
+        "fecha": dia.isoformat(),
+        "efectivo_esperado": float(cierre.efectivo_esperado),
+        "efectivo_contado": float(cierre.efectivo_contado),
+        "diferencia": float(cierre.diferencia),
+        "cerrado_por": cierre.cerrado_por,
+        "cerrado_en": cierre.cerrado_en,
     }
 
 
@@ -340,7 +437,10 @@ def reportes(
                 func.coalesce(func.sum(VentaItem.cantidad * VentaItem.precio_unitario), 0),
             )
             .join(Venta, VentaItem.venta_id == Venta.id)
-            .filter(Venta.fecha >= ini, Venta.fecha < fin, filtro_col.isnot(None))
+            .filter(
+                Venta.fecha >= ini, Venta.fecha < fin, filtro_col.isnot(None),
+                Venta.anulada.is_(False),   # lo anulado no cuenta como vendido
+            )
             .group_by(VentaItem.descripcion)
             .order_by(func.sum(VentaItem.cantidad).desc())
             .limit(15)
@@ -362,11 +462,14 @@ def reportes(
     atenciones_por_doctor = [{"doctor": n, "atenciones": int(c)} for n, c in doc_rows]
 
     total_ventas = (
-        db.query(func.count(Venta.id)).filter(Venta.fecha >= ini, Venta.fecha < fin).scalar()
+        db.query(func.count(Venta.id))
+        .filter(Venta.fecha >= ini, Venta.fecha < fin, Venta.anulada.is_(False))
+        .scalar()
     )
     ingreso_total = (
         db.query(func.coalesce(func.sum(Venta.total), 0))
-        .filter(Venta.fecha >= ini, Venta.fecha < fin).scalar()
+        .filter(Venta.fecha >= ini, Venta.fecha < fin, Venta.anulada.is_(False))
+        .scalar()
     )
 
     return {
