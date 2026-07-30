@@ -462,6 +462,20 @@ class Producto(Base):
     activo       = Column(Boolean, default=True)
     creado_en    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    # ── Vencimiento ──────────────────────────────────────────────────────────
+    # Aplica sobre todo a medicamentos y vacunas: administrar algo vencido es un
+    # problema sanitario y de responsabilidad, no solo de inventario.
+    #
+    # LIMITACIÓN CONOCIDA: se guarda UN vencimiento y UN lote por producto, el
+    # del stock que hay ahora. Si llegara mercadería nueva con otra fecha
+    # conviviendo con la anterior, hay que actualizar estos campos al reponer.
+    # Modelar lotes por separado (con su propio stock y descuento por el que
+    # vence primero) obligaría a rehacer todo el flujo de venta; para una
+    # clínica que repone de a poco, esto resuelve el problema real sin esa
+    # complejidad.
+    fecha_vencimiento = Column(Date)          # null = no aplica (accesorios, comida sin fecha)
+    lote              = Column(String(50))
+
 
 class Servicio(Base):
     __tablename__ = "servicios"

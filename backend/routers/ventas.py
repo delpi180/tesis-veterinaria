@@ -92,6 +92,22 @@ def crear_venta(payload: VentaCreate, db: Session = Depends(get_db)):
     if errores_stock:
         raise HTTPException(status_code=422, detail="Stock insuficiente — " + "; ".join(errores_stock))
 
+    # Vencidos: entregar un medicamento caducado es un problema sanitario, no
+    # de inventario. Se bloquea la venta y se dice qué hacer si la fecha está
+    # mal cargada, para que nadie quede trabado sin salida.
+    hoy = date.today()
+    vencidos = [
+        f"'{p.nombre}' venció el {p.fecha_vencimiento.strftime('%d/%m/%Y')}"
+        for p in productos.values()
+        if p.fecha_vencimiento and p.fecha_vencimiento < hoy
+    ]
+    if vencidos:
+        raise HTTPException(
+            status_code=422,
+            detail=("No se puede vender producto vencido — " + "; ".join(vencidos) +
+                    ". Si la fecha está equivocada, corrígela en Inventario."),
+        )
+
     # ── FASE 2: crear venta + items + descontar stock, todo o nada ───────────
     try:
         subtotal = sum(l["precio_unitario"] * l["cantidad"] for l in lineas)
@@ -172,7 +188,12 @@ def anular_venta(
 
     # Si el día ya fue cerrado, anular cambiaría un arqueo firmado: se bloquea
     # para que el cierre siga siendo una constancia y no algo que se mueve solo.
-    dia_venta = venta.fecha.astimezone(timezone.utc).date() if venta.fecha else None
+    # El arqueo y los totales del panel agrupan por día LOCAL de la clínica, no
+    # por día UTC. Con la hora de Lima (UTC-5) toda venta posterior a las 19:00
+    # cae en el día UTC siguiente: comparar en UTC dejaba anular ventas de un
+    # día ya cerrado justamente en el horario de cierre.
+    tz_local = datetime.now().astimezone().tzinfo
+    dia_venta = venta.fecha.astimezone(tz_local).date() if venta.fecha else None
     if dia_venta and db.query(CierreCaja).filter(CierreCaja.fecha == dia_venta).first():
         raise HTTPException(
             status_code=409,

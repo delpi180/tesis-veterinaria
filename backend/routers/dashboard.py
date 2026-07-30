@@ -167,6 +167,32 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         for p in stock_bajo
     ]
 
+    # ── Inventario: vencidos y por vencer ─────────────────────────────────────
+    # 30 días alcanza para devolver al proveedor o rematar antes de perderlo.
+    # Sin stock no hay nada que retirar, así que no se avisa.
+    limite_venc = hoy + timedelta(days=30)
+    por_vencer = (
+        db.query(Producto)
+        .filter(
+            Producto.activo.is_(True),
+            Producto.fecha_vencimiento.isnot(None),
+            Producto.fecha_vencimiento <= limite_venc,
+            Producto.stock > 0,
+        )
+        .order_by(Producto.fecha_vencimiento)
+        .all()
+    )
+    por_vencer_out = [
+        {
+            "id": p.id, "codigo": p.codigo, "nombre": p.nombre, "stock": p.stock,
+            "lote": p.lote,
+            "fecha_vencimiento": p.fecha_vencimiento.isoformat(),
+            "dias": (p.fecha_vencimiento - hoy).days,
+            "vencido": p.fecha_vencimiento < hoy,
+        }
+        for p in por_vencer
+    ]
+
     # ── Totales generales ─────────────────────────────────────────────────────
     total_clientes = db.query(func.count(Cliente.id)).scalar()
     total_pacientes = db.query(func.count(Paciente.id)).scalar()
@@ -269,6 +295,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         "ingresos_mes": float(ingresos_mes),
         "ventas_mes": int(ventas_mes),
         "stock_bajo": stock_bajo_out,
+        "por_vencer": por_vencer_out,
         "total_clientes": int(total_clientes),
         "total_pacientes": int(total_pacientes),
         "vacunas_proximas": vacunas,

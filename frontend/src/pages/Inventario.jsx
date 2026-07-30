@@ -32,6 +32,8 @@ const FORM_INICIAL = {
   stock:        '',
   stock_minimo: '5',
   activo:       true,
+  fecha_vencimiento: '',
+  lote:              '',
 }
 
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
@@ -45,6 +47,37 @@ const Spinner = () => (
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
   </svg>
 )
+
+const fmtFecha = (iso) => {
+  const [a, m, d] = iso.split('-')
+  return `${d}/${m}/${a}`
+}
+
+/** Aviso de caducidad. No muestra nada si el producto no lleva fecha o le
+ *  falta más de un mes: avisar de todo es lo mismo que no avisar de nada. */
+function BadgeVencimiento({ producto }) {
+  const estado = producto.estado_vencimiento
+  if (!estado || estado === 'vigente') return null
+
+  const dias = producto.dias_para_vencer
+  const vencido = estado === 'vencido'
+  const texto = vencido
+    ? `Vencido ${fmtFecha(producto.fecha_vencimiento)}`
+    : dias === 0 ? 'Vence hoy'
+    : `Vence en ${dias} día${dias === 1 ? '' : 's'}`
+
+  return (
+    <span
+      title={producto.lote ? `Lote ${producto.lote}` : undefined}
+      className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+        vencido ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'
+      }`}
+    >
+      <AlertTriangle className="w-3 h-3" /> {texto}
+    </span>
+  )
+}
+
 
 // ── Modal de kardex (movimientos + ajuste de stock) ──────────────────────────
 function KardexModal({ producto, onClose, onStockCambiado }) {
@@ -410,6 +443,12 @@ export default function Inventario() {
   const totalProductos = productos.length
   const bajoStock      = productos.filter(p => p.activo && p.stock_bajo).length
   const valorTotal     = productos.reduce((s, p) => s + p.stock * Number(p.precio), 0)
+  // Sin stock no hay nada que retirar de la estantería, así que no se avisa
+  const caducando = productos
+    .filter(p => p.activo && p.stock > 0 &&
+                 (p.estado_vencimiento === 'vencido' || p.estado_vencimiento === 'por_vencer'))
+    .sort((a, b) => a.dias_para_vencer - b.dias_para_vencer)
+  const vencidos = caducando.filter(p => p.estado_vencimiento === 'vencido')
 
   const today = new Date().toLocaleDateString('es-MX', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -435,6 +474,8 @@ export default function Inventario() {
       stock:        String(p.stock),
       stock_minimo: String(p.stock_minimo),
       activo:       p.activo,
+      fecha_vencimiento: p.fecha_vencimiento ?? '',
+      lote:              p.lote ?? '',
     })
     setErrorModal(null)
     setModalAbierto(true)
@@ -463,6 +504,8 @@ export default function Inventario() {
       stock:        parseInt(form.stock || '0', 10),
       stock_minimo: parseInt(form.stock_minimo || '0', 10),
       activo:       form.activo,
+      fecha_vencimiento: form.fecha_vencimiento || null,
+      lote:              form.lote.trim() || null,
     }
 
     setGuardando(true); setErrorModal(null)
@@ -527,6 +570,29 @@ export default function Inventario() {
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">
             ⚠ No se pudo conectar con el servidor: {error}
+          </div>
+        )}
+
+        {caducando.length > 0 && (
+          <div className={`border rounded-xl px-4 py-3 ${vencidos.length
+            ? 'bg-rose-50 border-rose-200' : 'bg-amber-50 border-amber-200'}`}>
+            <p className={`text-sm font-semibold flex items-center gap-2 ${vencidos.length
+              ? 'text-rose-700' : 'text-amber-800'}`}>
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              {vencidos.length > 0
+                ? `${vencidos.length} producto(s) vencido(s) — retíralos de la venta`
+                : `${caducando.length} producto(s) vencen en menos de 30 días`}
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-600">
+              {caducando.slice(0, 8).map(p => (
+                <span key={p.id}>
+                  <strong className="text-slate-700">{p.nombre}</strong>
+                  {p.lote ? ` (lote ${p.lote})` : ''} — {fmtFecha(p.fecha_vencimiento)}
+                  {' · '}{p.stock} en stock
+                </span>
+              ))}
+              {caducando.length > 8 && <span>y {caducando.length - 8} más…</span>}
+            </div>
           </div>
         )}
 
@@ -665,6 +731,7 @@ export default function Inventario() {
                         <p className="text-xs text-slate-400">
                           {[p.unidad, `Mín: ${p.stock_minimo}`].filter(Boolean).join(' · ')}
                         </p>
+                        <BadgeVencimiento producto={p} />
                       </td>
                       <td className="px-5 py-3.5">
                         <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${CAT_COLORS[p.categoria] ?? 'bg-slate-100 text-slate-600'}`}>
@@ -868,6 +935,30 @@ export default function Inventario() {
                     />
                     Producto activo
                   </label>
+                </div>
+
+                {/* Vencimiento: opcional, porque un collar o un plato no vencen */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className={labelCls}>Vence el</label>
+                    <input
+                      type="date"
+                      className={inputCls}
+                      value={form.fecha_vencimiento}
+                      onChange={e => setForm(f => ({ ...f, fecha_vencimiento: e.target.value }))}
+                    />
+                    <span className="text-[11px] text-slate-400">Déjalo vacío si no aplica</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className={labelCls}>Lote</label>
+                    <input
+                      type="text" maxLength={50}
+                      className={inputCls}
+                      placeholder="Ej. L-2451"
+                      value={form.lote}
+                      onChange={e => setForm(f => ({ ...f, lote: e.target.value }))}
+                    />
+                  </div>
                 </div>
 
                 {errorModal && (

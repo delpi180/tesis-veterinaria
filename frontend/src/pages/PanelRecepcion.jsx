@@ -56,6 +56,7 @@ export default function PanelRecepcion() {
   const pendientes = citasHoy.filter(c => c.estado === 'pendiente')
   const activas    = citasHoy.filter(c => c.estado !== 'cancelada')
   const stockBajo  = data?.stock_bajo ?? []
+  const porVencer  = data?.por_vencer ?? []
   const cajaTotal  = caja?.total ?? 0
   const cajaVentas = caja?.num_ventas ?? 0
   const asistenciasHoy = data?.asistencias_hoy ?? []
@@ -112,6 +113,30 @@ export default function PanelRecepcion() {
                 <p className="text-xs text-emerald-600 mt-0.5">{cajaVentas} venta(s)</p>
               </button>
             </div>
+
+            {/* Vencimientos — va antes de "por reponer" porque un producto
+                caducado no se puede vender, no es solo un faltante */}
+            {porVencer.length > 0 && (
+              <section className="bg-white rounded-xl border border-rose-200 shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-100 bg-rose-50 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-500" />
+                  <h2 className="text-xs font-semibold text-rose-700 uppercase tracking-widest">Vencimientos</h2>
+                </div>
+                <ul className="divide-y divide-slate-50">
+                  {porVencer.slice(0, 6).map(p => (
+                    <li key={p.id} className="px-5 py-2.5 flex items-center justify-between gap-3 text-sm">
+                      <span className="text-slate-700 min-w-0 truncate">
+                        {p.nombre}
+                        <span className="text-xs font-mono text-slate-400"> {p.lote ? `lote ${p.lote}` : p.codigo}</span>
+                      </span>
+                      <span className={`text-xs font-semibold shrink-0 ${p.vencido ? 'text-rose-600' : 'text-amber-600'}`}>
+                        {p.vencido ? 'Vencido' : p.dias === 0 ? 'Vence hoy' : `en ${p.dias} d`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {/* Stock bajo — detalle rápido */}
             {stockBajo.length > 0 && (

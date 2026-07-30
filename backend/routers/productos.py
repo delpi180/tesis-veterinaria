@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -84,6 +85,30 @@ def productos_stock_bajo(db: Session = Depends(get_db)):
         db.query(Producto)
         .filter(Producto.activo.is_(True), Producto.stock <= Producto.stock_minimo)
         .order_by(Producto.stock)
+        .all()
+    )
+
+
+@router.get("/por-vencer", response_model=list[ProductoOut])
+def productos_por_vencer(
+    dias: int = Query(30, ge=1, le=365, description="Ventana de aviso, en días"),
+    db: Session = Depends(get_db),
+):
+    """Lo que ya venció o vence dentro de la ventana, lo más urgente primero.
+
+    Los productos sin fecha quedan fuera: NULL es "no aplica", no "vencido".
+    """
+    limite = date.today() + timedelta(days=dias)
+    return (
+        db.query(Producto)
+        .filter(
+            Producto.activo.is_(True),
+            Producto.fecha_vencimiento.isnot(None),
+            Producto.fecha_vencimiento <= limite,
+            # Lo que ya se acabó no hay que retirarlo de la estantería
+            Producto.stock > 0,
+        )
+        .order_by(Producto.fecha_vencimiento)
         .all()
     )
 

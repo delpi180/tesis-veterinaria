@@ -391,6 +391,9 @@ class ProductoCreate(BaseModel):
     stock:        int   = Field(default=0, ge=0)
     stock_minimo: int   = Field(default=5,  ge=0)
     activo:       bool  = True
+    # Sobre todo para medicamentos y vacunas; null = no aplica
+    fecha_vencimiento: Optional[date] = None
+    lote:              Optional[str]  = None
 
 
 class ProductoUpdate(BaseModel):
@@ -403,6 +406,8 @@ class ProductoUpdate(BaseModel):
     stock:        Optional[int]   = Field(None, ge=0)
     stock_minimo: Optional[int]   = Field(None, ge=0)
     activo:       Optional[bool]  = None
+    fecha_vencimiento: Optional[date] = None
+    lote:              Optional[str]  = None
 
 
 class ProductoOut(BaseModel):
@@ -418,11 +423,32 @@ class ProductoOut(BaseModel):
     stock_minimo: int
     activo:       bool
     creado_en:    datetime
+    fecha_vencimiento: Optional[date] = None
+    lote:              Optional[str]  = None
 
     @computed_field
     @property
     def stock_bajo(self) -> bool:
         return self.stock <= self.stock_minimo
+
+    @computed_field
+    @property
+    def dias_para_vencer(self) -> Optional[int]:
+        """Negativo si ya venció; null si el producto no lleva fecha."""
+        if not self.fecha_vencimiento:
+            return None
+        return (self.fecha_vencimiento - date.today()).days
+
+    @computed_field
+    @property
+    def estado_vencimiento(self) -> Optional[str]:
+        """vencido | por_vencer (30 días) | vigente. Null si no lleva fecha."""
+        d = self.dias_para_vencer
+        if d is None:
+            return None
+        if d < 0:
+            return "vencido"
+        return "por_vencer" if d <= 30 else "vigente"
 
     @computed_field
     @property

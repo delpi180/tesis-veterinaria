@@ -80,6 +80,10 @@ export default function Inicio() {
   const semana         = data?.consultas_semana ?? []
   const totalSemana    = semana.reduce((s, d) => s + d.consultas, 0)
   const stockBajo      = data?.stock_bajo ?? []
+  const porVencer      = data?.por_vencer ?? []
+  // Reponer y caducar son dos problemas de inventario distintos, pero para
+  // quien mira el panel es una sola pregunta: "¿algo requiere mi atención?"
+  const alertasInv     = stockBajo.length + porVencer.length
   const vacunas        = data?.vacunas_proximas ?? []
   const presentes      = data?.presentes ?? []
 
@@ -103,12 +107,14 @@ export default function Inicio() {
       icon: 'text-sky-600', ring: 'bg-sky-100',
     },
     {
-      label: 'Alertas de Inventario', value: stockBajo.length,
-      sub: stockBajo.length ? 'Productos con stock bajo' : 'Todo en orden',
-      Icon: AlertTriangle, bg: stockBajo.length ? 'bg-red-50' : 'bg-slate-50',
-      border: stockBajo.length ? 'border-red-200' : 'border-slate-200',
-      icon: stockBajo.length ? 'text-red-500' : 'text-slate-400',
-      ring: stockBajo.length ? 'bg-red-100' : 'bg-slate-100',
+      label: 'Alertas de Inventario', value: alertasInv,
+      sub: !alertasInv ? 'Todo en orden'
+        : porVencer.length && stockBajo.length ? 'Por reponer y por vencer'
+        : porVencer.length ? 'Productos por vencer' : 'Productos con stock bajo',
+      Icon: AlertTriangle, bg: alertasInv ? 'bg-red-50' : 'bg-slate-50',
+      border: alertasInv ? 'border-red-200' : 'border-slate-200',
+      icon: alertasInv ? 'text-red-500' : 'text-slate-400',
+      ring: alertasInv ? 'bg-red-100' : 'bg-slate-100',
     },
   ]
 
@@ -144,8 +150,8 @@ export default function Inicio() {
               {loading ? 'Cargando resumen del día…' : (
                 <>
                   Tienes <strong className="text-white">{citasPendientes.length} turno{citasPendientes.length !== 1 ? 's' : ''}</strong> pendiente{citasPendientes.length !== 1 ? 's' : ''} hoy
-                  {stockBajo.length > 0 && (
-                    <> y <strong className="text-white">{stockBajo.length} alerta{stockBajo.length !== 1 ? 's' : ''}</strong> de inventario</>
+                  {alertasInv > 0 && (
+                    <> y <strong className="text-white">{alertasInv} alerta{alertasInv !== 1 ? 's' : ''}</strong> de inventario</>
                   )}
                   {vacunas.length > 0 && (
                     <>, con <strong className="text-white">{vacunas.length} vacuna{vacunas.length !== 1 ? 's' : ''}</strong> por recordar</>
@@ -383,10 +389,23 @@ export default function Inicio() {
             <div className="flex flex-col divide-y divide-slate-50 flex-1 overflow-y-auto max-h-[300px]">
               {loading ? (
                 <p className="text-xs text-slate-400 px-5 py-8 text-center">Cargando…</p>
-              ) : stockBajo.length === 0 ? (
+              ) : alertasInv === 0 ? (
                 <p className="text-xs text-slate-400 px-5 py-8 text-center">✓ Todo el inventario está en orden</p>
               ) : (
-                stockBajo.map(p => (
+                <>
+                {porVencer.map(p => (
+                  <div key={`v-${p.id}`} className="px-5 py-3 flex items-center gap-3">
+                    <AlertTriangle className={`w-4 h-4 shrink-0 ${p.vencido ? 'text-rose-500' : 'text-amber-500'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate">{p.nombre}</p>
+                      <p className="text-xs text-slate-400 font-mono">{p.codigo}{p.lote ? ` · lote ${p.lote}` : ''}</p>
+                    </div>
+                    <span className={`text-xs font-bold shrink-0 ${p.vencido ? 'text-rose-600' : 'text-amber-600'}`}>
+                      {p.vencido ? 'Vencido' : p.dias === 0 ? 'Vence hoy' : `${p.dias} d`}
+                    </span>
+                  </div>
+                ))}
+                {stockBajo.map(p => (
                   <div key={p.id} className="px-5 py-3 flex items-center gap-3">
                     <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -397,7 +416,8 @@ export default function Inicio() {
                       {p.stock} / mín {p.stock_minimo}
                     </span>
                   </div>
-                ))
+                ))}
+                </>
               )}
             </div>
           </section>
