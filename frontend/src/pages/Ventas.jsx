@@ -42,7 +42,7 @@ const mismoMes = (iso, ref) => {
 }
 
 // ── Reporte de ventas por rango (PDF) ─────────────────────────────────────────
-function reporteVentasPDF(ventas, rango, clienteMap) {
+function reporteVentasPDF(ventas, rango) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const W = 210
   const morado = [88, 28, 135]
@@ -81,7 +81,7 @@ function reporteVentasPDF(ventas, rango, clienteMap) {
     body: ventas.map(v => [
       nroBoleta(v.id),
       `${fmtFecha(v.fecha)} ${fmtHora(v.fecha)}`,
-      clienteMap[v.cliente_id]?.nombre ?? `Cliente #${v.cliente_id}`,
+      v.cliente_nombre ?? `Cliente #${v.cliente_id}`,
       v.items.map(it => `${it.descripcion} ×${it.cantidad}`).join(', '),
       fmtMoneda(v.total),
     ]),
@@ -206,7 +206,6 @@ export default function Ventas() {
   const navigate  = useNavigate()
   const [ventas,    setVentas]    = useState([])
   const [anulando,  setAnulando]  = useState(null)   // venta que se está por anular
-  const [clientes,  setClientes]  = useState([])
   const [productos, setProductos] = useState([])
   const [servicios, setServicios] = useState([])
   const [loading,   setLoading]   = useState(true)
@@ -233,14 +232,12 @@ export default function Ventas() {
   const cargar = async () => {
     setLoading(true); setError(null)
     try {
-      const [ventasData, clientesData, productosData, serviciosData] = await Promise.all([
+      const [ventasData, productosData, serviciosData] = await Promise.all([
         api.get('/api/ventas/'),
-        api.get('/api/clientes/'),
         api.get('/api/productos/'),  // solo activos
         api.get('/api/servicios/'),  // solo activos
       ])
       setVentas(Array.isArray(ventasData) ? ventasData : [])
-      setClientes(Array.isArray(clientesData) ? clientesData : [])
       setProductos(Array.isArray(productosData) ? productosData : [])
       setServicios(Array.isArray(serviciosData) ? serviciosData : [])
     } catch (e) {
@@ -280,21 +277,15 @@ export default function Ventas() {
       const cid = state.clienteId ? String(state.clienteId) : ''
       setClienteId(cid)
       if (cid) {
-        const targetCli = clientes.find(c => String(c.id) === cid)
-        if (targetCli) {
-          setSelectedClientObj(targetCli)
-          setCliSelLabel(`${targetCli.nombre}${targetCli.dni ? ` (${targetCli.dni})` : ''}`)
-        } else {
-          api.get(`/api/clientes/${cid}`)
-            .then(c => {
-              setSelectedClientObj(c)
-              setCliSelLabel(`${c.nombre}${c.dni ? ` (${c.dni})` : ''}`)
-            })
-            .catch(() => {
-              setSelectedClientObj(null)
-              setCliSelLabel(`Cliente #${cid}`)
-            })
-        }
+        api.get(`/api/clientes/${cid}`)
+          .then(c => {
+            setSelectedClientObj(c)
+            setCliSelLabel(`${c.nombre}${c.dni ? ` (${c.dni})` : ''}`)
+          })
+          .catch(() => {
+            setSelectedClientObj(null)
+            setCliSelLabel(`Cliente #${cid}`)
+          })
       } else {
         setSelectedClientObj(null)
         setCliSelLabel('')
@@ -304,7 +295,7 @@ export default function Ventas() {
       setModalAbierto(true)
       navigate('.', { replace: true, state: null })  // limpia el state para no reabrir
     }
-  }, [state, clientes])
+  }, [state])
 
   // Búsqueda de cliente por nombre o DNI (en el servidor, con debounce)
   useEffect(() => {
@@ -336,7 +327,6 @@ export default function Ventas() {
     setCliSelLabel('')
   }
 
-  const clienteMap = Object.fromEntries(clientes.map(c => [c.id, c]))
 
   // Exporta a CSV (Excel) las ventas actualmente cargadas (respeta el rango de fechas).
   const exportarVentas = () => {
@@ -346,7 +336,7 @@ export default function Ventas() {
       ['Boleta', 'Fecha', 'Hora', 'Cliente', 'Detalle', 'Subtotal', 'Descuento %', 'Total', 'Método'],
       ventas.map(v => [
         nroBoleta(v.id), fmtFecha(v.fecha), fmtHora(v.fecha),
-        clienteMap[v.cliente_id]?.nombre ?? `Cliente #${v.cliente_id}`,
+        v.cliente_nombre ?? `Cliente #${v.cliente_id}`,
         v.items.map(it => `${it.descripcion} x${it.cantidad}`).join(' | '),
         Number(v.subtotal ?? v.total).toFixed(2),
         Number(v.descuento_pct ?? 0).toFixed(0),
@@ -472,7 +462,11 @@ export default function Ventas() {
           : { servicio_id: l.id, cantidad: l.cantidad, ...(l.precio_variable ? { precio: Number(l.precio) } : {}) }
         ),
       })
-      const cliInfo = selectedClientObj || clienteMap[venta.cliente_id]
+      // selectedClientObj es el cliente recién elegido en el POS (con dni y
+      // teléfono); si por algo no está, se arma uno mínimo con lo que la
+      // propia venta ya trae embebido.
+      const cliInfo = selectedClientObj ||
+        (venta.cliente_nombre ? { nombre: venta.cliente_nombre, dni: venta.cliente_dni } : null)
       cerrarModal()
       if (venta) generarBoleta(venta, cliInfo)
       await cargar()
@@ -584,7 +578,7 @@ export default function Ventas() {
                 </button>
               )}
               <button
-                onClick={() => reporteVentasPDF(ventas, rango, clienteMap)}
+                onClick={() => reporteVentasPDF(ventas, rango)}
                 disabled={ventas.length === 0}
                 className="flex items-center gap-1 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg px-2.5 py-1 hover:bg-purple-50 transition disabled:opacity-40"
               >
@@ -641,7 +635,7 @@ export default function Ventas() {
                       <p className="text-xs text-slate-400">{fmtHora(v.fecha)}</p>
                     </td>
                     <td className="px-5 py-3.5 font-medium text-slate-800">
-                      {clienteMap[v.cliente_id]?.nombre ?? `Cliente #${v.cliente_id}`}
+                      {v.cliente_nombre ?? `Cliente #${v.cliente_id}`}
                     </td>
                     <td className="px-5 py-3.5 text-slate-500 text-xs">
                       {v.items.map(it => `${it.descripcion} ×${it.cantidad}`).join(', ')}
@@ -657,7 +651,8 @@ export default function Ventas() {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
-                          onClick={() => generarBoleta(v, clienteMap[v.cliente_id])}
+                          onClick={() => generarBoleta(v, v.cliente_nombre
+                            ? { nombre: v.cliente_nombre, dni: v.cliente_dni } : null)}
                           title="Generar boleta PDF"
                           className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg px-2.5 py-1 hover:bg-purple-50 transition"
                         >
@@ -1015,7 +1010,6 @@ export default function Ventas() {
       {anulando && (
         <DialogoAnular
           venta={anulando}
-          cliente={clienteMap[anulando.cliente_id]}
           onCerrar={() => setAnulando(null)}
           onAnulada={(actualizada) => {
             setVentas(prev => prev.map(x => x.id === actualizada.id ? actualizada : x))
@@ -1028,7 +1022,7 @@ export default function Ventas() {
   )
 }
 
-function DialogoAnular({ venta, cliente, onCerrar, onAnulada }) {
+function DialogoAnular({ venta, onCerrar, onAnulada }) {
   const toast = useToast()
   const [motivo, setMotivo] = useState('')
   const [guardando, setGuardando] = useState(false)
@@ -1066,7 +1060,7 @@ function DialogoAnular({ venta, cliente, onCerrar, onAnulada }) {
 
         <div className="px-5 py-4 flex flex-col gap-3">
           <div className="text-sm text-slate-700 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-            <p><span className="text-slate-500">Cliente:</span> {cliente?.nombre ?? `#${venta.cliente_id}`}</p>
+            <p><span className="text-slate-500">Cliente:</span> {venta.cliente_nombre ?? `#${venta.cliente_id}`}</p>
             <p><span className="text-slate-500">Total:</span> <strong>{fmtMoneda(venta.total)}</strong></p>
           </div>
 

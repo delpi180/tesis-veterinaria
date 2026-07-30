@@ -515,6 +515,18 @@ class Venta(Base):
     motivo_anulacion = Column(String(200))
 
     cliente = relationship("Cliente")
+
+    # El nombre del cliente va embebido en la respuesta para que el frontend
+    # no dependa de tener cargado el catálogo completo de clientes solo para
+    # mostrarlo: con miles de clientes, pedir "todos" para resolver un nombre
+    # es justo el tipo de atajo que se rompe en cuanto la lista crece.
+    @property
+    def cliente_nombre(self):
+        return self.cliente.nombre if self.cliente else None
+
+    @property
+    def cliente_dni(self):
+        return self.cliente.dni if self.cliente else None
     items   = relationship("VentaItem", back_populates="venta", cascade="all, delete-orphan")
 
 

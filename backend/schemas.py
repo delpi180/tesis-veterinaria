@@ -604,6 +604,8 @@ class VentaAnular(BaseModel):
 class VentaOut(BaseModel):
     id:            int
     cliente_id:    int
+    cliente_nombre: Optional[str] = None
+    cliente_dni:    Optional[str] = None
     fecha:         datetime
     total:         float                      # total final (con descuento)
     descuento_pct: float = 0

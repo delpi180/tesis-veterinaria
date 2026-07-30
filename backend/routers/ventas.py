@@ -17,10 +17,11 @@ router = APIRouter(prefix="/api/ventas", tags=["Ventas"])
 
 
 def _cargar_venta(db: Session, venta_id: int) -> Venta | None:
-    """Carga una venta con sus items y el producto/servicio de cada item (evita N+1)."""
+    """Carga una venta con cliente, items y el producto/servicio de cada item (evita N+1)."""
     return (
         db.query(Venta)
         .options(
+            joinedload(Venta.cliente),
             selectinload(Venta.items).joinedload(VentaItem.producto),
             selectinload(Venta.items).joinedload(VentaItem.servicio),
         )
@@ -31,6 +32,7 @@ def _cargar_venta(db: Session, venta_id: int) -> Venta | None:
 
 def _loader(q):
     return q.options(
+        joinedload(Venta.cliente),
         selectinload(Venta.items).joinedload(VentaItem.producto),
         selectinload(Venta.items).joinedload(VentaItem.servicio),
     )

@@ -60,6 +60,12 @@ def listar_productos(
     buscar:      Optional[str] = Query(None, description="Texto en nombre o código"),
     stock_bajo:  bool          = Query(False, description="Solo productos con stock <= stock_minimo"),
     solo_activos: bool         = Query(True,  description="Filtrar por activo=True"),
+    skip:        int           = Query(0,    ge=0),
+    # El catálogo de una clínica está acotado por espacio físico de estantería
+    # (nunca miles de SKU), así que 2000 alcanza de sobra en uso normal. Es un
+    # tope defensivo, igual que en el resto de listados: sin él, esta era la
+    # única lista del sistema sin ningún límite.
+    limit:       int           = Query(2000, ge=1, le=5000),
     db: Session = Depends(get_db),
 ):
     q = db.query(Producto)
@@ -75,7 +81,7 @@ def listar_productos(
                      func.coalesce(Producto.codigo, "").ilike(like))
     if stock_bajo:
         q = q.filter(Producto.stock <= Producto.stock_minimo)
-    return q.order_by(Producto.nombre).all()
+    return q.order_by(Producto.nombre).offset(skip).limit(limit).all()
 
 
 @router.get("/stock-bajo", response_model=list[ProductoOut])
