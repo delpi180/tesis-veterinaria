@@ -158,6 +158,9 @@ class Receta(Base):
 
     # Trazabilidad: quién la emitió (siempre un veterinario) y último cambio
     veterinario_id  = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    # Nombre copiado al borrar al usuario: la receta es un documento clínico y
+    # no puede quedar sin autor porque esa persona ya no trabaje en la clínica.
+    firmado_por     = Column(String(120))
     actualizado_por = Column(String(50))
     actualizado_en  = Column(DateTime(timezone=True))
 
@@ -166,7 +169,7 @@ class Receta(Base):
 
     @property
     def veterinario_nombre(self):
-        return self.veterinario.nombre if self.veterinario else None
+        return self.veterinario.nombre if self.veterinario else self.firmado_por
 
 
 class HistoriaClinica(Base):
@@ -226,6 +229,8 @@ class HistoriaClinica(Base):
 
     # Autoría: qué doctor veterinario llenó la historia (la hora es creado_en)
     veterinario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    # Ver Receta.firmado_por: sobrevive al borrado de la cuenta.
+    firmado_por    = Column(String(120))
 
     paciente    = relationship("Paciente", back_populates="historias")
     veterinario = relationship("Usuario")
@@ -233,7 +238,7 @@ class HistoriaClinica(Base):
 
     @property
     def veterinario_nombre(self):
-        return self.veterinario.nombre if self.veterinario else None
+        return self.veterinario.nombre if self.veterinario else self.firmado_por
 
 
 class Cita(Base):

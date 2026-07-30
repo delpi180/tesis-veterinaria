@@ -116,7 +116,18 @@ export default function Usuarios() {
   }
 
   const eliminar = async (u) => {
-    if (!window.confirm(`¿Eliminar al usuario "${u.usuario}"?`)) return
+    // Borrar arrastra cosas que no se ven desde esta pantalla; decirlas antes
+    // evita el "no sabía que se perdían las marcaciones".
+    const aviso = [
+      `¿Eliminar al usuario "${u.usuario}"?`,
+      '',
+      'Se borrarán sus marcaciones de asistencia.',
+      'Sus turnos asignados quedarán sin doctor, para reasignarlos.',
+      'Sus historias y recetas NO se tocan: conservan su nombre.',
+      '',
+      'Si solo quieres quitarle el acceso, desactívalo en vez de borrarlo.',
+    ].join('\n')
+    if (!window.confirm(aviso)) return
     try {
       await api.del(`/api/usuarios/${u.id}`)
       setUsuarios(prev => prev.filter(x => x.id !== u.id))

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Usuario, Asistencia, HistoriaClinica, Paciente
+from models import Usuario, Asistencia, Cita, HistoriaClinica, Paciente, Receta
 from schemas import UsuarioCreate, UsuarioUpdate, UsuarioOut, DoctorOut
 from core.security import hash_password
 from core.deps import solo_admin, usuario_actual
@@ -72,10 +72,32 @@ def actualizar_usuario(usuario_id: int, payload: UsuarioUpdate, request: Request
 
 @router.delete("/{usuario_id}", status_code=status.HTTP_204_NO_CONTENT)
 def eliminar_usuario(usuario_id: int, request: Request, db: Session = Depends(get_db)):
+    """Borra la cuenta y desengancha lo que dependía de ella.
+
+    Antes esto reventaba con un error de base de datos apenas la persona tenía
+    una marcación de asistencia o un turno asignado — o sea, siempre que
+    hubiera trabajado. Cada tabla que la referencia se resuelve según a quién
+    pertenece el dato:
+
+    - Asistencias: son las marcaciones de esa persona. Se van con ella.
+    - Turnos: son de la clínica. El turno queda sin doctor asignado y se
+      reasigna; borrarlos sería perder la agenda.
+    - Historias y recetas: son del paciente y no se tocan. Se les copia el
+      nombre del veterinario para que no queden sin autor.
+    """
     solo_admin(request)
     u = db.get(Usuario, usuario_id)
     if not u:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Borrarse a uno mismo cierra la sesión en el acto y puede dejar la clínica
+    # sin nadie que administre. Desactivarse a sí misma tampoco tiene sentido.
+    if getattr(request.state, "usuario", None) == u.usuario:
+        raise HTTPException(
+            status_code=409,
+            detail="No puedes eliminar tu propia cuenta. Pídeselo a otra administradora.",
+        )
+
     # No permitir quedarse sin veterinarios activos
     if u.rol == "veterinario":
         otros = (
@@ -85,8 +107,43 @@ def eliminar_usuario(usuario_id: int, request: Request, db: Session = Depends(ge
         )
         if otros == 0:
             raise HTTPException(status_code=409, detail="No puedes eliminar al único veterinario activo.")
-    db.delete(u)
-    db.commit()
+
+    # Tampoco dejar la clínica sin administradora
+    if u.rol == "recepcionista":
+        otras = (
+            db.query(Usuario)
+            .filter(Usuario.rol == "recepcionista", Usuario.activo.is_(True), Usuario.id != usuario_id)
+            .count()
+        )
+        if otras == 0:
+            raise HTTPException(
+                status_code=409,
+                detail="No puedes eliminar a la única administradora activa: nadie podría gestionar el sistema.",
+            )
+
+    nombre = u.nombre
+    request.state.actividad_detalle = nombre
+    try:
+        # Conservar la autoría clínica ANTES de soltar la referencia
+        for modelo in (HistoriaClinica, Receta):
+            (db.query(modelo)
+               .filter(modelo.veterinario_id == usuario_id)
+               .update({"firmado_por": nombre, "veterinario_id": None},
+                       synchronize_session=False))
+
+        (db.query(Cita)
+           .filter(Cita.veterinario_id == usuario_id)
+           .update({"veterinario_id": None}, synchronize_session=False))
+
+        (db.query(Asistencia)
+           .filter(Asistencia.usuario_id == usuario_id)
+           .delete(synchronize_session=False))
+
+        db.delete(u)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def _paciente_resumen(pac):
