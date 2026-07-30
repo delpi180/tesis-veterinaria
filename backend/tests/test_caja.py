@@ -7,8 +7,10 @@ anulado y que el cierre no se pueda tocar dos veces.
     cd backend
     python -m pytest tests/test_caja.py -v
 """
+import uuid
 from datetime import date, timedelta
 
+import pytest
 from sqlalchemy import text
 
 from database import SessionLocal
@@ -23,11 +25,28 @@ def _limpiar_cierre(dia: date):
         db.close()
 
 
-def _producto_con_stock(client, admin, minimo=5):
-    productos = client.get("/api/productos/?limit=50", headers=admin).json()
-    disponibles = [p for p in productos if p["stock"] > minimo]
-    assert disponibles, "se necesita un producto con stock para esta prueba"
-    return disponibles[0]
+@pytest.fixture
+def producto(client, admin):
+    """Producto propio de la prueba.
+
+    Antes se tomaba el primero del catálogo con stock. Eso ataba la prueba al
+    inventario que hubiera cargado en ese momento: el día que la clínica
+    depuró sus productos demo, seis pruebas de caja se cayeron sin que nada
+    del código hubiera cambiado. Y además vender de un producto real movía su
+    stock de verdad.
+    """
+    r = client.post("/api/productos/", json={
+        "nombre": f"QA Caja {uuid.uuid4().hex[:8]}",
+        "categoria": "accesorio", "precio": 20.0,
+        "stock": 50, "stock_minimo": 1,
+    }, headers=admin)
+    assert r.status_code == 201, r.text
+    p = r.json()
+    yield p
+    # Si quedó en alguna venta el backend impide borrarlo (integridad
+    # histórica); en ese caso al menos se saca del catálogo.
+    if client.delete(f"/api/productos/{p['id']}", headers=admin).status_code != 204:
+        client.put(f"/api/productos/{p['id']}", json={"activo": False}, headers=admin)
 
 
 def _crear_venta(client, admin, producto, cantidad=2, metodo="efectivo"):
@@ -42,14 +61,14 @@ def _crear_venta(client, admin, producto, cantidad=2, metodo="efectivo"):
 
 # ── Anulación ────────────────────────────────────────────────────────────────
 
-def test_anular_venta_devuelve_el_stock(client, admin):
+def test_anular_venta_devuelve_el_stock(client, admin, producto):
     """Anular tiene que revertir el descuento de inventario.
 
     Al vender se descuenta stock; sin esta reversión, un error de cobro se
     convertiría además en un error de inventario.
     """
-    p = _producto_con_stock(client, admin)
-    stock_inicial = p["stock"]
+    stock_inicial = producto["stock"]
+    p = producto
 
     venta = _crear_venta(client, admin, p, cantidad=2)
     tras_vender = client.get(f"/api/productos/{p['id']}", headers=admin).json()["stock"]
@@ -64,10 +83,10 @@ def test_anular_venta_devuelve_el_stock(client, admin):
     assert tras_anular == stock_inicial, "el stock no volvió a su valor original"
 
 
-def test_anular_no_borra_la_venta(client, admin):
+def test_anular_no_borra_la_venta(client, admin, producto):
     """La venta anulada sigue existiendo: el comprobante ya se entregó y su
     número tiene que poder rastrearse."""
-    p = _producto_con_stock(client, admin)
+    p = producto
     venta = _crear_venta(client, admin, p, cantidad=1)
     client.post(f"/api/ventas/{venta['id']}/anular",
                 json={"motivo": "Cliente devolvió el producto"}, headers=admin)
@@ -80,8 +99,8 @@ def test_anular_no_borra_la_venta(client, admin):
     assert d["anulada_por"] == "qa_admin"
 
 
-def test_anular_exige_motivo_y_no_se_repite(client, admin):
-    p = _producto_con_stock(client, admin)
+def test_anular_exige_motivo_y_no_se_repite(client, admin, producto):
+    p = producto
     venta = _crear_venta(client, admin, p, cantidad=1)
 
     # Un motivo vacío o de una letra no sirve como constancia
@@ -95,9 +114,9 @@ def test_anular_exige_motivo_y_no_se_repite(client, admin):
                        json={"motivo": "Otra vez"}, headers=admin).status_code == 409
 
 
-def test_anular_es_solo_de_la_administradora(client, admin, doctor):
+def test_anular_es_solo_de_la_administradora(client, admin, doctor, producto):
     """Mueve dinero e inventario: no es una acción del veterinario."""
-    p = _producto_con_stock(client, admin)
+    p = producto
     venta = _crear_venta(client, admin, p, cantidad=1)
     try:
         r = client.post(f"/api/ventas/{venta['id']}/anular",
@@ -112,13 +131,13 @@ def test_anular_es_solo_de_la_administradora(client, admin, doctor):
                     json={"motivo": "Limpieza de prueba automatizada"}, headers=admin)
 
 
-def test_lo_anulado_no_suma_en_los_totales(client, admin):
+def test_lo_anulado_no_suma_en_los_totales(client, admin, producto):
     """Si lo anulado siguiera sumando, anular no serviría de nada.
 
     Se comprueba en el arqueo Y en el panel de inicio: son cálculos distintos
     y hay que excluirlo en los dos.
     """
-    p = _producto_con_stock(client, admin)
+    p = producto
     antes_caja = client.get("/api/dashboard/cierre-caja", headers=admin).json()
 
     venta = _crear_venta(client, admin, p, cantidad=2, metodo="efectivo")
@@ -186,11 +205,11 @@ def test_cerrar_caja_es_solo_de_la_administradora(client, doctor):
                        json={"efectivo_contado": 10}, headers=doctor).status_code == 403
 
 
-def test_no_se_anula_una_venta_de_un_dia_ya_cerrado(client, admin):
+def test_no_se_anula_una_venta_de_un_dia_ya_cerrado(client, admin, producto):
     """Anular después del cierre cambiaría un arqueo ya firmado."""
     hoy = date.today()
     _limpiar_cierre(hoy)
-    p = _producto_con_stock(client, admin)
+    p = producto
     venta = _crear_venta(client, admin, p, cantidad=1)
     try:
         assert client.post("/api/dashboard/cierre-caja",

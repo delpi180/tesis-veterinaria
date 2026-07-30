@@ -61,12 +61,20 @@ def _clave_cliente(request: Request) -> str:
 
 
 def _es_ruta_clinica(path: str) -> bool:
-    """Historias clínicas, recetas y pipeline IA: reservado al rol veterinario
-    para escribir (la recepcionista puede leer, ver más abajo `lectura_historias`)."""
+    """Rutas reservadas al rol veterinario para escribir.
+
+    La receta es lo único que queda cerrado: es un documento que va firmado por
+    un colegiado y con su número de colegiatura, no algo que se pueda delegar.
+
+    Las historias clínicas sí las puede llenar la recepcionista. En consulta
+    cargada el doctor dicta y sigue atendiendo, y la alternativa real no es
+    "que la llene el doctor después" sino que la consulta quede sin registrar.
+    Queda constancia de quién la escribió (bitácora de actividad) y hay que
+    indicar qué veterinario atendió, así que la firma clínica no se falsea.
+    """
     return (
-        "/historias" in path
-        or "/recetas" in path
-        or path in {"/api/procesar-historia", "/api/procesar-receta", "/api/transcribe"}
+        "/recetas" in path
+        or path == "/api/procesar-receta"
     )
 
 
@@ -204,15 +212,15 @@ async def auth_middleware(request: Request, call_next):
                 status_code=401,
                 content={"detail": "Tu cuenta fue desactivada. Contacta a la administradora."},
             )
-        # Control de rol: la recepcionista puede LEER (GET) la historia clínica y
-        # las recetas del paciente (para ver su ficha completa), pero no
-        # crear/editar/eliminar consultas ni recetas ni usar el pipeline de IA
-        # — eso queda reservado al veterinario.
-        lectura_historias = request.method == "GET" and ("/historias" in path or "/recetas" in path)
+        # Control de rol: la recepcionista puede leer la ficha completa del
+        # paciente y llenar historias clínicas; emitir recetas no (ver
+        # `_es_ruta_clinica`). Leer una receta ya emitida sí, para reimprimirla
+        # o reenviarla al cliente.
+        lectura_recetas = request.method == "GET" and "/recetas" in path
         if (
             sesion["rol"] != "veterinario"
             and _es_ruta_clinica(path)
-            and not lectura_historias
+            and not lectura_recetas
         ):
             return JSONResponse(
                 status_code=403,
@@ -293,10 +301,14 @@ app.include_router(dashboard.router)
 app.include_router(clientes.router)
 app.include_router(pacientes.router)
 app.include_router(citas.router)
-app.include_router(evaluadores.router)
-app.include_router(sus.router)
-app.include_router(tam.router)
-app.include_router(encuestas.router)
+# Módulos de tesis: si están apagados ni siquiera se montan, así que sus rutas
+# devuelven 404. Ocultarlos solo en el menú dejaría los endpoints abiertos a
+# cualquiera que escriba la URL.
+if settings.modulos_tesis:
+    app.include_router(evaluadores.router)
+    app.include_router(sus.router)
+    app.include_router(tam.router)
+    app.include_router(encuestas.router)
 app.include_router(productos.router)
 app.include_router(servicios.router)
 app.include_router(ventas.router)
@@ -646,8 +658,11 @@ class ExactitudRequest(BaseModel):
     referencia: dict = {}
 
 
-@app.post("/api/comparar-exactitud")
+# Solo con los módulos de tesis encendidos; ver core/config.py
+@app.post("/api/comparar-exactitud", include_in_schema=settings.modulos_tesis)
 def comparar_exactitud(body: ExactitudRequest, request: Request):
+    if not settings.modulos_tesis:
+        raise HTTPException(status_code=404, detail="Not Found")
     """
     Compara la extracción de la IA contra una historia de referencia
     (gold-standard) y reporta precisión, recall y F1 por campo.
@@ -710,8 +725,10 @@ def comparar_exactitud(body: ExactitudRequest, request: Request):
     }
 
 
-@app.post("/api/comparar-extraccion")
+@app.post("/api/comparar-extraccion", include_in_schema=settings.modulos_tesis)
 def comparar_extraccion(body: ComparativaRequest, request: Request):
+    if not settings.modulos_tesis:
+        raise HTTPException(status_code=404, detail="Not Found")
     """
     Compara el método LÉXICO (soap_processor) contra el método IA (GPT) sobre el
     mismo texto: campos completados y tiempo de procesamiento. Para evaluación de tesis.

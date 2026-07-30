@@ -3,7 +3,17 @@ import pytest
 from sqlalchemy import text
 
 import main
+from core.config import settings
 from database import SessionLocal
+
+# Los módulos de tesis vienen apagados en producción (core/config.py); estas
+# pruebas solo tienen sentido con MODULOS_TESIS=true.
+requiere_tesis = pytest.mark.skipif(
+    not settings.modulos_tesis,
+    reason="Módulos de tesis desactivados",
+)
+
+
 
 # client / admin (recepcionista) / doctor (veterinario) provienen de conftest.py.
 # Las historias clínicas las crea el doctor (rol veterinario).
@@ -34,6 +44,7 @@ def test_vacio():
 
 # ── Endpoint de tiempos ──────────────────────────────────────────────────────
 
+@requiere_tesis
 def test_metricas_tiempo(client, admin, doctor):
     cli = client.get("/api/clientes/", headers=admin).json()
     if not cli or not cli[0]["pacientes"]:

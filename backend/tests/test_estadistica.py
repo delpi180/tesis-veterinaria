@@ -1,7 +1,16 @@
 """Tests del módulo de estadística inferencial (Tier 1 de tesis)."""
 import pytest
 
+from core.config import settings
 from services import estadistica as E
+
+# El endpoint vive en el router de encuestas, que solo se monta con los
+# módulos de tesis encendidos (core/config.py). Las funciones puras de más
+# arriba se prueban siempre.
+requiere_tesis = pytest.mark.skipif(
+    not settings.modulos_tesis,
+    reason="Módulos de tesis desactivados",
+)
 
 
 # ── Distribución t: validada contra valores de tabla ─────────────────────────
@@ -50,6 +59,7 @@ def test_t_test_welch():
 
 # ── Endpoint integrado ───────────────────────────────────────────────────────
 
+@requiere_tesis
 def test_endpoint_estadisticas(client, admin):
     # Usa los fixtures de conftest (usuario qa creado directo en la BD) en vez de
     # credenciales hardcodeadas, para que pase igual en local y en CI.

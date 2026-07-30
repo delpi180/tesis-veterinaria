@@ -52,15 +52,17 @@ def test_roles(client, admin, doctor):
         assert client.get(f"/api/pacientes/{pid}/historias/", headers=doctor).status_code == 200
 
 
-def test_recepcionista_lee_pero_no_escribe_historias(client, admin):
-    """La recepcionista puede VER la historia (ficha) pero no crearla/editarla."""
+def test_recepcionista_lee_historias_y_no_emite_recetas(client, admin):
+    """La recepcionista ve la ficha completa y desde 2026 también puede llenar
+    historias (ver tests/test_roles_historias.py). Lo que sigue cerrado es la
+    receta: va firmada por un colegiado."""
     cli = client.get("/api/clientes/", headers=admin).json()
     if cli and cli[0]["pacientes"]:
         pid = cli[0]["pacientes"][0]["id"]
-        # leer: permitido
         assert client.get(f"/api/pacientes/{pid}/historias/", headers=admin).status_code == 200
-        # crear: bloqueado (reservado al veterinario)
-        r = client.post(f"/api/pacientes/{pid}/historias/", json={"motivo_consulta": "x"}, headers=admin)
+        r = client.post(f"/api/pacientes/{pid}/recetas/", json={
+            "items": [{"medicamento": "Amoxicilina", "dosis": "1 tableta"}],
+        }, headers=admin)
         assert r.status_code == 403
 
 
@@ -280,15 +282,19 @@ def test_documento_adjunto_a_historia_puntual(client, admin, doctor):
                            json={"motivo_consulta": "Control"}, headers=doctor).json()
         assert hist["documentos_count"] == 0
 
-        # La recepción NO puede adjuntar documentos a una historia (solo el veterinario)
+        # La recepción también puede adjuntar: es quien recibe en mostrador el
+        # análisis o la radiografía que trae el cliente. Antes estaba cerrado
+        # junto con toda la historia clínica; al abrirse la historia (ver
+        # tests/test_roles_historias.py) esto va con ella.
         r_admin = client.post(
             f"/api/pacientes/{pac['id']}/historias/{hist['id']}/documento",
-            files={"archivo": ("hemograma.pdf", io.BytesIO(b"%PDF-1.4 fake"), "application/pdf")},
+            files={"archivo": ("recibido-en-mostrador.pdf", io.BytesIO(b"%PDF-1.4 fake"), "application/pdf")},
             headers=admin,
         )
-        assert r_admin.status_code == 403
+        assert r_admin.status_code == 201
+        client.delete(f"/api/pacientes/{pac['id']}/documentos/{r_admin.json()['id']}", headers=admin)
 
-        # El veterinario sí puede
+        # El veterinario también
         contenido = b"%PDF-1.4 hemograma de control"
         r = client.post(
             f"/api/pacientes/{pac['id']}/historias/{hist['id']}/documento",

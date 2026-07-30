@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Stethoscope, Pencil, RefreshCw, Trash2, Printer } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { api, esVeterinario, getToken } from '../services/api'
+import { api, getToken } from '../services/api'
 import { estadoStyle, estadoLabel, ESTADOS_CITA, waRecordatorio } from '../utils/citas'
 import { clinicaActual } from '../services/clinica'
 
@@ -590,16 +590,14 @@ export default function Turnos() {
                         >
                           {ESTADOS_CITA.map(s => <option key={s} value={s}>{estadoLabel(s)}</option>)}
                         </select>
-                        {esVeterinario() && (
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/consultas/${cita.paciente_id}`, { state: { citaId: cita.id } })}
-                            title="Atender (registrar historia)"
-                            className="px-2.5 h-7 rounded-lg bg-purple-700 hover:bg-purple-600 text-white text-xs font-semibold transition shrink-0"
-                          >
-                            Atender
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/consultas/${cita.paciente_id}`, { state: { citaId: cita.id } })}
+                          title="Atender (registrar historia)"
+                          className="px-2.5 h-7 rounded-lg bg-purple-700 hover:bg-purple-600 text-white text-xs font-semibold transition shrink-0"
+                        >
+                          Atender
+                        </button>
                         <button
                           type="button"
                           onClick={() => abrirEditar(cita)}

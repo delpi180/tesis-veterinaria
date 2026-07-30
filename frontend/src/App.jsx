@@ -10,7 +10,7 @@ import './App.css'
 // Cada pantalla se descarga recién cuando se entra a ella.
 //
 // Antes toda la aplicación viajaba en un solo archivo de 1,47 MB: la
-// recepcionista descargaba los gráficos de Mediciones y el generador de PDF
+// recepcionista descargaba los gráficos y el generador de PDF
 // aunque nunca los abriera, y no veía nada hasta que terminaba de bajar todo.
 // Login queda fuera de esta lista a propósito: es la primera pantalla y
 // dividirla solo agregaría una espera extra antes de poder escribir el usuario.
@@ -32,7 +32,6 @@ const Actividad         = lazy(() => import('./pages/Actividad'))
 const Reportes          = lazy(() => import('./pages/Reportes'))
 const PanelRecepcion    = lazy(() => import('./pages/PanelRecepcion'))
 const Vacunacion        = lazy(() => import('./pages/Vacunacion'))
-const Mediciones        = lazy(() => import('./pages/Mediciones'))
 const Errores           = lazy(() => import('./pages/Errores'))
 
 function CargandoPantalla() {
@@ -76,8 +75,10 @@ function AppProtegida() {
           <Route path="/mi-panel"               element={<SoloVet><MiPanel /></SoloVet>} />
           <Route path="/clientes"               element={<Clientes />} />
           <Route path="/clientes/:id"           element={<DetalleCliente />} />
-          <Route path="/consultas"              element={<SoloVet><HistoriasClinicas /></SoloVet>} />
-          <Route path="/consultas/:pacienteId"  element={<SoloVet><HistoriasClinicas /></SoloVet>} />
+          {/* La recepcionista también llena historias cuando el doctor no da
+              abasto; adentro se le pide indicar qué veterinario atendió */}
+          <Route path="/consultas"              element={<HistoriasClinicas />} />
+          <Route path="/consultas/:pacienteId"  element={<HistoriasClinicas />} />
           {/* Ficha del paciente: ambos roles la VEN; las acciones de escritura van gateadas adentro */}
           <Route path="/pacientes/:pacienteId/historial" element={<HistorialPaciente />} />
           <Route path="/turnos"                 element={<Turnos />} />
@@ -93,7 +94,6 @@ function AppProtegida() {
           <Route path="/usuarios"               element={<SoloAdmin><Usuarios /></SoloAdmin>} />
           <Route path="/errores"                element={<SoloAdmin><Errores /></SoloAdmin>} />
           <Route path="/usuarios/:usuarioId/perfil" element={<PerfilDoctor />} />
-          <Route path="/mediciones"             element={<Mediciones />} />
           <Route path="*"                       element={<Navigate to="/" replace />} />
         </Routes>
         </Suspense>

@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     # CORS: "*" en dev; en prod poner el dominio de Vercel (CSV) vía variable.
     cors_origins: str = "*"
 
+    # Módulos de tesis (encuestas SUS/TAM, evaluadores, comparativas IA vs
+    # léxico). No le sirven de nada a la clínica y confunden al personal, así
+    # que vienen apagados. El código queda: se reactiva con MODULOS_TESIS=true
+    # cuando haya que volver a medir.
+    modulos_tesis: bool = False
+
     # Rate-limit del login (anti fuerza bruta)
     login_max_intentos: int = 8     # intentos fallidos permitidos
     login_ventana_seg:  int = 300   # ventana de tiempo (5 min)

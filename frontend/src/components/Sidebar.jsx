@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Calendar,
-  Package, Stethoscope, BarChart2, Activity, LogOut, Wallet, UserCog,
+  Package, Stethoscope, BarChart2, LogOut, Wallet, UserCog,
   Clock, ClipboardList, History, PieChart, ConciergeBell, Syringe, Menu, X, Bug,
 } from 'lucide-react'
 import { getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
@@ -35,10 +35,6 @@ const SECCION_ADMIN = [
   { label: 'Usuarios',          to: '/usuarios',   Icon: UserCog,  admin: true },
   { label: 'Errores',           to: '/errores',    Icon: Bug,      admin: true },
 ]
-const SECCION_TESIS = [
-  { label: 'Mediciones', to: '/mediciones', Icon: Activity },
-]
-
 function NavItem({ label, to, Icon, onClick }) {
   return (
     <NavLink
@@ -130,7 +126,6 @@ export default function Sidebar() {
           </div>
           <Seccion titulo="Clínica" items={SECCION_CLINICA} />
           <Seccion titulo="Administración" items={SECCION_ADMIN} />
-          <Seccion titulo="Tesis" items={SECCION_TESIS} />
         </nav>
 
         {/* Footer */}

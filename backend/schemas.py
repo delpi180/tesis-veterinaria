@@ -81,6 +81,11 @@ class HistoriaClinicaCreate(BaseModel):
     segundos_registro: Optional[int] = Field(None, ge=0)
     metodo_registro:   Optional[Literal['manual', 'ia']] = None
 
+    # Veterinario que ATENDIÓ la consulta. Lo manda la recepcionista cuando
+    # llena la historia por el doctor; si escribe el propio veterinario se
+    # ignora y firma él (nadie firma en nombre de otro).
+    veterinario_id: Optional[int] = None
+
 
 class HistoriaClinicaOut(BaseModel):
     """Respuesta completa con todos los campos clínicos."""

@@ -5,7 +5,16 @@ Cubre la búsqueda global, encuestas (SUS/TAM), CRUD de citas y restricciones de
 import pytest
 from sqlalchemy import text
 
+from core.config import settings
 from database import SessionLocal
+
+
+# Los módulos de tesis vienen apagados en producción (core/config.py); estas
+# pruebas solo tienen sentido con MODULOS_TESIS=true.
+requiere_tesis = pytest.mark.skipif(
+    not settings.modulos_tesis,
+    reason="Módulos de tesis desactivados",
+)
 
 
 # ── Búsqueda Global ──────────────────────────────────────────────────────────
@@ -99,6 +108,7 @@ def test_busqueda_global_incluye_historias_clinicas(client, admin, doctor):
 
 # ── Evaluadores y Encuestas (SUS & TAM) ───────────────────────────────────────
 
+@requiere_tesis
 def test_evaluadores_y_encuestas_flujo(client, admin):
     # 1. Crear evaluador
     r = client.post("/api/evaluadores/", json={

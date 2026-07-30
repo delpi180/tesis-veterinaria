@@ -532,14 +532,12 @@ export default function HistorialPaciente() {
           >
             <Download className="w-4 h-4" /> PDF
           </button>
-          {esVeterinario() && (
-            <button
-              onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente } })}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition"
-            >
-              <Stethoscope className="w-4 h-4" /> Atender / Nueva consulta
-            </button>
-          )}
+          <button
+            onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente } })}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition"
+          >
+            <Stethoscope className="w-4 h-4" /> Atender / Nueva consulta
+          </button>
         </div>
       </header>
 
@@ -641,7 +639,7 @@ export default function HistorialPaciente() {
                       paciente={paciente}
                       cliente={cliente}
                       defaultOpen={i === 0}
-                      onEdit={esVeterinario() ? handleEdit : undefined}
+                      onEdit={handleEdit}
                       onDelete={esVeterinario() ? handleDelete : undefined}
                     />
                   ))

@@ -90,6 +90,31 @@ def eliminar_paciente(paciente_id: int, db: Session = Depends(get_db)):
 
 # ── Historias clínicas de un paciente ────────────────────────────────────────
 
+def _resolver_veterinario(db: Session, request: Request, usuario, propuesto):
+    """Quién queda como veterinario que atendió la consulta.
+
+    Si la escribe el propio doctor, firma él: nadie firma en nombre de otro.
+    Si la escribe la recepcionista tiene que decir a qué doctor corresponde,
+    porque una historia sin veterinario responsable no sirve como registro
+    clínico. Quién la tecleó queda en la bitácora de actividad.
+    """
+    if getattr(request.state, "rol", None) == "veterinario":
+        return usuario.id if usuario else None
+
+    if not propuesto:
+        raise HTTPException(
+            status_code=422,
+            detail="Indica qué veterinario atendió la consulta.",
+        )
+    vet = db.get(Usuario, propuesto)
+    if not vet or vet.rol != "veterinario" or not vet.activo:
+        raise HTTPException(
+            status_code=422,
+            detail="El veterinario indicado no existe o no está activo.",
+        )
+    return vet.id
+
+
 @router.post(
     "/{paciente_id}/historias/",
     response_model=HistoriaClinicaOut,
@@ -106,11 +131,13 @@ def crear_historia(
     if not paciente:
         raise HTTPException(status_code=404, detail="Paciente no encontrado")
     request.state.actividad_detalle = paciente.nombre
+    datos = payload.model_dump()
+    vet_id = _resolver_veterinario(db, request, usuario, datos.pop("veterinario_id", None))
     try:
         historia = HistoriaClinica(
-            **payload.model_dump(),
+            **datos,
             paciente_id=paciente_id,
-            veterinario_id=usuario.id if usuario else None,  # firma del doctor
+            veterinario_id=vet_id,
         )
         db.add(historia)
         db.flush()  # obtener historia.id antes de generar la cita
@@ -159,7 +186,14 @@ def actualizar_historia(
     if not historia or historia.paciente_id != paciente_id:
         raise HTTPException(status_code=404, detail="Historia clínica no encontrada")
     cita_anterior = historia.proxima_cita
-    for campo, valor in payload.model_dump(exclude_unset=True).items():
+    datos = payload.model_dump(exclude_unset=True)
+    # Reasignar el veterinario responsable solo si viene explícito; editar
+    # cualquier otro campo no debe cambiar de quién es la firma.
+    if "veterinario_id" in datos:
+        datos["veterinario_id"] = _resolver_veterinario(
+            db, request, None, datos["veterinario_id"]
+        ) if getattr(request.state, "rol", None) != "veterinario" else historia.veterinario_id
+    for campo, valor in datos.items():
         setattr(historia, campo, valor)
     # Si la próxima cita cambió a un valor nuevo, agéndala en Turnos
     if historia.proxima_cita and historia.proxima_cita != cita_anterior:

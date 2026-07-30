@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronDown, Plus, Trash2, Download, Save, Check,
-  ArrowLeft, Mic, StopCircle, AlertTriangle, Loader2, FileText, Paperclip,
+  ArrowLeft, Mic, StopCircle, AlertTriangle, Loader2, FileText, Paperclip, Stethoscope,
 } from "lucide-react";
 import { generarPDF } from "../utils/pdfGenerator";
-import { api, authHeaders } from "../services/api";
+import { api, authHeaders, esVeterinario } from "../services/api";
 import VoiceTextProcessor from "../components/VoiceTextProcessor";
 import DocumentosPaciente from "../components/DocumentosPaciente";
 import { nombresSimilares } from "../utils/similitud";
@@ -569,6 +569,12 @@ export default function HistoriasClinicas() {
   const [inferenciasBrut, setInferenciasBrut] = useState({});
   const [highlights,    setHighlights]    = useState({});
 
+  // ── Quién atendió. El doctor firma su propia consulta; la recepcionista
+  //    la llena por él en consulta cargada y tiene que decir de quién es.
+  const llenaRecepcion = !esVeterinario();
+  const [doctores, setDoctores] = useState([]);
+  const [vetId, setVetId] = useState("");
+
   // ── Métrica de tiempo: cuándo empezó el registro y si se usó IA
   const inicioRegistro = useRef(Date.now());
   const usoIA = useRef(false);
@@ -586,6 +592,14 @@ export default function HistoriasClinicas() {
       .catch(() => setError("No se pudo cargar el paciente."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // La lista de doctores solo hace falta si la escribe la recepcionista
+  useEffect(() => {
+    if (!llenaRecepcion) return;
+    api.get("/api/usuarios/doctores")
+      .then(d => setDoctores(Array.isArray(d) ? d : []))
+      .catch(() => setDoctores([]));
+  }, [llenaRecepcion]);
 
   // ── Autoguardado del borrador en localStorage
   useEffect(() => {
@@ -632,6 +646,7 @@ export default function HistoriasClinicas() {
     setDatosIA(null);
     setInferenciasBrut({});
     setOpen({ s1: true, s2: true, s3: false, s4: false, s5: false });
+    setVetId("");
     // Reinicia la medición de tiempo para el siguiente registro
     inicioRegistro.current = Date.now();
     usoIA.current = false;
@@ -640,6 +655,8 @@ export default function HistoriasClinicas() {
   const handleEdit = h => {
     setForm(formFromHistoria(h));
     setEditandoId(h.id);
+    // Al corregir, se mantiene el doctor que ya figuraba
+    setVetId(h.veterinario_id ? String(h.veterinario_id) : "");
     setHighlights({});
     setOpen({ s1: true, s2: true, s3: true, s4: true, s5: true });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -801,9 +818,14 @@ export default function HistoriasClinicas() {
 
   // ── Guardar
   const handleSave = async () => {
+    if (llenaRecepcion && !vetId) {
+      setErrForm("Indica qué veterinario atendió la consulta.");
+      return;
+    }
     setGuardando(true); setErrForm(null);
     try {
       const payload = buildPayload(form);
+      if (llenaRecepcion) payload.veterinario_id = Number(vetId);
       // Auditoría IA
       if (transcripcionIA) payload.transcripcion = transcripcionIA;
       if (datosIA)         payload.datos_ia = { ...datosIA, inferencias: inferenciasBrut };
@@ -902,6 +924,29 @@ export default function HistoriasClinicas() {
               </button>
             )}
           </div>
+
+          {llenaRecepcion && (
+            <div className="flex flex-wrap items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+              <Stethoscope size={14} className="text-purple-600 shrink-0" />
+              <label htmlFor="vet-atendio" className="text-xs font-semibold text-purple-800">
+                Atendió el doctor:
+              </label>
+              <select
+                id="vet-atendio"
+                value={vetId}
+                onChange={e => setVetId(e.target.value)}
+                className="text-xs border border-purple-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                <option value="">Selecciona…</option>
+                {doctores.map(d => (
+                  <option key={d.id} value={d.id}>{d.nombre}</option>
+                ))}
+              </select>
+              <span className="text-[11px] text-slate-500">
+                La consulta queda a su nombre; tu usuario queda registrado como quien la escribió.
+              </span>
+            </div>
+          )}
 
           {/* Plantillas rápidas (solo en consulta nueva) */}
           {!editandoId && (

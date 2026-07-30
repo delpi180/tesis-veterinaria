@@ -33,7 +33,7 @@ A diferencia de versiones anteriores, el sistema ahora utiliza servicios de IA e
 El proyecto abarca la gestión integral de la veterinaria y la validación de la tesis:
 
 ### Gestión Veterinaria
-*   **Autenticación y Usuarios:** Roles de sistema (Veterinario, Recepcionista).
+*   **Autenticación y Usuarios:** Roles de sistema (Veterinario, Recepcionista). La recepcionista puede llenar historias clínicas cuando el doctor no da abasto, indicando qué veterinario atendió; emitir recetas sigue siendo exclusivo del veterinario.
 *   **Clientes y Pacientes:** Registro de propietarios y mascotas (especie, raza, edad, etc.).
 *   **Historias Clínicas y SOAP IA:** Ingreso manual o por voz. La IA (Deepgram + GPT) transcribe la consulta y extrae automáticamente los signos vitales, diagnósticos y tratamientos.
 *   **Citas (Turnos):** Agenda y calendario de atención.
@@ -41,7 +41,13 @@ El proyecto abarca la gestión integral de la veterinaria y la validación de la
 *   **Ventas y Facturación:** Registro de transacciones.
 *   **Dashboard:** KPIs, gráficos estadísticos y resumen general de la clínica.
 
-### Módulos de Evaluación (Tesis)
+### Módulos de Evaluación (Tesis) — DESACTIVADOS
+
+No le sirven a la clínica y confunden al personal, así que vienen apagados: sus
+rutas devuelven 404 y no aparecen en el menú. El código queda para poder volver
+a medir; para reactivarlos, `MODULOS_TESIS=true` en las variables de entorno del
+backend (y devolver la ruta `/mediciones` en `frontend/src/App.jsx`).
+
 *   **Comparativa de Exactitud IA vs Léxico:** Endpoints diseñados para comparar la extracción de datos de GPT-4o-mini contra un algoritmo léxico clásico y un *Gold Standard*, midiendo Precisión, Recall y F1-Score.
 *   **Encuestas de Usabilidad:** Formularios y recolección de datos utilizando la Escala de Usabilidad del Sistema (SUS).
 *   **Modelo de Aceptación Tecnológica (TAM):** Recolección de métricas sobre la percepción de utilidad y facilidad de uso por parte de los evaluadores.
