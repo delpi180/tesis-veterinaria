@@ -46,13 +46,38 @@ def _generar_cita_proxima(db: Session, historia: HistoriaClinica) -> None:
     if existe:
         return
 
+    # Varios doctores atendiendo a la misma hora está bien (es una clínica con
+    # varios consultorios); lo que no puede pasar es que UNO quede con dos
+    # turnos encima. El alta manual de turnos ya lo impide, pero este camino
+    # no pasaba por ahí y sí podía duplicarlo.
+    #
+    # No se aborta: la consulta no puede dejar de guardarse por un tema de
+    # agenda. El turno se crea sin doctor y recepción lo ubica.
+    veterinario_id = historia.veterinario_id
+    if veterinario_id:
+        ocupado = (
+            db.query(Cita.id)
+            .filter(
+                Cita.veterinario_id == veterinario_id,
+                Cita.fecha_hora == fecha,
+                Cita.estado != "cancelada",
+            )
+            .first()
+        )
+        if ocupado:
+            veterinario_id = None
+
+    notas = f"Generado automáticamente desde la historia clínica #{historia.id}"
+    if historia.veterinario_id and veterinario_id is None:
+        notas += " — el doctor ya tenía otro turno a esa hora; asignar doctor."
+
     db.add(Cita(
         paciente_id=historia.paciente_id,
         fecha_hora=fecha,
         motivo="Control (programado en consulta)",
         estado="pendiente",
-        notas=f"Generado automáticamente desde la historia clínica #{historia.id}",
-        veterinario_id=historia.veterinario_id,  # se asigna al doctor que atendió
+        notas=notas,
+        veterinario_id=veterinario_id,   # el doctor que atendió, si está libre
     ))
 
 
