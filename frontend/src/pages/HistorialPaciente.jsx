@@ -8,6 +8,7 @@ import {
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, esVeterinario } from '../services/api'
+import { Skeleton, SkeletonFilas, SkeletonTexto } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import RegistrosPaciente from '../components/RegistrosPaciente'
 import RecetasPaciente from '../components/RecetasPaciente'
@@ -43,12 +44,6 @@ const fmtFechaHora = (iso) =>
 const fmtFecha = (iso) =>
   new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
 
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-400">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 // ── Tarjeta de consulta (solo lectura) ──────────────────────────────────────
 function DRow({ label, value }) {
@@ -572,9 +567,15 @@ export default function HistorialPaciente() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
-            <Spinner /> <span className="text-sm">Cargando ficha…</span>
-          </div>
+          <>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+              <Skeleton className="h-4 w-1/3" />
+              <SkeletonTexto lineas={3} />
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <SkeletonFilas filas={4} conAvatar={false} />
+            </div>
+          </>
         ) : (
           <>
             {/* ── RESUMEN ─────────────────────────────────────────────────── */}

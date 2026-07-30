@@ -9,6 +9,7 @@ import {
   Clock, PawPrint, ChevronRight, TrendingUp, Syringe, MessageCircle, Package, Check,
 } from 'lucide-react'
 import { api, getUsuario } from '../services/api'
+import { Skeleton, SkeletonFilas } from '../components/Skeleton'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
 
 const fmtMoneda = (n) => `S/ ${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -27,12 +28,6 @@ function CustomTooltip({ active, payload, label }) {
   )
 }
 
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-400">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 export default function Inicio() {
   const navigate = useNavigate()
@@ -225,8 +220,12 @@ export default function Inicio() {
             </div>
             <div className="px-4 py-5">
               {loading ? (
-                <div className="flex items-center justify-center h-[220px] gap-3 text-slate-400">
-                  <Spinner /> <span className="text-sm">Cargando…</span>
+                // Barras de alturas distintas: ocupa el mismo alto que el
+                // gráfico real, así el panel no da un salto al llegar los datos
+                <div className="h-[220px] flex items-end justify-around gap-3 px-2 pb-6">
+                  {[45, 70, 35, 85, 55, 40, 65].map((h, i) => (
+                    <Skeleton key={i} className="flex-1" style={{ height: `${h}%` }} />
+                  ))}
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
@@ -268,7 +267,7 @@ export default function Inicio() {
 
             <div className="flex flex-col divide-y divide-slate-50 flex-1 overflow-y-auto max-h-[280px]">
               {loading ? (
-                <p className="text-xs text-slate-400 px-5 py-8 text-center">Cargando…</p>
+                <SkeletonFilas filas={4} conAvatar={false} />
               ) : citasHoy.length === 0 ? (
                 <p className="text-xs text-slate-400 px-5 py-8 text-center">Sin turnos para hoy</p>
               ) : (
@@ -328,7 +327,7 @@ export default function Inicio() {
             </div>
             <div className="flex flex-col divide-y divide-slate-50 flex-1 overflow-y-auto max-h-[300px]">
               {loading ? (
-                <p className="text-xs text-slate-400 px-5 py-8 text-center">Cargando…</p>
+                <SkeletonFilas filas={4} conAvatar={false} />
               ) : vacunas.length === 0 ? (
                 <p className="text-xs text-slate-400 px-5 py-8 text-center">Sin vacunas con próxima dosis registrada</p>
               ) : (
@@ -388,7 +387,7 @@ export default function Inicio() {
             </div>
             <div className="flex flex-col divide-y divide-slate-50 flex-1 overflow-y-auto max-h-[300px]">
               {loading ? (
-                <p className="text-xs text-slate-400 px-5 py-8 text-center">Cargando…</p>
+                <SkeletonFilas filas={4} conAvatar={false} />
               ) : alertasInv === 0 ? (
                 <p className="text-xs text-slate-400 px-5 py-8 text-center">✓ Todo el inventario está en orden</p>
               ) : (

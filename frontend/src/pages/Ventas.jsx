@@ -8,6 +8,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { clinicaActual } from '../services/clinica'
 import { api } from '../services/api'
+import { SkeletonFilas } from '../components/Skeleton'
 import { exportarCSV } from '../utils/exportUtils'
 import { useToast } from '../components/Toast'
 
@@ -34,12 +35,6 @@ const CATEGORIAS = ['comida', 'accesorio', 'medicamento']
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
 
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-500">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 const mismoMes = (iso, ref) => {
   const d = new Date(iso)
@@ -605,11 +600,7 @@ export default function Ventas() {
             </div>
           </div>
 
-          {loading && (
-            <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
-              <Spinner /> <span className="text-sm">Cargando ventas…</span>
-            </div>
-          )}
+          {loading && <SkeletonFilas filas={8} conAvatar={false} />}
 
           {!loading && !error && ventas.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">

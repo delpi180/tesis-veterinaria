@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Download } from 'lucide-react'
 import { api } from '../services/api'
+import { SkeletonFilas } from '../components/Skeleton'
 import { exportarCSV } from '../utils/exportUtils'
 import { useToast } from '../components/Toast'
 
@@ -250,11 +251,7 @@ export default function Clientes() {
             </div>
           </div>
 
-          {loading && (
-            <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
-              <Spinner /> <span className="text-sm">Cargando clientes…</span>
-            </div>
-          )}
+          {loading && <SkeletonFilas filas={7} />}
 
           {error && (
             <div className="mx-5 my-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">

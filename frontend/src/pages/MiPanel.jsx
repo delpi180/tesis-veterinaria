@@ -5,6 +5,7 @@ import {
   Users, Stethoscope,
 } from 'lucide-react'
 import { api, getNombre } from '../services/api'
+import { SkeletonFilas, SkeletonTarjetas } from '../components/Skeleton'
 
 const DIAS = [
   ['lun', 'Lun'], ['mar', 'Mar'], ['mie', 'Mié'], ['jue', 'Jue'],
@@ -18,12 +19,6 @@ const fmtFecha = (iso) =>
 const fmtHora = (iso) =>
   iso ? new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) : '—'
 
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 animate-spin text-purple-400">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 function Card({ title, Icon, count, children }) {
   return (
@@ -110,7 +105,12 @@ export default function MiPanel() {
 
       <main className="flex-1 px-4 md:px-6 py-4 md:py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
         {loading ? (
-          <div className="flex items-center justify-center py-20 gap-3 text-slate-400"><Spinner /> <span className="text-sm">Cargando…</span></div>
+          <>
+            <SkeletonTarjetas cantidad={3} className="grid grid-cols-1 md:grid-cols-3 gap-4" />
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <SkeletonFilas filas={5} />
+            </div>
+          </>
         ) : error ? (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">{error}</div>
         ) : (

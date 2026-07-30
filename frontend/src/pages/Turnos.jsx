@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Ste
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, getToken } from '../services/api'
+import { SkeletonFilas } from '../components/Skeleton'
 import { estadoStyle, estadoLabel, ESTADOS_CITA, waRecordatorio } from '../utils/citas'
 import { clinicaActual } from '../services/clinica'
 
@@ -543,7 +544,7 @@ export default function Turnos() {
 
             <div className="flex flex-col divide-y divide-slate-50 flex-1">
               {loading ? (
-                <p className="text-xs text-slate-400 px-4 py-8 text-center">Cargando...</p>
+                <SkeletonFilas filas={4} conAvatar={false} />
               ) : turnosDia.length === 0 ? (
                 <p className="text-xs text-slate-400 px-4 py-8 text-center">Sin turnos para este día</p>
               ) : (
@@ -650,7 +651,7 @@ export default function Turnos() {
           </div>
 
           {loading ? (
-            <p className="text-xs text-slate-400 px-5 py-8 text-center">Cargando...</p>
+            <SkeletonFilas filas={6} />
           ) : citasProximas.length === 0 ? (
             <p className="text-xs text-slate-400 px-5 py-8 text-center">No hay turnos próximos registrados</p>
           ) : (

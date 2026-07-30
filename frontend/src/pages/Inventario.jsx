@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Package, AlertTriangle, Coins, Search, Pencil, Trash2, X, Filter, History, ArrowDownUp, Sparkles, Mic, StopCircle, Plus, Download } from 'lucide-react'
 import { api, authHeaders } from '../services/api'
+import { SkeletonFilas } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
 import { exportarCSV } from '../utils/exportUtils'
@@ -41,12 +42,6 @@ const labelCls = 'text-xs font-semibold text-slate-600'
 
 const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-500">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 const fmtFecha = (iso) => {
   const [a, m, d] = iso.split('-')
@@ -688,11 +683,7 @@ export default function Inventario() {
             </span>
           </div>
 
-          {loading && (
-            <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
-              <Spinner /> <span className="text-sm">Cargando inventario…</span>
-            </div>
-          )}
+          {loading && <SkeletonFilas filas={8} conAvatar={false} />}
 
           {!loading && !error && productos.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
