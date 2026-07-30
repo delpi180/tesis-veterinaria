@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
-  ChevronDown, Plus, Trash2, Download, Save, Check,
-  ArrowLeft, Mic, StopCircle, AlertTriangle, Loader2, FileText, Paperclip, Stethoscope,
+  Plus, Trash2, Download, Save, Check,
+  ArrowLeft, AlertTriangle, FileText, Paperclip, Stethoscope,
 } from "lucide-react";
 import { generarPDF } from "../utils/pdfGenerator";
-import { api, authHeaders, esVeterinario } from "../services/api";
+import { api, esVeterinario } from "../services/api";
 import VoiceTextProcessor from "../components/VoiceTextProcessor";
 import DocumentosPaciente from "../components/DocumentosPaciente";
 import { nombresSimilares } from "../utils/similitud";
@@ -81,7 +81,7 @@ const toLocalDatetimeString = (v) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-// Campo → sección del acordeón (para auto-abrir con inferidos)
+// Campo → sección (para saltar a lo que la IA dejó por revisar)
 const FIELD_TO_SECTION = {
   motivo_consulta: "s1", tiempo_evolucion: "s1", derivado_por: "s1",
   detalle: "s1", alimentacion_tipo: "s1", alimentacion_cantidad_gr: "s1",
@@ -299,20 +299,66 @@ function Sel({ value, onChange, options, hl }) {
   );
 }
 
-// ── AccordionSection ─────────────────────────────────────────────────────────
+// ── Secciones del formulario ─────────────────────────────────────────────────
+//
+// Antes eran un acordeón: cinco bloques apilados que había que abrir y cerrar,
+// con la consulta entera en una sola columna larguísima. Revisar lo escrito en
+// anamnesis mientras se llena el plan significaba scrollear de punta a punta.
+// En pestañas cada parte de la consulta ocupa la pantalla y se salta directo.
+const SECCIONES = [
+  { id: "s1", num: "1", titulo: "Anamnesis",  corto: "Anamnesis" },
+  { id: "s2", num: "2", titulo: "Examen objetivo general (EOG)",   corto: "E. general" },
+  { id: "s3", num: "3", titulo: "Examen objetivo particular (EOP)", corto: "E. particular" },
+  { id: "s4", num: "4", titulo: "Diagnóstico", corto: "Diagnóstico" },
+  { id: "s5", num: "5", titulo: "Plan, tratamiento y vacunas", corto: "Plan" },
+];
 
-function AccordionSection({ num, title, isOpen, onToggle, children }) {
+function BarraSecciones({ activa, onCambiar, llenas, avisos }) {
   return (
-    <div className="border border-slate-200 rounded-md overflow-hidden">
-      <button type="button" onClick={onToggle}
-        className="w-full flex items-center gap-3 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-left transition-colors">
-        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-700 text-white text-xs font-bold flex items-center justify-center">
-          {num}
-        </span>
-        <span className="text-sm font-semibold text-slate-700 flex-1">{title}</span>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-      {isOpen && <div className="px-4 py-4 space-y-3 bg-white border-t border-slate-100">{children}</div>}
+    // La barra desplaza en móvil en vez de apretar cinco pestañas ilegibles
+    <div className="flex gap-1 overflow-x-auto border-b border-slate-200 -mx-1 px-1" role="tablist">
+      {SECCIONES.map(sec => {
+        const esActiva = sec.id === activa;
+        const aviso = avisos.has(sec.id);
+        return (
+          <button
+            key={sec.id}
+            type="button"
+            role="tab"
+            aria-selected={esActiva}
+            onClick={() => onCambiar(sec.id)}
+            className={[
+              "flex items-center gap-1.5 px-3 py-2 text-sm font-semibold whitespace-nowrap",
+              "border-b-2 -mb-px transition-colors",
+              esActiva
+                ? "border-purple-700 text-purple-800"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200",
+            ].join(" ")}
+          >
+            <span className={[
+              "w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0",
+              esActiva ? "bg-purple-700 text-white"
+                : llenas.has(sec.id) ? "bg-purple-100 text-purple-700"
+                : "bg-slate-100 text-slate-400",
+            ].join(" ")}>
+              {sec.num}
+            </span>
+            {sec.corto}
+            {/* Punto naranja: la IA dejó algo por revisar en esa sección */}
+            {aviso && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PanelSeccion({ activa, id, titulo, children }) {
+  if (activa !== id) return null;
+  return (
+    <div role="tabpanel" className="border border-slate-200 border-t-0 rounded-b-md bg-white px-4 py-4 space-y-3">
+      <p className="text-sm font-semibold text-slate-700">{titulo}</p>
+      {children}
     </div>
   );
 }
@@ -522,12 +568,85 @@ function HistoriaCard({ h, onEdit, onDelete }) {
 
 // PDF generation logic has been externalized to pdfGenerator.js
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Borrador en el navegador ─────────────────────────────────────────────────
+//
+// Se guarda para que un cierre accidental o un corte de luz no borre media
+// consulta. Lo que se guarda ahora incluye CUÁNDO: antes el borrador volvía
+// solo, sin decir nada, y un texto empezado el lunes reaparecía el jueves
+// dentro de "Nueva consulta" listo para guardarse como el examen de ese día.
+const claveBorrador = (id) => `draft_historia_${id}`;
 
-const fmtSec = s =>
-  `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+/** ¿El formulario está intacto? Se usa para no guardar borradores vacíos y
+ *  para saber si hay algo que perder al salir. */
+function formularioVacio(f) {
+  return Object.keys(f).every(key => {
+    if (key === "examen_particular") {
+      if (!f[key]) return true;
+      return Object.values(f[key]).every(sys => !sys.estado && !sys.detalle);
+    }
+    if (Array.isArray(f[key])) return f[key].length === 0;
+    return !f[key];
+  });
+}
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+// Un borrador reciente es casi siempre "se me cerró la pestaña": se recupera
+// solo. Uno viejo es otra consulta, otro día: no se toca sin permiso.
+const HORAS_RECUPERACION_AUTOMATICA = 12;
+
+/** Completa un borrador guardado con los campos que le falten.
+ *
+ *  Un borrador escrito por una versión anterior de la aplicación no tiene los
+ *  campos que se agregaron después. Cargarlo tal cual dejaba, por ejemplo,
+ *  `examen_particular` sin definir y la pantalla de consulta entera reventaba
+ *  al intentar dibujar los sistemas — con el texto del doctor atrapado dentro
+ *  de un borrador que ya no se podía abrir.
+ */
+function normalizarBorrador(guardado) {
+  return {
+    ...FORM_VACIO,
+    ...guardado,
+    examen_particular: { ...eopVacio(), ...(guardado?.examen_particular ?? {}) },
+    tratamiento_items: Array.isArray(guardado?.tratamiento_items) ? guardado.tratamiento_items : [],
+    vacunas_items:     Array.isArray(guardado?.vacunas_items)     ? guardado.vacunas_items     : [],
+  };
+}
+
+function leerBorrador(id) {
+  const crudo = localStorage.getItem(claveBorrador(id));
+  if (!crudo) return null;
+  try {
+    const dato = JSON.parse(crudo);
+    if (!dato || typeof dato !== "object") return null;
+    // Formato viejo: el objeto ERA el formulario, sin fecha. Se trata como
+    // antiguo (no se recupera solo) porque no hay forma de saber de cuándo es.
+    if (!dato.form) return { form: normalizarBorrador(dato), guardadoEn: null };
+    return { form: normalizarBorrador(dato.form), guardadoEn: dato.guardadoEn ?? null };
+  } catch (e) {
+    console.error("No se pudo leer el borrador:", e);
+    return null;
+  }
+}
+
+function esReciente(guardadoEn) {
+  if (!guardadoEn) return false;
+  const horas = (Date.now() - new Date(guardadoEn).getTime()) / 3600000;
+  return horas >= 0 && horas < HORAS_RECUPERACION_AUTOMATICA;
+}
+
+function describirCuando(guardadoEn) {
+  if (!guardadoEn) return "de una sesión anterior";
+  const d = new Date(guardadoEn);
+  const min = Math.round((Date.now() - d.getTime()) / 60000);
+  if (min < 1)  return "de hace un momento";
+  if (min < 60) return `de hace ${min} min`;
+  const hrs = Math.round(min / 60);
+  if (hrs < 24) return `de hace ${hrs} h`;
+  // 24 h a propósito: "11:32 a. m." termina en punto y deja "a. m.." al cerrar
+  // la frase, y en registro clínico la hora sin am/pm es menos ambigua.
+  const hora = d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `del ${d.toLocaleDateString("es-PE", { day: "numeric", month: "long" })} a las ${hora}`;
+}
+
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
@@ -543,25 +662,25 @@ export default function HistoriasClinicas() {
   const [error,     setError]     = useState(null);
 
   // ── Formulario
-  const [form,       setForm]       = useState(() => {
-    const savedDraft = localStorage.getItem(`draft_historia_${id}`);
-    if (savedDraft) {
-      try {
-        const parsed = JSON.parse(savedDraft);
-        if (parsed && typeof parsed === "object") {
-          return parsed;
-        }
-      } catch (e) {
-        console.error("No se pudo cargar el borrador:", e);
-      }
-    }
-    return FORM_VACIO;
-  });
+  // El borrador se lee UNA vez al montar (initializer perezoso) y de ahí sale
+  // tanto el formulario inicial como el aviso que se le muestra al usuario.
+  const [borrador] = useState(() => leerBorrador(id));
+  const [form, setForm] = useState(
+    () => (esReciente(borrador?.guardadoEn) ? borrador.form : FORM_VACIO)
+  );
+  // Aviso visible: recuperado (reciente) o disponible (viejo, sin tocar)
+  const [avisoBorrador, setAvisoBorrador] = useState(
+    () => (borrador
+      ? { cuando: describirCuando(borrador.guardadoEn), recuperado: esReciente(borrador.guardadoEn) }
+      : null)
+  );
   const [editandoId, setEditandoId] = useState(null);
   const [guardando,  setGuardando]  = useState(false);
   const [guardadoOk, setGuardadoOk] = useState(false);
   const [errForm,    setErrForm]    = useState(null);
-  const [open, setOpen] = useState({ s1: true, s2: true, s3: false, s4: false, s5: false });
+  const [seccionActiva, setSeccionActiva] = useState("s1");
+  // Secciones donde la IA dejó algo por revisar (punto naranja en la pestaña)
+  const [seccionesConAviso, setSeccionesConAviso] = useState(() => new Set());
 
   // ── IA / voz
   const [transcripcionIA, setTranscripcionIA] = useState("");
@@ -593,6 +712,29 @@ export default function HistoriasClinicas() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // ── Salir con la consulta a medio llenar ───────────────────────────────────
+  // El borrador la salva, pero nadie lo sabe en el momento: sin aviso, cerrar
+  // la pestaña se siente como perder el trabajo.
+  const hayCambios = !formularioVacio(form);
+
+  useEffect(() => {
+    if (!hayCambios) return;
+    const alSalir = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", alSalir);
+    return () => window.removeEventListener("beforeunload", alSalir);
+  }, [hayCambios]);
+
+  /** Navegación interna: el aviso del navegador no cubre moverse dentro de la
+   *  aplicación, así que el botón de volver pregunta por su cuenta. */
+  const salir = () => {
+    if (hayCambios && !window.confirm(
+      "Tienes una consulta a medio llenar.\n\n" +
+      "Se guarda como borrador y podrás retomarla al volver a esta mascota, " +
+      "pero todavía no queda registrada en la historia clínica.\n\n¿Salir igual?"
+    )) return;
+    navigate(-1);
+  };
+
   // La lista de doctores solo hace falta si la escribe la recepcionista
   useEffect(() => {
     if (!llenaRecepcion) return;
@@ -603,23 +745,12 @@ export default function HistoriasClinicas() {
 
   // ── Autoguardado del borrador en localStorage
   useEffect(() => {
-    const isFormEmpty = (f) => {
-      return Object.keys(f).every(key => {
-        if (key === "examen_particular") {
-          if (!f[key]) return true;
-          return Object.values(f[key]).every(sys => !sys.estado && !sys.detalle);
-        }
-        if (Array.isArray(f[key])) {
-          return f[key].length === 0;
-        }
-        return !f[key];
-      });
-    };
-
-    if (isFormEmpty(form)) {
-      localStorage.removeItem(`draft_historia_${id}`);
+    if (formularioVacio(form)) {
+      localStorage.removeItem(claveBorrador(id));
     } else {
-      localStorage.setItem(`draft_historia_${id}`, JSON.stringify(form));
+      localStorage.setItem(claveBorrador(id), JSON.stringify({
+        form, guardadoEn: new Date().toISOString(),
+      }));
     }
   }, [form, id]);
 
@@ -634,7 +765,6 @@ export default function HistoriasClinicas() {
       examen_particular: { ...p.examen_particular, [s]: { ...p.examen_particular[s], [c]: e.target.value } },
     }));
 
-  const toggle = k => setOpen(p => ({ ...p, [k]: !p[k] }));
 
   // ── Resetear formulario + estado IA
   const resetForm = () => {
@@ -645,11 +775,25 @@ export default function HistoriasClinicas() {
     setTranscripcionIA("");
     setDatosIA(null);
     setInferenciasBrut({});
-    setOpen({ s1: true, s2: true, s3: false, s4: false, s5: false });
+    setSeccionActiva("s1");
+    setSeccionesConAviso(new Set());
     setVetId("");
+    setAvisoBorrador(null);
     // Reinicia la medición de tiempo para el siguiente registro
     inicioRegistro.current = Date.now();
     usoIA.current = false;
+  };
+
+  // Traer un borrador viejo que se dejó sin tocar
+  const recuperarBorrador = () => {
+    setForm(borrador.form);
+    setAvisoBorrador(a => ({ ...a, recuperado: true }));
+  };
+
+  const descartarBorrador = () => {
+    localStorage.removeItem(claveBorrador(id));
+    setAvisoBorrador(null);
+    if (avisoBorrador?.recuperado) setForm(FORM_VACIO);
   };
 
   const handleEdit = h => {
@@ -658,7 +802,7 @@ export default function HistoriasClinicas() {
     // Al corregir, se mantiene el doctor que ya figuraba
     setVetId(h.veterinario_id ? String(h.veterinario_id) : "");
     setHighlights({});
-    setOpen({ s1: true, s2: true, s3: true, s4: true, s5: true });
+    setSeccionActiva("s1");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -687,7 +831,8 @@ export default function HistoriasClinicas() {
         next.vacunas_items = tpl.vacunas_items.map(i => ({ ...i }));
       return next;
     });
-    setOpen(o => ({ ...o, s1: true, s5: true }));
+    // La plantilla llena anamnesis y plan; se deja al usuario en la primera
+    setSeccionActiva("s1");
   };
 
   const handleDelete = async h => {
@@ -801,17 +946,17 @@ export default function HistoriasClinicas() {
       hl[campo] = "alerta";
     setHighlights(hl);
 
-    // Auto-abrir secciones con inferidos o con alertas de rango
-    const sectionsToOpen = new Set();
+    // Marcar las secciones con inferidos o alertas de rango y llevar al doctor
+    // a la primera: con pestañas no basta con "abrirlas", hay que ir.
+    const porRevisar = new Set();
     for (const [campo, tipo] of Object.entries(hl))
       if ((tipo === "inferido" || tipo === "alerta") && FIELD_TO_SECTION[campo])
-        sectionsToOpen.add(FIELD_TO_SECTION[campo]);
-    if (sectionsToOpen.size > 0)
-      setOpen(prev => {
-        const next = { ...prev };
-        sectionsToOpen.forEach(s => { next[s] = true; });
-        return next;
-      });
+        porRevisar.add(FIELD_TO_SECTION[campo]);
+    setSeccionesConAviso(porRevisar);
+    if (porRevisar.size > 0) {
+      const primera = SECCIONES.find(sec => porRevisar.has(sec.id));
+      if (primera) setSeccionActiva(primera.id);
+    }
   };
 
   // Lógica de IA delegada a VoiceTextProcessor
@@ -854,6 +999,23 @@ export default function HistoriasClinicas() {
     }
   };
 
+  // Secciones con algo escrito: la pestaña lo muestra para saber de un vistazo
+  // qué falta, sin tener que entrar a cada una.
+  const seccionesLlenas = (() => {
+    const llenas = new Set();
+    for (const [campo, valor] of Object.entries(form)) {
+      if (!valor || (Array.isArray(valor) && valor.length === 0)) continue;
+      const sec = FIELD_TO_SECTION[campo];
+      if (sec) llenas.add(sec);
+    }
+    // Los que no están en el mapa campo→sección
+    if ((form.tratamiento_items?.length || form.vacunas_items?.length ||
+         form.proxima_cita)) llenas.add("s5");
+    if (form.examen_particular &&
+        Object.values(form.examen_particular).some(x => x.estado || x.detalle)) llenas.add("s3");
+    return llenas;
+  })();
+
   // ── Contador de inferidos pendientes
   const numInferidos = Object.values(highlights).filter(v => v === "inferido").length;
 
@@ -866,7 +1028,7 @@ export default function HistoriasClinicas() {
       {/* Header */}
       <div className="bg-purple-700 text-white px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="hover:bg-white/20 p-1 rounded transition-colors">
+          <button onClick={salir} className="hover:bg-white/20 p-1 rounded transition-colors">
             <ArrowLeft size={18} />
           </button>
           <div>
@@ -925,6 +1087,29 @@ export default function HistoriasClinicas() {
             )}
           </div>
 
+          {avisoBorrador && (
+            <div className="flex flex-wrap items-center gap-2 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2">
+              <FileText size={14} className="text-amber-600 shrink-0" />
+              <span className="text-xs text-amber-900">
+                {avisoBorrador.recuperado
+                  ? <>Se recuperó un borrador <strong>{avisoBorrador.cuando}</strong>. Revísalo antes de guardar.</>
+                  : <>Hay un borrador sin guardar <strong>{avisoBorrador.cuando}</strong>.</>}
+              </span>
+              <div className="flex gap-2 ml-auto">
+                {!avisoBorrador.recuperado && (
+                  <button type="button" onClick={recuperarBorrador}
+                    className="text-xs font-semibold px-2.5 py-1 rounded-md bg-amber-600 text-white hover:bg-amber-500 transition">
+                    Recuperarlo
+                  </button>
+                )}
+                <button type="button" onClick={descartarBorrador}
+                  className="text-xs font-semibold px-2.5 py-1 rounded-md border border-amber-300 text-amber-800 hover:bg-amber-100 transition">
+                  Descartar
+                </button>
+              </div>
+            </div>
+          )}
+
           {llenaRecepcion && (
             <div className="flex flex-wrap items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
               <Stethoscope size={14} className="text-purple-600 shrink-0" />
@@ -966,8 +1151,15 @@ export default function HistoriasClinicas() {
             </div>
           )}
 
+          <BarraSecciones
+            activa={seccionActiva}
+            onCambiar={setSeccionActiva}
+            llenas={seccionesLlenas}
+            avisos={seccionesConAviso}
+          />
+
           {/* S1 — Anamnesis */}
-          <AccordionSection num="1" title="Anamnesis" isOpen={open.s1} onToggle={() => toggle("s1")}>
+          <PanelSeccion activa={seccionActiva} id="s1" titulo="Anamnesis">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Field label="Tipo de consulta" hl={highlights.tipo_consulta}>
                 <Sel value={form.tipo_consulta} onChange={setF("tipo_consulta")} options={OPT.tipo_consulta} hl={highlights.tipo_consulta} />
@@ -999,10 +1191,10 @@ export default function HistoriasClinicas() {
                 placeholder="Vacunas previas: polivalente (ene-2026), antirrábica (mar-2026). Desparasitaciones, cirugías, enfermedades anteriores…"
                 hl={highlights.antecedentes} />
             </Field>
-          </AccordionSection>
+          </PanelSeccion>
 
           {/* S2 — EOG */}
-          <AccordionSection num="2" title="Examen objetivo general (EOG)" isOpen={open.s2} onToggle={() => toggle("s2")}>
+          <PanelSeccion activa={seccionActiva} id="s2" titulo="Examen objetivo general (EOG)">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {[
                 ["temperatura_c",           "Temperatura (°C)", "38.5", "any"],
@@ -1032,10 +1224,10 @@ export default function HistoriasClinicas() {
                 <TIn value={form.linfonodulos} onChange={setF("linfonodulos")} placeholder="No reactivos" hl={highlights.linfonodulos} />
               </Field>
             </div>
-          </AccordionSection>
+          </PanelSeccion>
 
           {/* S3 — EOP */}
-          <AccordionSection num="3" title="Examen objetivo particular (EOP)" isOpen={open.s3} onToggle={() => toggle("s3")}>
+          <PanelSeccion activa={seccionActiva} id="s3" titulo="Examen objetivo particular (EOP)">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
               {SISTEMAS_EOP.map(s => (
                 <div key={s} className="grid grid-cols-1 sm:grid-cols-5 gap-2 items-end border-b border-slate-100 sm:border-0 pb-2 sm:pb-0">
@@ -1048,10 +1240,10 @@ export default function HistoriasClinicas() {
                 </div>
               ))}
             </div>
-          </AccordionSection>
+          </PanelSeccion>
 
           {/* S4 — Diagnóstico */}
-          <AccordionSection num="4" title="Diagnóstico" isOpen={open.s4} onToggle={() => toggle("s4")}>
+          <PanelSeccion activa={seccionActiva} id="s4" titulo="Diagnóstico">
             <Field label="Diagnóstico presuntivo" hl={highlights.diagnostico_presuntivo}>
               <TAr value={form.diagnostico_presuntivo} onChange={setF("diagnostico_presuntivo")} rows={2} hl={highlights.diagnostico_presuntivo} />
             </Field>
@@ -1062,10 +1254,10 @@ export default function HistoriasClinicas() {
             <Field label="Diagnóstico definitivo" hl={highlights.diagnostico_definitivo}>
               <TAr value={form.diagnostico_definitivo} onChange={setF("diagnostico_definitivo")} rows={2} hl={highlights.diagnostico_definitivo} />
             </Field>
-          </AccordionSection>
+          </PanelSeccion>
 
           {/* S5 — Plan */}
-          <AccordionSection num="5" title="Plan, tratamiento y vacunas" isOpen={open.s5} onToggle={() => toggle("s5")}>
+          <PanelSeccion activa={seccionActiva} id="s5" titulo="Plan, tratamiento y vacunas">
             <Field label="Exámenes solicitados" hl={highlights.examenes_solicitados}>
               <TAr value={form.examenes_solicitados} onChange={setF("examenes_solicitados")} rows={2} hl={highlights.examenes_solicitados} />
             </Field>
@@ -1094,7 +1286,7 @@ export default function HistoriasClinicas() {
                   className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-purple-300 focus:border-purple-300" />
               </Field>
             </div>
-          </AccordionSection>
+          </PanelSeccion>
 
           {errForm && (
             <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">{errForm}</div>
