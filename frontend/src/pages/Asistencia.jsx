@@ -363,7 +363,7 @@ export default function Asistencia() {
       {editando && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setEditando(null) }}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-800">Corregir marcación</p>
@@ -377,8 +377,8 @@ export default function Asistencia() {
               </button>
             </div>
 
-            <form onSubmit={guardarCorreccion}>
-              <div className="px-5 py-4 flex flex-col gap-4">
+            <form onSubmit={guardarCorreccion} className="flex flex-col flex-1 min-h-0">
+              <div className="px-5 py-4 flex flex-col gap-4 overflow-y-auto">
                 <p className="text-xs text-slate-500">
                   Ajusta la hora real de entrada y salida cuando el horario varíe o
                   no se haya alcanzado a marcar en el momento.

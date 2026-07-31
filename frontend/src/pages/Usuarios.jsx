@@ -233,15 +233,15 @@ export default function Usuarios() {
       {modalAbierto && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
           onClick={(e) => { if (e.target === e.currentTarget) cerrar() }}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <p className="text-sm font-bold text-slate-800">{editId ? 'Editar Usuario' : 'Nuevo Usuario'}</p>
               <button onClick={cerrar} className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={guardar}>
-              <div className="px-5 py-4 flex flex-col gap-4">
+            <form onSubmit={guardar} className="flex flex-col flex-1 min-h-0">
+              <div className="px-5 py-4 flex flex-col gap-4 overflow-y-auto">
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>Usuario {!editId && <span className="text-rose-500">*</span>}</label>
                   <input type="text" className={inputCls} value={form.usuario} disabled={!!editId}
@@ -253,7 +253,7 @@ export default function Usuarios() {
                   <input type="text" className={inputCls} value={form.nombre}
                     onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>{editId ? 'Nueva contraseña' : 'Contraseña'} {!editId && <span className="text-rose-500">*</span>}</label>
                     <input type="password" className={inputCls} value={form.password}
@@ -269,7 +269,7 @@ export default function Usuarios() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>DNI</label>
                     <input type="text" className={inputCls} value={form.dni} maxLength={8}

@@ -844,7 +844,7 @@ export default function Inventario() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>Categoría</label>
                     <select
@@ -883,7 +883,7 @@ export default function Inventario() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>Precio <span className="text-rose-500">*</span></label>
                     <input
@@ -906,7 +906,7 @@ export default function Inventario() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 items-end">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:items-end">
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>Stock mínimo</label>
                     <input
@@ -929,7 +929,7 @@ export default function Inventario() {
                 </div>
 
                 {/* Vencimiento: opcional, porque un collar o un plato no vencen */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>Vence el</label>
                     <input
