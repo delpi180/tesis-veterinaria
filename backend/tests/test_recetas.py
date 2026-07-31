@@ -10,7 +10,7 @@ petición ANTES de llamar al modelo).
 from sqlalchemy import text
 
 from database import SessionLocal
-from services.receta_extractor import _deduplicar_items, _mismo_medicamento
+from services.receta_extractor import _limpiar_vacios, _quitar_repetidos
 
 
 def _crear_paciente(client, admin, sufijo, dni):
@@ -88,24 +88,45 @@ def test_guardar_receta_no_duplica_en_doble_envio(client, admin, doctor):
         _borrar(client, admin, cli, pac)
 
 
-# ── Deduplicación de medicamentos dictados (lado del extractor de IA) ───────
+# ── Limpieza de la lista dictada (lado del extractor de IA) ─────────────────
 
-def test_mismo_medicamento_reconoce_variantes():
-    assert _mismo_medicamento("Amoxicilina", "amoxicilina") is True
-    assert _mismo_medicamento("Meloxicam", "Meloxicam 1.5%") is True
-    assert _mismo_medicamento("Enrofloxacina", "Metronidazol") is False
+def test_dos_pautas_del_mismo_farmaco_se_conservan():
+    """Antes esto fusionaba por NOMBRE y se quedaba con la última mención.
 
-
-def test_deduplicar_items_conserva_la_ultima_mencion():
-    """Si el veterinario dicta el mismo medicamento dos veces (p. ej. corrige
-    la frecuencia a mitad de la dictadura), debe quedar una sola entrada con
-    el dato más reciente, no dos filas duplicadas."""
+    La idea era absorber las correcciones del veterinario, pero el modelo ya
+    las resuelve solo (devuelve una sola línea). Lo que sí hacía era borrar
+    pautas legítimas: la dosis de carga de un fenobarbital, o la inyectable
+    cuando además va la presentación oral. Un medicamento recetado que
+    desaparece sin aviso es peor que uno repetido: lo repetido se ve.
+    """
     items = [
-        {"medicamento": "Meloxicam", "dosis": "0.1 mg/kg", "via": "Oral", "frecuencia": "c/24h", "duracion": None},
-        {"medicamento": "meloxicam", "dosis": "0.1 mg/kg", "via": "Oral", "frecuencia": "c/12h", "duracion": "5 días"},
-        {"medicamento": "Amoxicilina", "dosis": "250 mg", "via": None, "frecuencia": None, "duracion": None},
+        {"medicamento": "Fenobarbital", "dosis": "5 mg/kg", "via": None,
+         "frecuencia": None, "duracion": "hoy"},
+        {"medicamento": "fenobarbital", "dosis": "2.5 mg/kg", "via": None,
+         "frecuencia": "c/12h", "duracion": "permanente"},
     ]
-    resultado = _deduplicar_items(items)
+    resultado = _quitar_repetidos(items)
+    assert len(resultado) == 2, "se perdió la dosis de carga"
+
+
+def test_se_descarta_lo_que_es_identico():
+    """Una línea repetida campo por campo no aporta nada y confunde al imprimir."""
+    fila = {"medicamento": "Meloxicam", "dosis": "0.1 mg/kg", "via": "Oral",
+            "frecuencia": "c/24h", "duracion": "3 días"}
+    resultado = _quitar_repetidos([fila, dict(fila), {**fila, "medicamento": "Amoxicilina"}])
     assert len(resultado) == 2
-    meloxicam = next(i for i in resultado if "meloxicam" in i["medicamento"].lower())
-    assert meloxicam["frecuencia"] == "c/12h"   # se quedó con la corrección, no con la primera mención
+
+
+def test_se_ignoran_las_lineas_sin_medicamento():
+    assert _quitar_repetidos([{"medicamento": "", "dosis": "5 mg"}]) == []
+
+
+def test_la_palabra_null_no_llega_a_la_receta_impresa():
+    """El modelo a veces escribe "null" como texto; sin limpiarlo, la boleta
+    que recibe el cliente dice literalmente "Vía: null"."""
+    limpio = _limpiar_vacios({"medicamento": "Amoxicilina", "dosis": "4 mg/kg",
+                              "via": "null", "frecuencia": "N/A", "duracion": "-"})
+    assert limpio["via"] is None
+    assert limpio["frecuencia"] is None
+    assert limpio["duracion"] is None
+    assert limpio["medicamento"] == "Amoxicilina"

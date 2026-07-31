@@ -98,14 +98,47 @@ información a JSON siguiendo el esquema y las reglas de mapeo clínico.
 REGLAS GENERALES:
 - Devuelve SOLO JSON válido, sin markdown ni texto extra.
 - Si un dato NO se menciona, pon null. NUNCA inventes datos no dichos.
-- Convierte números en palabras a cifras: "treinta y nueve dos"→39.2;
-  "cuatro kilos y medio"→4.5; "ciento veinte"→120.
 - Para campos de OPCIONES CERRADAS, elige EXACTAMENTE uno de los valores
   permitidos según las reglas de mapeo. Interpreta el lenguaje coloquial del
   veterinario.
 - Para cada campo de opción cerrada que completes, indica si fue EXPLÍCITO
   (el vet dio el dato claramente) o INFERIDO (lo dedujiste de una mención
   genérica). Esto va en el objeto "_inferencias".
+
+NÚMEROS — constantes y dosis:
+- Copia el número EXACTAMENTE como se dictó. No redondees, no lo ajustes al
+  valor "habitual", no corrijas lo que te parezca raro. Si el dictado dice 4,
+  escribe 4 aunque lo normal en ese fármaco fuera otra cifra.
+- Convierte palabras a cifras SIN cambiar el valor, también dentro de las
+  dosis: "treinta y nueve dos"→39.2; "cuatro kilos y medio"→4.5;
+  "ciento veinte"→120; "cuatro miligramos por kilo"→"4 mg/kg";
+  "cero punto uno"→"0.1". Nunca dejes el número escrito en palabras.
+- Si un número quedó cortado o no se entiende, pon null en ese campo. Un hueco
+  se completa a mano; un número inventado se le administra al animal.
+
+TRATAMIENTOS vs VACUNAS — no se mezclan:
+- "vacunas_items": SOLO biológicos de inmunización (quíntuple, séxtuple,
+  antirrábica, triple felina, tos de las perreras/bordetella, y marcas como
+  Nobivac, Vanguard, Eurican, Defensor, Rabisin). Van con su lote y su
+  próxima dosis; NO llevan dosis en mg ni frecuencia.
+- "tratamiento_items": todo lo demás que se administra o receta — antibióticos,
+  antiinflamatorios, antiparasitarios (ivermectina, praziquantel), analgésicos.
+  Un antiparasitario NO es una vacuna aunque se aplique el mismo día.
+- Si en la misma frase hay vacuna y fármaco ("le puse la antirrábica y le di
+  praziquantel"), separa cada uno en su lista.
+
+UNA LÍNEA POR PAUTA:
+- Un mismo fármaco puede aparecer VARIAS veces si tiene pautas distintas, y
+  todas van como líneas separadas: "enrofloxacina inyectable hoy y tabletas
+  por 7 días" son DOS líneas; "fenobarbital 5 mg/kg de carga y después
+  2.5 mg/kg cada 12 horas" también.
+- Solo se unifica cuando el veterinario se CORRIGE sobre lo que acaba de decir
+  ("no, mejor cada 8 horas"): ahí queda una sola línea, la corregida.
+- "via" es la vía de administración (oral, SC, IM, IV, tópica, oftálmica,
+  ótica). NO es la presentación: "tabletas", "jarabe" o "inyectable" van en el
+  nombre del medicamento.
+- "dicho" es el fragmento LITERAL del dictado del que sacaste esa línea,
+  copiado tal cual. Deja ver qué se oyó, para poder compararlo de un vistazo.
 
 MAPEO DE ESCALAS CLÍNICAS (opciones cerradas):
 
@@ -189,8 +222,8 @@ ESQUEMA JSON (todas las claves; null si no se menciona):
   }},
   "diagnostico_presuntivo": str, "diagnosticos_diferenciales": str,
   "diagnostico_definitivo": str, "examenes_solicitados": str,
-  "tratamiento_items": [{{"medicamento": str, "dosis": str, "via": str, "frecuencia": str, "duracion": str}}],
-  "vacunas_items": [{{"vacuna": str, "lote": str, "proxima_dosis": str}}],
+  "tratamiento_items": [{{"medicamento": str, "dosis": str, "via": str, "frecuencia": str, "duracion": str, "dicho": str}}],
+  "vacunas_items": [{{"vacuna": str, "lote": str, "proxima_dosis": str, "dicho": str}}],
   "indicaciones": str, "pronostico": str, "proxima_cita": str,
   "_inferencias": {{"campo": "explicito"|"inferido", ...}}
 }}
@@ -245,14 +278,16 @@ def _build_schema() -> dict:
         "examen_particular": _obj({s: _s() for s in _SISTEMAS}),
         "diagnostico_presuntivo": _s(), "diagnosticos_diferenciales": _s(),
         "diagnostico_definitivo": _s(), "examenes_solicitados": _s(),
+        # "dicho": fragmento literal del dictado, para verificar lo que se oyó
         "tratamiento_items": {
             "type": "array",
             "items": _obj({"medicamento": _s(), "dosis": _s(), "via": _s(),
-                           "frecuencia": _s(), "duracion": _s()}),
+                           "frecuencia": _s(), "duracion": _s(), "dicho": _s()}),
         },
         "vacunas_items": {
             "type": "array",
-            "items": _obj({"vacuna": _s(), "lote": _s(), "proxima_dosis": _s()}),
+            "items": _obj({"vacuna": _s(), "lote": _s(), "proxima_dosis": _s(),
+                           "dicho": _s()}),
         },
         "indicaciones": _s(), "pronostico": _enum(_CERRADOS["pronostico"]),
         "proxima_cita": _s(),
@@ -277,6 +312,34 @@ _RANGOS = {
     "condicion_corporal":      (1, 9, "/9"),
     "alimentacion_cantidad_gr": (1, 5000, "g"),
 }
+
+
+# El modelo a veces escribe la palabra "null" dentro de un campo de texto en
+# vez de dejarlo vacío. Sin esto, la historia impresa muestra "Vía: null".
+_VACIOS = {"null", "none", "n/a", "na", "-", "--", "no aplica", "no especificado"}
+
+
+def _limpiar_vacios(datos: dict) -> dict:
+    """Convierte los 'null' escritos como texto en nulos de verdad."""
+    def limpio(v):
+        if isinstance(v, str) and v.strip().lower() in _VACIOS:
+            return None
+        return v
+
+    for clave in ("tratamiento_items", "vacunas_items"):
+        lista = datos.get(clave)
+        if isinstance(lista, list):
+            datos[clave] = [
+                {k: limpio(v) for k, v in item.items()}
+                for item in lista if isinstance(item, dict)
+            ]
+    for k, v in list(datos.items()):
+        if isinstance(v, str):
+            datos[k] = limpio(v)
+    ep = datos.get("examen_particular")
+    if isinstance(ep, dict):
+        datos["examen_particular"] = {k: limpio(v) for k, v in ep.items()}
+    return datos
 
 
 def _validar_rangos(datos: dict) -> dict:
@@ -376,6 +439,7 @@ def extraer_historia(texto: str) -> dict:
 
     # Post-procesado: resolver expresiones de fecha relativas que el LLM no calculó.
     parsed = _patch_dates(parsed, today)
+    parsed = _limpiar_vacios(parsed)
 
     # Validación de rangos fisiológicos.
     alertas_rango = _validar_rangos(parsed)

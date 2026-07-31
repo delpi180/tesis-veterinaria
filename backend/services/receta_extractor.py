@@ -23,16 +23,37 @@ información a JSON siguiendo el esquema.
 REGLAS:
 - Devuelve SOLO JSON válido, sin markdown ni texto extra.
 - Si un dato NO se menciona, pon null. NUNCA inventes datos no dichos.
-- Convierte números en palabras a cifras: "quince miligramos por kilo" → "15 mg/kg".
-- Un mismo medicamento se menciona UNA sola vez en la lista, con su dosis,
-  vía, frecuencia y duración más completas mencionadas en el dictado. Si el
-  veterinario repite o corrige un medicamento ya dicho (p. ej. "mejor cada 8
-  horas, no cada 12"), actualiza esa entrada en vez de crear una nueva.
-- "vía" es la vía de administración: oral, subcutánea (SC), intramuscular (IM),
-  intravenosa (IV), tópica, etc. Usa el término tal como se dictó, normalizado.
+
+NÚMEROS — lo más importante de una receta:
+- Copia el número EXACTAMENTE como se dictó. No redondees, no ajustes a la
+  dosis "habitual" del fármaco, no corrijas lo que te parezca raro. Si el
+  dictado dice 4, escribe 4 aunque lo normal fuera otra cifra.
+- Convierte palabras a cifras sin cambiar el valor: "quince miligramos por
+  kilo" → "15 mg/kg"; "cero punto uno" → "0.1"; "dos y medio" → "2.5".
+- Si un número no se entiende o quedó cortado, pon null en ese campo. Un hueco
+  es recuperable; un número inventado se administra al animal.
+
+UNA LÍNEA POR PAUTA:
+- Un mismo fármaco puede aparecer VARIAS veces si tiene pautas distintas, y
+  todas van como líneas separadas. Ejemplos que son DOS líneas:
+  "enrofloxacina inyectable hoy y tabletas por 7 días";
+  "fenobarbital 5 mg/kg de carga y después 2.5 mg/kg cada 12 horas".
+- Solo se unifica cuando el veterinario se CORRIGE sobre lo que acaba de
+  decir ("no, mejor cada 8 horas", "ah no, 30 no 20"): en ese caso deja una
+  sola línea con la versión corregida.
+
+CAMPOS:
+- "via" es la vía de administración: oral, subcutánea (SC), intramuscular (IM),
+  intravenosa (IV), tópica, oftálmica, ótica. NO es la presentación: "tabletas",
+  "jarabe", "inyectable" o "gotas" van en el nombre del medicamento, no en via.
 - "diagnostico" es el motivo clínico de la receta si se menciona (p. ej.
   "gastroenteritis leve"). "indicaciones" son instrucciones para el dueño
   (dieta, reposo, cuándo volver a control), no las dosis de los medicamentos.
+- Las vacunas NO son medicamentos de receta: si se menciona que se aplicó una
+  vacuna, no la incluyas en "items".
+- "dicho" es el fragmento LITERAL del dictado del que sacaste esa línea,
+  copiado tal cual (sin corregir ni completar). Sirve para que el veterinario
+  compare de un vistazo lo que el sistema oyó contra lo que él dijo.
 
 ESQUEMA JSON:
 {
@@ -40,7 +61,7 @@ ESQUEMA JSON:
   "indicaciones": str o null,
   "items": [
     {"medicamento": str, "dosis": str o null, "via": str o null,
-     "frecuencia": str o null, "duracion": str o null}
+     "frecuencia": str o null, "duracion": str o null, "dicho": str o null}
   ]
 }
 """
@@ -60,8 +81,10 @@ _SCHEMA = {
                     "via":         {"type": ["string", "null"]},
                     "frecuencia":  {"type": ["string", "null"]},
                     "duracion":    {"type": ["string", "null"]},
+                    # Fragmento literal del dictado: deja ver qué se oyó
+                    "dicho":       {"type": ["string", "null"]},
                 },
-                "required": ["medicamento", "dosis", "via", "frecuencia", "duracion"],
+                "required": ["medicamento", "dosis", "via", "frecuencia", "duracion", "dicho"],
                 "additionalProperties": False,
             },
         },
@@ -76,31 +99,55 @@ def _normalizar(s: str) -> str:
     return re.sub(r"[^a-z0-9\s]", "", s.lower().strip())
 
 
-def _mismo_medicamento(a: str, b: str) -> bool:
-    na, nb = _normalizar(a), _normalizar(b)
-    if not na or not nb:
-        return False
-    if na == nb:
-        return True
-    return len(na) > 4 and len(nb) > 4 and (na in nb or nb in na)
+# El modelo a veces escribe la palabra "null" dentro de un campo de texto en
+# vez de dejarlo vacío. Sin esto, la receta impresa dice literalmente
+# "Vía: null" delante del cliente.
+_VACIOS = {"null", "none", "n/a", "na", "-", "--", "no aplica", "no especificado"}
 
 
-def _deduplicar_items(items: list[dict]) -> list[dict]:
-    """Combina entradas del mismo medicamento en una sola (se queda con la
-    última mención, que suele ser la corrección del veterinario)."""
+def _limpiar_vacios(item: dict) -> dict:
+    return {
+        k: (None if isinstance(v, str) and v.strip().lower() in _VACIOS else v)
+        for k, v in item.items()
+    }
+
+
+def _huella(item: dict) -> tuple:
+    """Identidad de una línea de receta: el fármaco Y su pauta completa."""
+    return tuple(
+        _normalizar(item.get(c))
+        for c in ("medicamento", "dosis", "via", "frecuencia", "duracion")
+    )
+
+
+def _quitar_repetidos(items: list[dict]) -> list[dict]:
+    """Descarta líneas idénticas, nada más.
+
+    Antes esto fusionaba por NOMBRE: dos entradas del mismo fármaco se
+    colapsaban en una y se conservaba la última. La intención era absorber las
+    correcciones del veterinario ("no, mejor cada 8 horas"), pero el modelo ya
+    resuelve eso solo — devuelve una sola línea cuando detecta una corrección.
+
+    Lo que sí hacía era borrar pautas legítimas: "fenobarbital 5 mg/kg de
+    carga hoy, después 2.5 mg/kg cada 12 horas" perdía la dosis de carga, y
+    "enrofloxacina inyectable hoy y tabletas por 7 días" perdía la inyectable.
+    Un medicamento recetado que desaparece sin aviso es peor que uno repetido:
+    lo repetido se ve, lo que falta no.
+
+    Un mismo fármaco puede aparecer varias veces con pautas distintas y todas
+    son válidas. Solo se descarta lo que es idéntico campo por campo.
+    """
     resultado: list[dict] = []
+    vistos: set[tuple] = set()
     for item in items:
+        item = _limpiar_vacios(item)
         if not (item.get("medicamento") or "").strip():
             continue
-        idx = next(
-            (i for i, existente in enumerate(resultado)
-             if _mismo_medicamento(existente["medicamento"], item["medicamento"])),
-            None,
-        )
-        if idx is not None:
-            resultado[idx] = item
-        else:
-            resultado.append(item)
+        h = _huella(item)
+        if h in vistos:
+            continue
+        vistos.add(h)
+        resultado.append(item)
     return resultado
 
 
@@ -154,6 +201,6 @@ def extraer_receta(texto: str) -> dict:
     return {
         "diagnostico": parsed.get("diagnostico"),
         "indicaciones": parsed.get("indicaciones"),
-        "items": _deduplicar_items(parsed.get("items") or []),
+        "items": _quitar_repetidos(parsed.get("items") or []),
         "transcripcion": texto,
     }

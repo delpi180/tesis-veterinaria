@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Loader2, Pencil, Download, Pill, X, Send } from 'lucide-react'
+import { Plus, Trash2, Loader2, Pencil, Download, Pill, X, Send, Mic } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, esVeterinario } from '../services/api'
@@ -199,6 +199,15 @@ function ItemsEditor({ items, onChange }) {
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
+          {/* El dictado por voz puede cambiar un número con el ruido de la
+              consulta. Con el fragmento original a la vista, el doctor compara
+              la cifra en vez de confiar a ciegas en el campo. */}
+          {it.dicho && (
+            <p className="sm:col-span-6 text-[11px] text-slate-500 italic flex items-start gap-1">
+              <Mic className="w-3 h-3 shrink-0 mt-0.5 text-slate-400" />
+              <span>se oyó: “{it.dicho}”</span>
+            </p>
+          )}
         </div>
       ))}
       <button type="button" onClick={add}
@@ -279,9 +288,15 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
     setForm(prev => {
       const itemsPrevios = prev.items.filter(i => i.medicamento.trim())
       const itemsFusionados = [...itemsPrevios]
+      // Solo se fusiona contra lo que YA estaba escrito, no contra lo que este
+      // mismo dictado acaba de agregar: una receta puede llevar dos pautas del
+      // mismo fármaco ("inyectable hoy y tabletas por 7 días") y buscar en
+      // toda la lista las colapsaba en una, borrando una indicación.
+      const nPrevias = itemsPrevios.length
       ;(items || []).forEach(nuevo => {
         if (!nuevo.medicamento?.trim()) return
-        const idx = itemsFusionados.findIndex(i => nombresSimilares(i.medicamento, nuevo.medicamento))
+        const idx = itemsFusionados.findIndex((i, k) =>
+          k < nPrevias && nombresSimilares(i.medicamento, nuevo.medicamento))
         if (idx > -1) {
           itemsFusionados[idx] = {
             medicamento: nuevo.medicamento || itemsFusionados[idx].medicamento,
@@ -289,6 +304,7 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
             via:         nuevo.via        || itemsFusionados[idx].via,
             frecuencia:  nuevo.frecuencia || itemsFusionados[idx].frecuencia,
             duracion:    nuevo.duracion   || itemsFusionados[idx].duracion,
+            dicho:       nuevo.dicho      || itemsFusionados[idx].dicho,
           }
         } else {
           itemsFusionados.push({ ...ITEM_VACIO, ...nuevo })

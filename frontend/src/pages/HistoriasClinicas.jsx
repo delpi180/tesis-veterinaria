@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Plus, Trash2, Download, Save, Check,
-  ArrowLeft, AlertTriangle, FileText, Paperclip, Stethoscope,
+  ArrowLeft, AlertTriangle, FileText, Paperclip, Stethoscope, Mic,
 } from "lucide-react";
 import { generarPDF } from "../utils/pdfGenerator";
 import { api, esVeterinario } from "../services/api";
@@ -365,6 +365,24 @@ function PanelSeccion({ activa, id, titulo, children }) {
 
 // ── Listas editables ─────────────────────────────────────────────────────────
 
+/** Lo que el sistema oyó para esta línea.
+ *
+ *  El reconocimiento de voz falla con ruido de consulta y a veces cambia un
+ *  número ("cuatro" → "dos"). Eso no se puede eliminar del todo, pero sí se
+ *  puede dejar a la vista: con el fragmento original al lado, el doctor
+ *  compara la cifra de un vistazo en vez de confiar a ciegas en el campo.
+ *  Solo aparece en lo que acaba de dictar; al reabrir la consulta ya no.
+ */
+function LoQueSeOyo({ texto }) {
+  if (!texto) return null;
+  return (
+    <p className="col-span-full text-[11px] text-slate-500 italic flex items-start gap-1 -mt-0.5">
+      <Mic size={11} className="shrink-0 mt-0.5 text-slate-400" />
+      <span>se oyó: “{texto}”</span>
+    </p>
+  );
+}
+
 function TratamientoList({ items, onChange }) {
   const add    = () => onChange([...items, { ...TX_EMPTY }]);
   const remove = i  => onChange(items.filter((_, idx) => idx !== i));
@@ -395,6 +413,7 @@ function TratamientoList({ items, onChange }) {
                 <Trash2 size={13} />
               </button>
             </div>
+            <LoQueSeOyo texto={item.dicho} />
           </div>
         </div>
       ))}
@@ -429,6 +448,7 @@ function VacunaList({ items, onChange }) {
               <Trash2 size={13} />
             </button>
           </div>
+          <LoQueSeOyo texto={item.dicho} />
         </div>
       ))}
       <button type="button" onClick={add}
@@ -887,9 +907,16 @@ export default function HistoriasClinicas() {
       if (Array.isArray(datos.tratamiento_items) && datos.tratamiento_items.length > 0) {
         const existingTx = (prev.tratamiento_items || []).filter(i => i.medicamento?.trim());
         const mergedTx = [...existingTx];
+        // Solo se fusiona contra lo que YA estaba en el formulario, no contra
+        // lo que este mismo dictado acaba de agregar: un dictado puede traer
+        // dos pautas legítimas del mismo fármaco ("inyectable hoy y tabletas
+        // por 7 días") y buscar en toda la lista las colapsaba en una,
+        // borrando una indicación sin avisar.
+        const nPrevias = existingTx.length;
 
         datos.tratamiento_items.forEach(incoming => {
-          const matchedIdx = mergedTx.findIndex(item => nombresSimilares(item.medicamento, incoming.medicamento));
+          const matchedIdx = mergedTx.findIndex((item, i) =>
+            i < nPrevias && nombresSimilares(item.medicamento, incoming.medicamento));
           if (matchedIdx > -1) {
             const matchedItem = { ...mergedTx[matchedIdx] };
             if (incoming.medicamento) matchedItem.medicamento = incoming.medicamento;
@@ -897,6 +924,7 @@ export default function HistoriasClinicas() {
             if (incoming.via) matchedItem.via = incoming.via;
             if (incoming.frecuencia) matchedItem.frecuencia = incoming.frecuencia;
             if (incoming.duracion) matchedItem.duracion = incoming.duracion;
+            if (incoming.dicho) matchedItem.dicho = incoming.dicho;
             mergedTx[matchedIdx] = matchedItem;
           } else {
             mergedTx.push({
@@ -905,6 +933,7 @@ export default function HistoriasClinicas() {
               via: incoming.via || "",
               frecuencia: incoming.frecuencia || "",
               duracion: incoming.duracion || "",
+              dicho: incoming.dicho || "",
             });
           }
         });
@@ -914,20 +943,24 @@ export default function HistoriasClinicas() {
       if (Array.isArray(datos.vacunas_items) && datos.vacunas_items.length > 0) {
         const existingVx = (prev.vacunas_items || []).filter(i => i.vacuna?.trim());
         const mergedVx = [...existingVx];
+        const nPreviasVx = existingVx.length;   // ver comentario en tratamientos
 
         datos.vacunas_items.forEach(incoming => {
-          const matchedIdx = mergedVx.findIndex(item => nombresSimilares(item.vacuna, incoming.vacuna));
+          const matchedIdx = mergedVx.findIndex((item, i) =>
+            i < nPreviasVx && nombresSimilares(item.vacuna, incoming.vacuna));
           if (matchedIdx > -1) {
             const matchedItem = { ...mergedVx[matchedIdx] };
             if (incoming.vacuna) matchedItem.vacuna = incoming.vacuna;
             if (incoming.lote) matchedItem.lote = incoming.lote;
             if (incoming.proxima_dosis) matchedItem.proxima_dosis = incoming.proxima_dosis;
+            if (incoming.dicho) matchedItem.dicho = incoming.dicho;
             mergedVx[matchedIdx] = matchedItem;
           } else {
             mergedVx.push({
               vacuna: incoming.vacuna || "",
               lote: incoming.lote || "",
               proxima_dosis: incoming.proxima_dosis || "",
+              dicho: incoming.dicho || "",
             });
           }
         });
