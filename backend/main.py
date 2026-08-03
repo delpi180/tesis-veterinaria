@@ -17,6 +17,7 @@ from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
     busqueda, inventario, asistencia, mi_panel, actividad, configuracion, errores,
+    respaldo,
 )
 from core import ratelimit
 from core.config import settings
@@ -319,6 +320,7 @@ app.include_router(mi_panel.router)
 app.include_router(actividad.router)
 app.include_router(configuracion.router)
 app.include_router(errores.router)
+app.include_router(respaldo.router)
 
 
 _SECRETO_POR_DEFECTO = "vet-los-pinos-secreto-dev"

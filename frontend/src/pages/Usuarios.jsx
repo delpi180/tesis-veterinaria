@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UserCog, Plus, Pencil, Trash2, X, ShieldCheck, User, IdCard } from 'lucide-react'
-import { api, getUsuario } from '../services/api'
+import { UserCog, Plus, Pencil, Trash2, X, ShieldCheck, User, IdCard, Download } from 'lucide-react'
+import { api, authHeaders, getUsuario } from '../services/api'
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 import { useToast } from '../components/Toast'
 import { useConfirmar } from '../components/Confirmar'
 import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
@@ -31,6 +33,64 @@ const Spinner = () => (
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
   </svg>
 )
+
+/**
+ * Descarga de los datos de la clínica.
+ *
+ * Railway guarda copias continuas de la base, pero eso protege el servidor,
+ * no a la dueña: no puede abrirlas ni llevárselas. Sus clientes y las
+ * historias de sus pacientes son suyos, y tiene que poder tenerlos en la mano
+ * sin depender de nadie.
+ */
+function RespaldoDatos() {
+  const toast = useToast()
+  const [bajando, setBajando] = useState(false)
+
+  const descargar = async () => {
+    setBajando(true)
+    try {
+      // No pasa por `api` porque la respuesta es un ZIP, no JSON.
+      const res = await fetch(`${BASE_URL}/api/respaldo/`, { headers: authHeaders() })
+      if (!res.ok) throw new Error('No se pudo generar el respaldo.')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `respaldo_${new Date().toISOString().slice(0, 10)}.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success('Respaldo descargado. Guárdalo en un lugar seguro.')
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setBajando(false)
+    }
+  }
+
+  return (
+    <section className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+        <Download className="w-5 h-5 text-emerald-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-slate-800">Copia de tus datos</p>
+        <p className="text-xs text-slate-500 mt-0.5 leading-snug">
+          Descarga clientes, mascotas, historias clínicas, recetas, inventario y
+          ventas en archivos de Excel. Conviene hacerlo de vez en cuando y
+          guardarlo fuera del sistema.
+        </p>
+      </div>
+      <button
+        onClick={descargar}
+        disabled={bajando}
+        className="flex items-center justify-center gap-2 px-4 py-2 border border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-sm font-semibold rounded-lg transition disabled:opacity-50 shrink-0"
+      >
+        <Download className="w-4 h-4" />
+        {bajando ? 'Generando…' : 'Descargar'}
+      </button>
+    </section>
+  )
+}
 
 export default function Usuarios() {
   const confirmar = useConfirmar()
@@ -159,6 +219,8 @@ export default function Usuarios() {
         </div>
 
         <DatosClinica />
+
+        <RespaldoDatos />
 
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">

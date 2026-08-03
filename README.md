@@ -153,7 +153,10 @@ python -m pytest -q
 También corren automáticamente en **GitHub Actions** en cada push (`.github/workflows/ci.yml`).
 
 ### Respaldos (backups)
-La base de datos es la fuente de verdad. **Respáldala periódicamente.**
+Son dos cosas distintas y hacen falta las dos.
+
+**1. Respaldo técnico** — para *restaurar el sistema* tras una falla. Es el
+`.dump` de Postgres; lo maneja quien administra el servidor.
 ```bash
 # Crear respaldo
 cd backend
@@ -164,6 +167,15 @@ pg_restore --clean --no-owner -d "<DATABASE_URL>" backend/backups/backup_XXXX.du
 ```
 Recomendado: programar el script (Programador de tareas / cron), guardar los `.dump`
 en un lugar externo y, si el proveedor lo ofrece, activar backups automáticos / PITR.
+
+**2. Copia de los datos de la clínica** — para que la dueña *tenga sus datos*.
+Desde **Usuarios → Copia de tus datos** descarga un ZIP con un CSV por tabla
+(clientes, mascotas, historias, recetas, inventario, servicios, ventas), que se
+abre en Excel. Reservado a la administradora.
+
+El `.dump` protege el servidor pero es ilegible para ella y no se lo puede
+llevar; el ZIP es legible y portátil pero no sirve para restaurar el sistema.
+Por eso conviven.
 
 ### Variables de entorno (producción)
 | Variable | Notas |
