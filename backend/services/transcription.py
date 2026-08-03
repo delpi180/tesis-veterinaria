@@ -1,26 +1,10 @@
 import os
 from deepgram import DeepgramClient
 from core.config import settings
+from services.vocabulario import keyterms
 
 
-# Vocabulario veterinario para "keyterm boosting": ayuda a Deepgram a no
-# transcribir mal nombres de fármacos, vacunas y términos clínicos frecuentes.
-KEYTERMS_VET = [
-    # Vacunas
-    "Nobivac", "Vanguard", "Eurican", "Defensor", "Rabisin", "Bravecto",
-    "Quíntuple", "Séxtuple", "Antirrábica", "Triple felina", "Puppy",
-    # Fármacos
-    "Amoxicilina", "Metronidazol", "Meloxicam", "Carprofeno", "Enrofloxacina",
-    "Ivermectina", "Cefalexina", "Dexametasona", "Prednisona", "Tramadol",
-    "Maropitant", "Cerenia", "Omeprazol", "Ranitidina", "Furosemida",
-    "Doxiciclina", "Gabapentina", "Apoquel",
-    # Términos clínicos
-    "mucosas", "ictéricas", "cianóticas", "linfonódulos", "taquicardia",
-    "deshidratado", "hematuria", "anorexia", "condición corporal",
-]
-
-
-def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav") -> str:
+def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav", db=None) -> str:
     """
     Transcribe audio_bytes a texto usando Deepgram (pre-recorded REST).
     Devuelve el transcript como string plano.
@@ -28,8 +12,10 @@ def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav") -> str:
     - El modelo y el idioma son configurables en .env (DEEPGRAM_MODEL,
       DEEPGRAM_LANGUAGE). Por defecto nova-3 + multi (maneja español con
       nombres de marca en inglés).
-    - Se aplica keyterm boosting con vocabulario veterinario. Si la combinación
-      modelo/idioma no soporta keyterm, reintenta automáticamente sin él.
+    - Se aplica keyterm boosting. El vocabulario incluye los medicamentos y
+      razas que esta clínica realmente maneja, no solo una lista genérica
+      (ver services/vocabulario.py). Si la combinación modelo/idioma no
+      soporta keyterm, reintenta automáticamente sin él.
     """
     if not settings.deepgram_api_key:
         raise RuntimeError(
@@ -55,10 +41,13 @@ def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav") -> str:
         f"— modelo={settings.deepgram_model} lang={settings.deepgram_language}"
     )
 
+    vocabulario = keyterms(db)
+    print(f"[DEEPGRAM] {len(vocabulario)} términos de refuerzo")
+
     def _llamar(con_keyterms: bool):
         kwargs = dict(base_kwargs)
         if con_keyterms:
-            kwargs["keyterm"] = KEYTERMS_VET
+            kwargs["keyterm"] = vocabulario
         return client.listen.v1.media.transcribe_file(**kwargs)
 
     try:

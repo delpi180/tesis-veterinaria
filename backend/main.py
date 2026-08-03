@@ -500,11 +500,21 @@ async def transcribe_endpoint(request: Request, audio: UploadFile = File(...)):
                    f"límite de {MAX_AUDIO_MB} MB. Graba la consulta en tramos más cortos.",
         )
 
+    # El vocabulario de refuerzo se arma con los medicamentos y razas de esta
+    # clínica, así que hace falta una sesión. Se abre y cierra acá porque la
+    # transcripción corre en otro hilo y puede tardar minutos: sostener una
+    # conexión del pool todo ese rato sería desperdiciarla.
+    db_vocab = SessionLocal()
     try:
         import asyncio
-        texto = await asyncio.to_thread(transcribe_audio, audio_bytes, filename=audio.filename or "audio.wav")
+        texto = await asyncio.to_thread(
+            transcribe_audio, audio_bytes,
+            filename=audio.filename or "audio.wav", db=db_vocab,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en transcripción: {str(e)}")
+    finally:
+        db_vocab.close()
 
     return TranscribeResponse(transcripcion=texto)
 
