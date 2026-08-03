@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Mic, StopCircle, Loader2, Check, AlertTriangle, FileText, Keyboard } from "lucide-react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 import { api, authHeaders } from "../services/api";

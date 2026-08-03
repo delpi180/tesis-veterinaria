@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Bug, RefreshCw, Check, Monitor, Server, ChevronDown, ChevronRight } from 'lucide-react'
+import { RefreshCw, Check, Monitor, Server, ChevronDown, ChevronRight } from 'lucide-react'
 import { api } from '../services/api'
 import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
 

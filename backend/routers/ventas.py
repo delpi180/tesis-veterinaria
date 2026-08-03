@@ -15,6 +15,12 @@ from core.deps import usuario_actual, solo_admin
 
 router = APIRouter(prefix="/api/ventas", tags=["Ventas"])
 
+# Cuánto atrás se busca una venta idéntica para no duplicarla. Suficiente para
+# cubrir un reintento tras un corte de red; corto como para no bloquear a un
+# cliente que de verdad vuelve a comprar lo mismo (dos bolsas del mismo
+# alimento en visitas seguidas, por ejemplo).
+VENTANA_ANTIDUPLICADO = timedelta(seconds=30)
+
 
 def _cargar_venta(db: Session, venta_id: int) -> Venta | None:
     """Carga una venta con cliente, items y el producto/servicio de cada item (evita N+1)."""
@@ -109,6 +115,40 @@ def crear_venta(payload: VentaCreate, db: Session = Depends(get_db)):
             detail=("No se puede vender producto vencido — " + "; ".join(vencidos) +
                     ". Si la fecha está equivocada, corrígela en Inventario."),
         )
+
+    # ── Guarda contra el doble cobro ─────────────────────────────────────────
+    #
+    # El botón de cobrar se deshabilita mientras se envía, así que el doble
+    # clic no es el problema. El caso real es peor: la red se corta DESPUÉS de
+    # que el servidor grabó la venta. La recepcionista ve un error, vuelve a
+    # cobrar, y queda la venta duplicada — con el stock descontado dos veces y
+    # el cliente pagando dos veces. Con datos móviles en una clínica eso pasa.
+    #
+    # Si el mismo cliente tiene una venta idéntica de hace segundos, se
+    # devuelve ESA en vez de crear otra. Las recetas ya lo hacían; las ventas,
+    # que mueven plata y stock, no.
+    firma_actual = sorted(
+        (l["producto_id"], l["servicio_id"], l["cantidad"], l["precio_unitario"])
+        for l in lineas
+    )
+    desde = datetime.now(timezone.utc) - VENTANA_ANTIDUPLICADO
+    for candidata in (
+        _loader(db.query(Venta))
+        .filter(
+            Venta.cliente_id == payload.cliente_id,
+            Venta.fecha >= desde,
+            Venta.anulada.is_(False),
+        )
+        .order_by(Venta.fecha.desc())
+        .limit(5)
+        .all()
+    ):
+        firma_previa = sorted(
+            (i.producto_id, i.servicio_id, i.cantidad, float(i.precio_unitario))
+            for i in candidata.items
+        )
+        if firma_previa == firma_actual and candidata.metodo_pago == payload.metodo_pago:
+            return candidata
 
     # ── FASE 2: crear venta + items + descontar stock, todo o nada ───────────
     try:

@@ -11,6 +11,7 @@ import { api } from '../services/api'
 import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { SkeletonFilas } from '../components/Skeleton'
 import { exportarCSV } from '../utils/exportUtils'
+import { calcularTotales } from '../utils/dinero'
 import { useToast } from '../components/Toast'
 
 const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -33,8 +34,6 @@ const metodoLabel = (m) => METODOS_PAGO.find(x => x.v === m)?.l ?? m
 const CAT_LABEL = { comida: 'Comida', accesorio: 'Accesorio', medicamento: 'Medicamento' }
 const CATEGORIAS = ['comida', 'accesorio', 'medicamento']
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
-const labelCls = 'text-xs font-semibold text-slate-600'
 
 
 const mismoMes = (iso, ref) => {
@@ -430,10 +429,8 @@ export default function Ventas() {
     l.key === key ? { ...l, precio: valor } : l))
   const quitarLinea = (key) => setCarrito(c => c.filter(l => l.key !== key))
 
-  const totalCarrito = carrito.reduce((s, l) => s + (Number(l.precio) || 0) * l.cantidad, 0)  // subtotal
-  const descPct       = Math.max(0, Math.min(100, Number(descuentoPct) || 0))
-  const descuentoMonto = totalCarrito * descPct / 100
-  const totalFinal     = totalCarrito - descuentoMonto
+  const { subtotal: totalCarrito, pct: descPct, descuento: descuentoMonto, total: totalFinal } =
+    calcularTotales(carrito, descuentoPct)
 
   // Catálogo filtrado para el panel izquierdo
   const term = catBusqueda.trim().toLowerCase()

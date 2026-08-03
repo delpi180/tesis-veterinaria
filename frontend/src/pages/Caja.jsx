@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
 import { clinicaActual } from '../services/clinica'
+import { calcularArqueo } from '../utils/dinero'
 
 const fmtMoneda = (n) => `S/ ${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtHora = (iso) => new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
@@ -44,9 +45,10 @@ function ArqueoCaja({ fecha, esperado, cierre, onCerrado }) {
   const [guardando, setGuardando] = useState(false)
 
   // Diferencia en vivo, para que se vea antes de confirmar
-  const contadoNum = parseFloat(contado)
-  const hayNumero = contado !== '' && !Number.isNaN(contadoNum)
-  const diferencia = hayNumero ? Math.round((contadoNum - esperado) * 100) / 100 : null
+  const arqueo = calcularArqueo(contado, esperado)
+  const contadoNum = arqueo.contado
+  const hayNumero  = arqueo.contado !== null
+  const diferencia = arqueo.diferencia
 
   const registrar = async () => {
     if (!hayNumero || contadoNum < 0) {

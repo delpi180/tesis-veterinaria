@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, LogOut, Wallet, UserCog,
   Clock, ClipboardList, History, PieChart, ConciergeBell, Syringe, Menu, X, Bug,
 } from 'lucide-react'
-import { getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
+import { api, getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
 import GlobalSearch from './GlobalSearch'
 import { useClinica } from '../services/clinica'
+import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
 
 const PawIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
@@ -35,7 +36,21 @@ const SECCION_ADMIN = [
   { label: 'Usuarios',          to: '/usuarios',   Icon: UserCog,  admin: true },
   { label: 'Errores',           to: '/errores',    Icon: Bug,      admin: true },
 ]
-function NavItem({ label, to, Icon, onClick }) {
+/** Una sección del menú. Vive fuera del componente a propósito: declarada
+ *  adentro, React la trataba como un componente nuevo en cada render. */
+function Seccion({ titulo, items, onNavegar, avisos }) {
+  if (items.length === 0) return null
+  return (
+    <>
+      <p className="text-purple-400 text-xs font-semibold uppercase tracking-widest px-3 mt-5 mb-2 first:mt-0">{titulo}</p>
+      {items.map(item => (
+        <NavItem key={item.to} {...item} onClick={onNavegar} aviso={avisos?.[item.to] ?? 0} />
+      ))}
+    </>
+  )
+}
+
+function NavItem({ label, to, Icon, onClick, aviso = 0 }) {
   return (
     <NavLink
       to={to}
@@ -52,7 +67,15 @@ function NavItem({ label, to, Icon, onClick }) {
         <>
           <Icon className="w-5 h-5 shrink-0" strokeWidth={1.8} />
           <span className="flex-1">{label}</span>
-          {isActive && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />}
+          {aviso > 0 && (
+            <span
+              title={`${aviso} sin revisar`}
+              className="shrink-0 min-w-[1.25rem] px-1.5 h-5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center"
+            >
+              {aviso > 99 ? '99+' : aviso}
+            </span>
+          )}
+          {isActive && aviso === 0 && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />}
         </>
       )}
     </NavLink>
@@ -70,22 +93,25 @@ export default function Sidebar() {
     (!i.admin || esAdmin())
   )
 
+  // Errores sin revisar. El sistema ya los registraba, pero había que
+  // acordarse de entrar a la pantalla para verlos: un fallo podía repetirse
+  // semanas sin que nadie se enterara. Solo la administradora los ve.
+  const [erroresPendientes, setErroresPendientes] = useState(0)
+  const cargarPendientes = () => {
+    if (!esAdmin()) return Promise.resolve()
+    return api.get('/api/errores/pendientes')
+      .then(r => setErroresPendientes(r?.pendientes ?? 0))
+      .catch(() => {})   // el menú no puede romperse por esto
+  }
+  // El hook solo programa el ciclo; la primera consulta va aparte.
+  useEffect(() => { cargarPendientes() }, [])
+  useRefrescoAuto(cargarPendientes, 60000)
+
   const handleLogout = () => {
     cerrarSesion()
     navigate('/login', { replace: true })
   }
   const cerrar = () => setAbierto(false)
-
-  const Seccion = ({ titulo, items }) => {
-    const vis = visible(items)
-    if (vis.length === 0) return null
-    return (
-      <>
-        <p className="text-purple-400 text-xs font-semibold uppercase tracking-widest px-3 mt-5 mb-2 first:mt-0">{titulo}</p>
-        {vis.map(item => <NavItem key={item.to} {...item} onClick={cerrar} />)}
-      </>
-    )
-  }
 
   return (
     <>
@@ -124,8 +150,9 @@ export default function Sidebar() {
           <div className="mb-2">
             <GlobalSearch />
           </div>
-          <Seccion titulo="Clínica" items={SECCION_CLINICA} />
-          <Seccion titulo="Administración" items={SECCION_ADMIN} />
+          <Seccion titulo="Clínica" items={visible(SECCION_CLINICA)} onNavegar={cerrar} />
+          <Seccion titulo="Administración" items={visible(SECCION_ADMIN)} onNavegar={cerrar}
+            avisos={{ '/errores': erroresPendientes }} />
         </nav>
 
         {/* Footer */}

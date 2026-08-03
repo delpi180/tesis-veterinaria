@@ -63,6 +63,17 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # Antes CI compilaba y probaba pero no pasaba el lint, aunque el comando
+      # ya existía. Un `useToast` usado sin importar compila igual y solo
+      # revienta al abrir esa pantalla: así llegó a producción una vez. El
+      # lint lo detecta al instante.
+      #
+      # Falla solo con errores; las advertencias de estilo no frenan un
+      # despliegue (ver la severidad de cada regla en eslint.config.js).
+      - name: Revisar lint
+        working-directory: frontend
+        run: npm run lint
+
       - name: Ejecutar tests
         working-directory: frontend
         run: npm run test -- --run

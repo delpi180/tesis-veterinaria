@@ -171,7 +171,7 @@ const PLANTILLAS = [
 
 // ── Payload / hidratación de formulario ──────────────────────────────────────
 
-function buildPayload(form) {
+export function buildPayload(form) {
   const out = {};
   for (const [k, v] of Object.entries(form)) {
     if (["examen_particular", "tratamiento_items", "vacunas_items"].includes(k)) continue;
@@ -599,7 +599,7 @@ const claveBorrador = (id) => `draft_historia_${id}`;
 
 /** ¿El formulario está intacto? Se usa para no guardar borradores vacíos y
  *  para saber si hay algo que perder al salir. */
-function formularioVacio(f) {
+export function formularioVacio(f) {
   return Object.keys(f).every(key => {
     if (key === "examen_particular") {
       if (!f[key]) return true;
@@ -622,7 +622,7 @@ const HORAS_RECUPERACION_AUTOMATICA = 12;
  *  al intentar dibujar los sistemas — con el texto del doctor atrapado dentro
  *  de un borrador que ya no se podía abrir.
  */
-function normalizarBorrador(guardado) {
+export function normalizarBorrador(guardado) {
   return {
     ...FORM_VACIO,
     ...guardado,
@@ -648,7 +648,7 @@ function leerBorrador(id) {
   }
 }
 
-function esReciente(guardadoEn) {
+export function esReciente(guardadoEn) {
   if (!guardadoEn) return false;
   const horas = (Date.now() - new Date(guardadoEn).getTime()) / 3600000;
   return horas >= 0 && horas < HORAS_RECUPERACION_AUTOMATICA;
