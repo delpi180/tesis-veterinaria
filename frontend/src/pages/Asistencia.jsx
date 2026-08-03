@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Clock, LogIn, LogOut, Trash2, Stethoscope, Filter, BarChart3, AlertTriangle, RefreshCw, Pencil, X } from 'lucide-react'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
+import { useConfirmar } from '../components/Confirmar'
+import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
 
 const inputCls = 'border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
@@ -50,6 +52,7 @@ const Spinner = () => (
 )
 
 export default function Asistencia() {
+  const confirmar = useConfirmar()
   const toast = useToast()
   const [doctores, setDoctores] = useState([])
   const [hoyRegs,  setHoyRegs]  = useState([])   // marcaciones de hoy (para los botones)
@@ -62,6 +65,7 @@ export default function Asistencia() {
 
   // Corrección manual de una marcación
   const [editando,      setEditando]      = useState(null)
+  useCerrarConEscape(!!editando, () => setEditando(null))
   const [formEdit,      setFormEdit]      = useState({ hora_ingreso: '', hora_salida: '' })
   const [guardandoEdit, setGuardandoEdit] = useState(false)
   const [errorEdit,     setErrorEdit]     = useState(null)
@@ -136,7 +140,12 @@ export default function Asistencia() {
   }
 
   const eliminar = async (reg) => {
-    if (!window.confirm('¿Eliminar esta marcación?')) return
+    if (!await confirmar({
+      titulo: 'Eliminar marcación',
+      mensaje: `Se borrará la marcación de ${reg.usuario_nombre ?? 'este usuario'}.`,
+      detalle: 'Si la hora está mal, es mejor corregirla que borrarla: así queda constancia del turno trabajado.',
+      confirmarTexto: 'Eliminar',
+    })) return
     try {
       await api.del(`/api/asistencia/${reg.id}`)
       setRegistros(prev => prev.filter(x => x.id !== reg.id))
@@ -387,7 +396,7 @@ export default function Asistencia() {
                   <label className="text-xs font-semibold text-slate-600">
                     Hora de ingreso <span className="text-rose-500">*</span>
                   </label>
-                  <input type="datetime-local" className={inputCls} value={formEdit.hora_ingreso}
+                  <input type="datetime-local" autoFocus className={inputCls} value={formEdit.hora_ingreso}
                     onChange={e => setFormEdit(f => ({ ...f, hora_ingreso: e.target.value }))} />
                 </div>
                 <div className="flex flex-col gap-1">

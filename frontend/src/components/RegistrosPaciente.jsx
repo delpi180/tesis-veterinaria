@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Trash2, Loader2, Paperclip, Eye } from 'lucide-react'
 import { api, authHeaders } from '../services/api'
 import { useToast } from './Toast'
+import { useConfirmar } from './Confirmar'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
@@ -18,6 +19,7 @@ const hoyStr = () => {
  * tipo: 'antiparasitario' | 'estetica'
  */
 export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'Producto' }) {
+  const confirmar = useConfirmar()
   const toast = useToast()
   const esComplementario = tipo === 'complementario'
   const [items, setItems] = useState([])
@@ -92,7 +94,11 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
   }
 
   const eliminarDocumento = async (it, doc) => {
-    if (!window.confirm(`¿Eliminar el archivo "${doc.nombre}"?`)) return
+    if (!await confirmar({
+      titulo: 'Eliminar archivo',
+      mensaje: `Se borrará "${doc.nombre}" de este registro.`,
+      confirmarTexto: 'Eliminar',
+    })) return
     try {
       await api.del(`/api/pacientes/${pacienteId}/documentos/${doc.id}`)
       setItems(prev => prev.map(x => x.id === it.id ? { ...x, documentos: (x.documentos || []).filter(d => d.id !== doc.id) } : x))
@@ -103,7 +109,12 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
   }
 
   const eliminar = async (it) => {
-    if (!window.confirm('¿Eliminar este registro?')) return
+    if (!await confirmar({
+      titulo: 'Eliminar registro',
+      mensaje: 'Se borrará este registro clínico y los archivos que tenga adjuntos.',
+      detalle: 'No se puede deshacer.',
+      confirmarTexto: 'Eliminar',
+    })) return
     try {
       await api.del(`/api/pacientes/${pacienteId}/registros/${it.id}`)
       setItems(prev => prev.filter(x => x.id !== it.id))

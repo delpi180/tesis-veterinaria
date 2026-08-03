@@ -4,6 +4,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, esVeterinario } from '../services/api'
 import { useToast } from './Toast'
+import { useConfirmar } from './Confirmar'
 import { clinicaActual } from '../services/clinica'
 import { nombresSimilares } from '../utils/similitud'
 import VoiceTextProcessor from './VoiceTextProcessor'
@@ -219,6 +220,7 @@ function ItemsEditor({ items, onChange }) {
 }
 
 export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
+  const confirmar = useConfirmar()
   const toast = useToast()
   const puedeEscribir = esVeterinario()
   const [recetas, setRecetas] = useState([])
@@ -352,7 +354,12 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
   }
 
   const eliminar = async (r) => {
-    if (!window.confirm(`¿Eliminar la receta del ${fmtFecha(r.fecha)}? Esta acción no se puede deshacer.`)) return
+    if (!await confirmar({
+      titulo: 'Eliminar receta',
+      mensaje: `Se borrará la receta del ${fmtFecha(r.fecha)}.`,
+      detalle: 'No se puede deshacer. Si ya se le entregó al cliente, conviene conservarla como constancia de lo que se indicó.',
+      confirmarTexto: 'Eliminar receta',
+    })) return
     try {
       await api.del(`/api/pacientes/${pacienteId}/recetas/${r.id}`)
       setRecetas(prev => prev.filter(x => x.id !== r.id))

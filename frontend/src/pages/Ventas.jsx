@@ -8,6 +8,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { clinicaActual } from '../services/clinica'
 import { api } from '../services/api'
+import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { SkeletonFilas } from '../components/Skeleton'
 import { exportarCSV } from '../utils/exportUtils'
 import { useToast } from '../components/Toast'
@@ -1023,6 +1024,7 @@ export default function Ventas() {
 }
 
 function DialogoAnular({ venta, onCerrar, onAnulada }) {
+  useCerrarConEscape(true, onCerrar)
   const toast = useToast()
   const [motivo, setMotivo] = useState('')
   const [guardando, setGuardando] = useState(false)

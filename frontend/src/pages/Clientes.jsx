@@ -183,7 +183,17 @@ export default function Clientes() {
     }
   }
 
-  const handleSuccess = () => { setShowForm(false); irPagina(1) }
+  // Un dueño nuevo llega con su mascota: encadenar las dos altas.
+  //
+  // Antes esto solo cerraba el formulario y volvía a la página 1 de la lista.
+  // Con 2500 clientes paginados de a 25, cargarle la mascota obligaba a
+  // buscar al dueño que se acababa de crear y entrar a su ficha — tres pasos
+  // de búsqueda para completar un alta que es una sola en la vida real.
+  const handleSuccess = (nuevo) => {
+    setShowForm(false)
+    if (nuevo?.id) navigate(`/clientes/${nuevo.id}`, { state: { nuevaMascota: true } })
+    else irPagina(1)
+  }
 
   const term = searchTerm.trim()
   const clientesFiltrados = clientes   // el servidor ya filtra/pagina

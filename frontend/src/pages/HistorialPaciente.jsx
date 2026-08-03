@@ -8,6 +8,7 @@ import {
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, esVeterinario } from '../services/api'
+import { useConfirmar } from '../components/Confirmar'
 import { Skeleton, SkeletonFilas, SkeletonTexto } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import RegistrosPaciente from '../components/RegistrosPaciente'
@@ -411,6 +412,7 @@ function fichaConsultaPDF(paciente, cliente, h) {
 
 // ── Página ───────────────────────────────────────────────────────────────────
 export default function HistorialPaciente() {
+  const confirmar = useConfirmar()
   const { pacienteId } = useParams()
   const navigate = useNavigate()
   const { state } = useLocation()
@@ -433,7 +435,12 @@ export default function HistorialPaciente() {
     const fecha = new Date(h.fecha || h.creado_en).toLocaleDateString('es-PE', {
       day: '2-digit', month: 'short', year: 'numeric',
     })
-    if (!window.confirm(`¿Eliminar la consulta del ${fecha}? Esta acción no se puede deshacer.`)) return
+    if (!await confirmar({
+      titulo: 'Eliminar consulta',
+      mensaje: `Se borrará la consulta del ${fecha} del historial de este paciente.`,
+      detalle: 'No se puede deshacer. Es parte del registro clínico del animal.',
+      confirmarTexto: 'Eliminar consulta',
+    })) return
     try {
       await api.del(`/api/pacientes/${pacienteId}/historias/${h.id}`)
       setHistorias(p => p.filter(x => x.id !== h.id))

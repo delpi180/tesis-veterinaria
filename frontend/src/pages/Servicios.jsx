@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Stethoscope, Search, Pencil, Trash2, X, Tag, Coins, Sparkles, Mic, StopCircle } from 'lucide-react'
+import { Stethoscope, Search, Pencil, Trash2, X, Tag, Coins, Sparkles, Mic, StopCircle, Plus } from 'lucide-react'
 import { api, authHeaders } from '../services/api'
 import { useToast } from '../components/Toast'
+import { useConfirmar } from '../components/Confirmar'
+import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
@@ -189,6 +191,7 @@ function ServiciosIAModal({ onClose, onAplicado }) {
 }
 
 export default function Servicios() {
+  const confirmar = useConfirmar()
   const [servicios, setServicios] = useState([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
@@ -256,6 +259,7 @@ export default function Servicios() {
     setForm(FORM_INICIAL)
     setErrorModal(null)
   }
+  useCerrarConEscape(modalAbierto, cerrarModal)
 
   const handleGuardar = async (e) => {
     e.preventDefault()
@@ -290,7 +294,12 @@ export default function Servicios() {
   }
 
   const handleEliminar = async (s) => {
-    if (!window.confirm(`¿Eliminar el servicio "${s.nombre}"?`)) return
+    if (!await confirmar({
+      titulo: 'Eliminar servicio',
+      mensaje: `Se quitará "${s.nombre}" del catálogo.`,
+      detalle: 'Si ya se cobró alguna vez el sistema no dejará borrarlo; desactívalo para dejar de ofrecerlo sin perder el historial de ventas.',
+      confirmarTexto: 'Eliminar',
+    })) return
     try {
       await api.del(`/api/servicios/${s.id}`)
       setServicios(prev => prev.filter(x => x.id !== s.id))
@@ -384,8 +393,16 @@ export default function Servicios() {
           {!loading && !error && servicios.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <Stethoscope className="w-8 h-8 mb-2 opacity-40" />
-              <p className="text-sm font-medium">Aún no hay servicios registrados</p>
-              <p className="text-xs mt-1">Usa el botón "Nuevo Servicio" para comenzar</p>
+              <p className="text-sm font-medium text-slate-500">Aún no hay servicios en el catálogo</p>
+              <p className="text-xs mt-1 mb-4">
+                Son las prestaciones que se cobran: consulta, vacunación, baño, cirugía…
+              </p>
+              <button
+                onClick={abrirNuevo}
+                className="flex items-center gap-2 px-4 py-2 bg-sky-700 hover:bg-sky-600 text-white text-sm font-semibold rounded-lg shadow-sm transition"
+              >
+                <Plus className="w-4 h-4" /> Nuevo Servicio
+              </button>
             </div>
           )}
 
@@ -476,6 +493,7 @@ export default function Servicios() {
                   <label className={labelCls}>Nombre <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
+                    autoFocus
                     className={inputCls}
                     placeholder="Ej. Consulta general, Baño, Operación…"
                     value={form.nombre}

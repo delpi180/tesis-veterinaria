@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { generarPDF } from "../utils/pdfGenerator";
 import { api, esVeterinario } from "../services/api";
+import { useConfirmar } from "../components/Confirmar";
 import VoiceTextProcessor from "../components/VoiceTextProcessor";
 import DocumentosPaciente from "../components/DocumentosPaciente";
 import { nombresSimilares } from "../utils/similitud";
@@ -671,6 +672,7 @@ function describirCuando(guardadoEn) {
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function HistoriasClinicas() {
+  const confirmar = useConfirmar()
   const { pacienteId: id } = useParams();
   const navigate = useNavigate();
   const { state: navState } = useLocation();   // { citaId } cuando se viene de "Atender"
@@ -746,12 +748,13 @@ export default function HistoriasClinicas() {
 
   /** Navegación interna: el aviso del navegador no cubre moverse dentro de la
    *  aplicación, así que el botón de volver pregunta por su cuenta. */
-  const salir = () => {
-    if (hayCambios && !window.confirm(
-      "Tienes una consulta a medio llenar.\n\n" +
-      "Se guarda como borrador y podrás retomarla al volver a esta mascota, " +
-      "pero todavía no queda registrada en la historia clínica.\n\n¿Salir igual?"
-    )) return;
+  const salir = async () => {
+    if (hayCambios && !await confirmar({
+      titulo: 'Salir sin guardar',
+      mensaje: 'Tienes una consulta a medio llenar. Se guarda como borrador y podrás retomarla al volver a esta mascota, pero todavía no queda registrada en la historia clínica.',
+      confirmarTexto: 'Salir igual',
+      peligroso: false,
+    })) return;
     navigate(-1);
   };
 
@@ -859,7 +862,12 @@ export default function HistoriasClinicas() {
     const fecha = new Date(h.fecha || h.creado_en).toLocaleDateString("es-PE", {
       day: "2-digit", month: "short", year: "numeric",
     });
-    if (!window.confirm(`¿Eliminar la consulta del ${fecha}? Esta acción no se puede deshacer.`)) return;
+    if (!await confirmar({
+      titulo: 'Eliminar consulta',
+      mensaje: `Se borrará la consulta del ${fecha} del historial de este paciente.`,
+      detalle: 'No se puede deshacer. Es parte del registro clínico del animal.',
+      confirmarTexto: 'Eliminar consulta',
+    })) return;
     try {
       await api.del(`/api/pacientes/${id}/historias/${h.id}`);
       setHistorias(p => p.filter(x => x.id !== h.id));

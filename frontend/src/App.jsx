@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import { ToastProvider } from './components/Toast'
+import { ConfirmarProvider } from './components/Confirmar'
 import { ClinicaProvider } from './services/clinica'
 import Login from './pages/Login'
 import { getToken, esVeterinario, esAdmin } from './services/api'
@@ -107,10 +108,12 @@ export default function App() {
     <BrowserRouter>
       <ClinicaProvider>
         <ToastProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/*"     element={<AppProtegida />} />
-          </Routes>
+          <ConfirmarProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/*"     element={<AppProtegida />} />
+            </Routes>
+          </ConfirmarProvider>
         </ToastProvider>
       </ClinicaProvider>
     </BrowserRouter>

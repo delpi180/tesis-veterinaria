@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import { api, authHeaders } from '../services/api'
 import { useToast } from './Toast'
+import { useConfirmar } from './Confirmar'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
@@ -34,6 +35,7 @@ const esImagen = (mime) => (mime || '').startsWith('image/')
  * quedar suelto a nivel de la mascota sin saber a qué consulta corresponde.
  */
 export default function DocumentosPaciente({ pacienteId, historiaId = null, titulo = 'Documentos complementarios' }) {
+  const confirmar = useConfirmar()
   const toast = useToast()
   const [docs, setDocs]       = useState([])
   const [cargando, setCargando] = useState(true)
@@ -111,7 +113,12 @@ export default function DocumentosPaciente({ pacienteId, historiaId = null, titu
   }
 
   const eliminar = async (doc) => {
-    if (!window.confirm(`¿Eliminar "${doc.nombre}"? Esta acción no se puede deshacer.`)) return
+    if (!await confirmar({
+      titulo: 'Eliminar documento',
+      mensaje: `Se borrará "${doc.nombre}" de la ficha del paciente.`,
+      detalle: 'No se puede deshacer. Si es el único ejemplar del análisis o la radiografía, se pierde.',
+      confirmarTexto: 'Eliminar',
+    })) return
     try {
       await api.del(`/api/pacientes/${pacienteId}/documentos/${doc.id}`)
       setDocs(d => d.filter(x => x.id !== doc.id))

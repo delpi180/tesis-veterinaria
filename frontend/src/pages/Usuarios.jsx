@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { UserCog, Plus, Pencil, Trash2, X, ShieldCheck, User, IdCard } from 'lucide-react'
 import { api, getUsuario } from '../services/api'
 import { useToast } from '../components/Toast'
+import { useConfirmar } from '../components/Confirmar'
+import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import DatosClinica from '../components/DatosClinica'
 
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
@@ -31,6 +33,7 @@ const Spinner = () => (
 )
 
 export default function Usuarios() {
+  const confirmar = useConfirmar()
   const toast = useToast()
   const navigate = useNavigate()
   const yo = getUsuario()
@@ -74,6 +77,7 @@ export default function Usuarios() {
     return { ...f, dias_laborales: ordenado.join(',') }
   })
   const cerrar = () => { setModalAbierto(false); setEditId(null); setErrorModal(null) }
+  useCerrarConEscape(modalAbierto, cerrar)
 
   const guardar = async (e) => {
     e.preventDefault()
@@ -118,16 +122,12 @@ export default function Usuarios() {
   const eliminar = async (u) => {
     // Borrar arrastra cosas que no se ven desde esta pantalla; decirlas antes
     // evita el "no sabía que se perdían las marcaciones".
-    const aviso = [
-      `¿Eliminar al usuario "${u.usuario}"?`,
-      '',
-      'Se borrarán sus marcaciones de asistencia.',
-      'Sus turnos asignados quedarán sin doctor, para reasignarlos.',
-      'Sus historias y recetas NO se tocan: conservan su nombre.',
-      '',
-      'Si solo quieres quitarle el acceso, desactívalo en vez de borrarlo.',
-    ].join('\n')
-    if (!window.confirm(aviso)) return
+    if (!await confirmar({
+      titulo: `Eliminar a ${u.nombre}`,
+      mensaje: 'Se borrarán sus marcaciones de asistencia. Sus turnos quedarán sin doctor asignado, para reasignarlos. Sus historias y recetas no se tocan: conservan su nombre.',
+      detalle: 'Si solo quieres quitarle el acceso al sistema, desactívalo en vez de borrarlo.',
+      confirmarTexto: 'Eliminar usuario',
+    })) return
     try {
       await api.del(`/api/usuarios/${u.id}`)
       setUsuarios(prev => prev.filter(x => x.id !== u.id))
@@ -245,6 +245,7 @@ export default function Usuarios() {
                 <div className="flex flex-col gap-1">
                   <label className={labelCls}>Usuario {!editId && <span className="text-rose-500">*</span>}</label>
                   <input type="text" className={inputCls} value={form.usuario} disabled={!!editId}
+                    autoFocus
                     placeholder="ej. recepcion1"
                     onChange={e => setForm(f => ({ ...f, usuario: e.target.value }))} />
                 </div>

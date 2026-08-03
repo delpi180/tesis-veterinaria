@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import {
   ChevronLeft, Plus, Search, Stethoscope, Calendar, Clock,
   MessageCircle, FileText, ClipboardList, X, PawPrint, ChevronRight, Phone,
   Pencil, Trash2, ShoppingCart, AlertTriangle, Activity, Paperclip,
 } from 'lucide-react'
 import { api, esAdmin } from '../services/api'
+import { useConfirmar } from '../components/Confirmar'
+import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
 import DocumentosPaciente from '../components/DocumentosPaciente'
 
@@ -166,6 +168,7 @@ function PacienteForm({ clienteId, onSuccess, onCancel, visible }) {
 
 // ── Modal Agendar cita ──────────────────────────────────────────────────────
 function AgendarCitaModal({ paciente, onClose, onCreated }) {
+  useCerrarConEscape(true, onClose)
   const _d = new Date()
   const hoy = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`
   const [form, setForm] = useState({ fecha: hoy, hora: '09:00', motivo: '', notas: '', veterinario_id: '' })
@@ -252,7 +255,7 @@ function AgendarCitaModal({ paciente, onClose, onCreated }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className={labelCls}>Fecha <span className="text-rose-500">*</span></label>
-                <input type="date" className={inputCls} value={form.fecha}
+                <input type="date" autoFocus className={inputCls} value={form.fecha}
                   onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))} />
               </div>
               <div className="flex flex-col gap-1">
@@ -311,6 +314,7 @@ function AgendarCitaModal({ paciente, onClose, onCreated }) {
 
 // ── Modal editar mascota ─────────────────────────────────────────────────────
 function EditarMascotaModal({ paciente, onClose, onGuardado }) {
+  useCerrarConEscape(true, onClose)
   const [form, setForm] = useState({
     nombre:  paciente.nombre,
     especie: paciente.especie,
@@ -590,13 +594,17 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
 
 // ── Vista principal ────────────────────────────────────────────────────────
 export default function DetalleCliente() {
+  const confirmar = useConfirmar()
   const { id }   = useParams()
   const navigate = useNavigate()
+  const { state: estadoNav } = useLocation()
   const [cliente, setCliente]     = useState(null)
   const [pacientes, setPacientes] = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
-  const [showForm, setShowForm]   = useState(false)
+  // Si venimos de registrar al dueño, el alta de mascota ya viene abierta:
+  // es el mismo trámite de mostrador, no dos cosas separadas.
+  const [showForm, setShowForm]   = useState(() => !!estadoNav?.nuevaMascota)
   const [busqueda, setBusqueda]   = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [agendarPaciente, setAgendarPaciente] = useState(null)
@@ -646,9 +654,12 @@ export default function DetalleCliente() {
   }
 
   const handleEliminarMascota = async (p) => {
-    if (!window.confirm(
-      `¿Eliminar a "${p.nombre}"? Se borrarán también sus historias clínicas y citas. Esta acción no se puede deshacer.`
-    )) return
+    if (!await confirmar({
+      titulo: `Eliminar a ${p.nombre}`,
+      mensaje: 'Se borrarán también todas sus historias clínicas y sus turnos agendados.',
+      detalle: 'No se puede deshacer. El historial médico de esta mascota se pierde para siempre.',
+      confirmarTexto: 'Eliminar mascota',
+    })) return
     try {
       await api.del(`/api/pacientes/${p.id}`)
       setPacientes(prev => prev.filter(x => x.id !== p.id))

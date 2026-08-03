@@ -4,6 +4,8 @@ import { ChevronLeft, ChevronRight, Clock, User, PawPrint, X, MessageCircle, Ste
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, getToken } from '../services/api'
+import { useConfirmar } from '../components/Confirmar'
+import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { SkeletonFilas } from '../components/Skeleton'
 import { estadoStyle, estadoLabel, ESTADOS_CITA, waRecordatorio } from '../utils/citas'
 import { clinicaActual } from '../services/clinica'
@@ -50,6 +52,7 @@ const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm te
 const labelCls = 'text-xs font-semibold text-slate-600'
 
 export default function Turnos() {
+  const confirmar = useConfirmar()
   const now = new Date()
   const navigate = useNavigate()
 
@@ -220,7 +223,12 @@ export default function Turnos() {
 
   // Elimina un turno (creado por error o duplicado). Confirma antes.
   const eliminarCita = async (cita) => {
-    if (!window.confirm('¿Eliminar este turno? Esta acción no se puede deshacer.\n\n(Si el turno solo terminó, mejor cámbialo a "Atendida" para conservar el registro.)')) return
+    if (!await confirmar({
+      titulo: 'Eliminar turno',
+      mensaje: 'El turno desaparece de la agenda y no se puede recuperar.',
+      detalle: 'Si el turno ya se atendió o el cliente no vino, es mejor cambiarle el estado a "Atendida" o "Cancelada": así queda el registro de lo que pasó.',
+      confirmarTexto: 'Eliminar turno',
+    })) return
     try {
       await api.del(`/api/citas/${cita.id}`)
       setCitas(prev => prev.filter(c => c.id !== cita.id))
@@ -331,6 +339,7 @@ export default function Turnos() {
     setPacSelLabel(''); setPacBusq(''); setPacResultados([])
     setErrorModal(null)
   }
+  useCerrarConEscape(modalAbierto, cerrarModal)
 
   const handleGuardar = async (e) => {
     e.preventDefault()
@@ -889,6 +898,7 @@ export default function Turnos() {
                         value={pacBusq}
                         onChange={e => setPacBusq(e.target.value)}
                         placeholder="Buscar por mascota, dueño o DNI…"
+                        autoFocus
                         className={inputCls}
                         autoComplete="off"
                       />

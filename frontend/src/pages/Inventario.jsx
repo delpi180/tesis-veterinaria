@@ -3,6 +3,8 @@ import { Package, AlertTriangle, Coins, Search, Pencil, Trash2, X, Filter, Histo
 import { api, authHeaders } from '../services/api'
 import { SkeletonFilas } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
+import { useConfirmar } from '../components/Confirmar'
+import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
 import { exportarCSV } from '../utils/exportUtils'
 
@@ -76,6 +78,7 @@ function BadgeVencimiento({ producto }) {
 
 // ── Modal de kardex (movimientos + ajuste de stock) ──────────────────────────
 function KardexModal({ producto, onClose, onStockCambiado }) {
+  useCerrarConEscape(true, onClose)
   const toast = useToast()
   const [movs, setMovs]   = useState([])
   const [cargando, setCargando] = useState(true)
@@ -198,6 +201,7 @@ function KardexModal({ producto, onClose, onStockCambiado }) {
 const EJEMPLO_INV = 'Llegaron veinte cajas de amoxicilina a tres soles cada una, diez pipetas de Bravecto a ochenta soles, y agrega un producto nuevo: alimento Royal Canin de tres kilos, comida, a sesenta y cinco soles, cinco bolsas.'
 
 function EntradaIAModal({ onClose, onAplicado }) {
+  useCerrarConEscape(true, onClose)
   const toast = useToast()
   const [texto, setTexto]     = useState('')
   const [items, setItems]     = useState(null)   // null = aún no interpretado
@@ -368,6 +372,7 @@ function EntradaIAModal({ onClose, onAplicado }) {
 }
 
 export default function Inventario() {
+  const confirmar = useConfirmar()
   const toast = useToast()
   const [productos, setProductos] = useState([])
   const [loading,   setLoading]   = useState(true)
@@ -482,6 +487,7 @@ export default function Inventario() {
     setForm(FORM_INICIAL)
     setErrorModal(null)
   }
+  useCerrarConEscape(modalAbierto, cerrarModal)
 
   const handleGuardar = async (e) => {
     e.preventDefault()
@@ -520,7 +526,12 @@ export default function Inventario() {
   }
 
   const handleEliminar = async (p) => {
-    if (!window.confirm(`¿Eliminar "${p.nombre}" (${p.codigo}) del inventario?`)) return
+    if (!await confirmar({
+      titulo: 'Eliminar producto',
+      mensaje: `Se quitará "${p.nombre}" (${p.codigo}) del inventario.`,
+      detalle: 'Si el producto ya tiene ventas registradas el sistema no dejará borrarlo; en ese caso desactívalo para sacarlo del catálogo sin perder el historial.',
+      confirmarTexto: 'Eliminar',
+    })) return
     try {
       await api.del(`/api/productos/${p.id}`)
       setProductos(prev => prev.filter(x => x.id !== p.id))
@@ -688,8 +699,25 @@ export default function Inventario() {
           {!loading && !error && productos.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <Package className="w-8 h-8 mb-2 opacity-40" />
-              <p className="text-sm font-medium">Aún no hay productos registrados</p>
-              <p className="text-xs mt-1">Usa el botón "Nuevo Producto" para comenzar</p>
+              <p className="text-sm font-medium text-slate-500">Aún no hay productos en el inventario</p>
+              <p className="text-xs mt-1 mb-4">Cárgalos uno por uno, o dicta la lista completa de una vez.</p>
+              {/* El texto decía "usa el botón Nuevo Producto" pero no era un
+                  botón: obligaba a buscarlo arriba. Al arrancar la clínica
+                  esta es la primera pantalla que ven, así que la acción va acá. */}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  onClick={abrirNuevo}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow-sm transition"
+                >
+                  <Plus className="w-4 h-4" /> Nuevo Producto
+                </button>
+                <button
+                  onClick={() => setEntradaIA(true)}
+                  className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 hover:bg-purple-50 text-sm font-semibold rounded-lg transition"
+                >
+                  <Sparkles className="w-4 h-4" /> Entrada por voz/texto
+                </button>
+              </div>
             </div>
           )}
 
@@ -826,6 +854,7 @@ export default function Inventario() {
                   <label className={labelCls}>Nombre <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
+                    autoFocus
                     className={inputCls}
                     placeholder="Ej. Alimento Premium 3 kg"
                     value={form.nombre}
