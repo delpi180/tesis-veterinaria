@@ -539,10 +539,15 @@ def procesar_historia_endpoint(body: ProcessHistoriaRequest, request: Request):
     if not body.texto.strip():
         raise HTTPException(status_code=400, detail="El campo 'texto' no puede estar vacío.")
 
+    # El catálogo de medicamentos de la clínica va al prompt: permite
+    # reconocer una marca mal transcrita en vez de copiarla rota.
+    db_cat = SessionLocal()
     try:
-        resultado = extraer_historia(body.texto)
+        resultado = extraer_historia(body.texto, db=db_cat)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en extracción IA: {str(e)}")
+    finally:
+        db_cat.close()
 
     return resultado
 
@@ -566,10 +571,13 @@ def procesar_receta_endpoint(body: ProcesarRecetaRequest, request: Request):
     if not body.texto.strip():
         raise HTTPException(status_code=400, detail="El campo 'texto' no puede estar vacío.")
 
+    db_cat = SessionLocal()
     try:
-        resultado = extraer_receta(body.texto)
+        resultado = extraer_receta(body.texto, db=db_cat)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en extracción IA: {str(e)}")
+    finally:
+        db_cat.close()
 
     return resultado
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Trash2, Loader2, Pencil, Download, Pill, X, Send, Mic } from 'lucide-react'
+import { Plus, Trash2, Loader2, Pencil, Download, Pill, X, Send, Mic, AlertTriangle } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { api, esVeterinario } from '../services/api'
@@ -183,7 +183,10 @@ function ItemsEditor({ items, onChange }) {
   return (
     <div className="flex flex-col gap-2">
       {items.map((it, i) => (
-        <div key={i} className="grid grid-cols-1 sm:grid-cols-6 gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+        <div key={i} className={`grid grid-cols-1 sm:grid-cols-6 gap-2 p-2.5 border rounded-lg ${
+          it.en_catalogo === false
+            ? 'bg-amber-50 border-amber-300'
+            : 'bg-slate-50 border-slate-200'}`}>
           <input value={it.medicamento} onChange={e => update(i, 'medicamento', e.target.value)}
             placeholder="Medicamento" className="sm:col-span-2 text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
           <input value={it.dosis} onChange={e => update(i, 'dosis', e.target.value)}
@@ -207,6 +210,15 @@ function ItemsEditor({ items, onChange }) {
             <p className="sm:col-span-6 text-[11px] text-slate-500 italic flex items-start gap-1">
               <Mic className="w-3 h-3 shrink-0 mt-0.5 text-slate-400" />
               <span>se oyó: “{it.dicho}”</span>
+            </p>
+          )}
+          {/* La IA puede reconocer mal una marca dictada. Si el nombre no
+              coincide con ningún producto del inventario se avisa, sin
+              bloquear: recetar algo que la clínica no vende es legítimo. */}
+          {it.en_catalogo === false && (
+            <p className="sm:col-span-6 text-[11px] text-amber-800 flex items-start gap-1">
+              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5 text-amber-600" />
+              <span>No está en tu inventario — revisa que el nombre sea correcto.</span>
             </p>
           )}
         </div>
@@ -307,6 +319,10 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
             frecuencia:  nuevo.frecuencia || itemsFusionados[idx].frecuencia,
             duracion:    nuevo.duracion   || itemsFusionados[idx].duracion,
             dicho:       nuevo.dicho      || itemsFusionados[idx].dicho,
+            // El aviso de "no está en tu inventario" viene del backend y se
+            // arma campo por campo: sin esto se perdería justo al fusionar,
+            // que es cuando el dictado corrige una línea ya escrita.
+            en_catalogo: nuevo.en_catalogo,
           }
         } else {
           itemsFusionados.push({ ...ITEM_VACIO, ...nuevo })

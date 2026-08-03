@@ -15,6 +15,7 @@ de audio que se muestra junto a cada campo, para que el doctor lo compare.
 """
 import re
 import time
+import unicodedata
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -153,3 +154,97 @@ def invalidar_cache() -> None:
     """Para las pruebas y para cuando se recarga el inventario de golpe."""
     global _cache
     _cache = None
+
+
+# ── Catálogo de medicamentos para la extracción ──────────────────────────────
+#
+# El vocabulario de arriba ayuda a Deepgram a OÍR bien la marca. Esto es para
+# el paso siguiente: si igual salió mal escrita, GPT puede reconocerla si sabe
+# qué medicamentos existen en esta clínica. Sin catálogo, "melo si vet" se
+# copia tal cual al tratamiento y a la receta.
+_cache_catalogo: tuple[float, list[str]] | None = None
+
+
+def catalogo_medicamentos(db: Session | None) -> list[str]:
+    """Nombres completos de los medicamentos activos, como están cargados.
+
+    A diferencia del vocabulario de refuerzo, acá NO se limpia la dosis: lo
+    que se busca es que el tratamiento quede escrito igual que el producto,
+    para poder cobrarlo después sin volver a tipearlo.
+    """
+    global _cache_catalogo
+    ahora = time.time()
+    if _cache_catalogo and (ahora - _cache_catalogo[0]) < _TTL_SEGUNDOS:
+        return _cache_catalogo[1]
+
+    nombres: list[str] = []
+    if db is not None:
+        try:
+            nombres = [
+                n for (n,) in db.query(Producto.nombre)
+                                .filter(Producto.activo.is_(True),
+                                        Producto.categoria == "medicamento")
+                                .order_by(Producto.nombre)
+                                .limit(300)
+                                .all()
+                if (n or "").strip()
+            ]
+        except Exception:
+            nombres = []
+
+    _cache_catalogo = (ahora, nombres)
+    return nombres
+
+
+def _clave(texto: str) -> str:
+    """Compara sin tildes, sin mayúsculas y sin la dosis pegada al nombre."""
+    base = unicodedata.normalize("NFKD", (texto or "").lower())
+    base = "".join(c for c in base if not unicodedata.combining(c))
+    return " ".join(_limpiar(base).split())
+
+
+def coincide_con_catalogo(nombre: str, catalogo: list[str]) -> bool:
+    """¿Este medicamento existe en el inventario de la clínica?
+
+    Se usa para avisar en pantalla cuando NO coincide. Con el catálogo vacío
+    devuelve True siempre: marcar todo como desconocido cuando la clínica
+    todavía no cargó su inventario sería puro ruido.
+    """
+    if not catalogo:
+        return True
+    clave = _clave(nombre)
+    if not clave:
+        return False
+    for producto in catalogo:
+        cp = _clave(producto)
+        if not cp:
+            continue
+        # Contención en ambos sentidos: el doctor dice "meloxivet" y el
+        # producto es "MELOXIVET 4MG", o al revés si cargaron solo la marca.
+        if clave == cp or clave in cp or cp in clave:
+            return True
+    return False
+
+
+def bloque_catalogo(catalogo: list[str]) -> str:
+    """Trozo de prompt que le dice al modelo qué medicamentos hay acá.
+
+    Sin esto una marca mal transcrita se copia tal cual: "melo si vet" queda
+    en el tratamiento y nadie sabe qué es. Con el catálogo el modelo puede
+    reconocerla y escribirla como está en el inventario — lo que además deja
+    el nombre listo para cobrarlo sin volver a tipearlo.
+
+    Se le dice explícitamente que NO invente: un medicamento que la clínica no
+    tiene en stock es perfectamente válido en una receta.
+    """
+    if not catalogo:
+        return ""
+    lista = "\n".join(f"- {n}" for n in catalogo[:150])
+    return (
+        "\n\nMEDICAMENTOS DE ESTA CLÍNICA:\n" + lista +
+        "\n\nSi lo dictado se parece a uno de esta lista (aunque la "
+        "transcripción lo haya escrito mal, por ejemplo 'melo si vet' por "
+        "'MELOXIVET'), usa el nombre EXACTO de la lista. Si no se parece a "
+        "ninguno, escribe lo que se dictó sin inventar: puede ser un "
+        "medicamento que la clínica no tiene en stock, y eso es válido."
+    )

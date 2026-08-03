@@ -14,6 +14,10 @@ import re
 import unicodedata
 from openai import OpenAI
 from core.config import settings
+from services.vocabulario import (
+    bloque_catalogo, catalogo_medicamentos, coincide_con_catalogo,
+)
+
 
 _SYSTEM_PROMPT = """
 Eres un asistente de documentación clínica veterinaria. Recibes lo que un
@@ -151,7 +155,7 @@ def _quitar_repetidos(items: list[dict]) -> list[dict]:
     return resultado
 
 
-def extraer_receta(texto: str) -> dict:
+def extraer_receta(texto: str, db=None) -> dict:
     """
     Llama al LLM para extraer diagnóstico, indicaciones y medicamentos de la
     receta dictada.
@@ -165,6 +169,7 @@ def extraer_receta(texto: str) -> dict:
         )
 
     client = OpenAI(api_key=settings.openai_api_key)
+    catalogo = catalogo_medicamentos(db)
 
     print(f"[GPT] Extrayendo receta — modelo={settings.llm_model} ({len(texto)} chars)")
 
@@ -177,7 +182,7 @@ def extraer_receta(texto: str) -> dict:
             },
             temperature=0.15,
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": _SYSTEM_PROMPT + bloque_catalogo(catalogo)},
                 {"role": "user", "content": texto},
             ],
         )
@@ -198,9 +203,18 @@ def extraer_receta(texto: str) -> dict:
     tokens = completion.usage
     print(f"[GPT] OK — tokens: {tokens.prompt_tokens} prompt / {tokens.completion_tokens} completion")
 
+    # Se marca en Python, no se le pregunta al modelo: si el modelo se
+    # equivocó al reconocer la marca, también se equivocaría al decir que la
+    # reconoció. La comprobación tiene que ser independiente de él.
+    items = _quitar_repetidos(parsed.get("items") or [])
+    for item in items:
+        item["en_catalogo"] = coincide_con_catalogo(
+            item.get("medicamento", ""), catalogo
+        )
+
     return {
         "diagnostico": parsed.get("diagnostico"),
         "indicaciones": parsed.get("indicaciones"),
-        "items": _quitar_repetidos(parsed.get("items") or []),
+        "items": items,
         "transcripcion": texto,
     }

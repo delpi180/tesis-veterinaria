@@ -131,3 +131,47 @@ def test_no_repite_terminos_ni_se_pasa_del_tope():
     minusculas = [t.lower() for t in terminos]
     assert len(minusculas) == len(set(minusculas)), "hay términos repetidos"
     assert len(terminos) <= vocabulario.MAX_KEYTERMS
+
+
+# ── Reconocer una marca contra el catálogo ───────────────────────────────────
+
+CATALOGO = ["MELOXIVET 4MG x 10 TAB", "HEPATINE frasco 30 ml", "Complejo B12"]
+
+
+def test_reconoce_la_marca_aunque_venga_con_la_dosis():
+    """El doctor dicta "meloxivet" y el producto está cargado con su
+    presentación: son el mismo medicamento."""
+    assert vocabulario.coincide_con_catalogo("Meloxivet", CATALOGO)
+    assert vocabulario.coincide_con_catalogo("MELOXIVET 4MG", CATALOGO)
+
+
+def test_ignora_tildes_y_mayusculas():
+    assert vocabulario.coincide_con_catalogo("hepatine", CATALOGO)
+    assert vocabulario.coincide_con_catalogo("Complejo b12", CATALOGO)
+
+
+def test_marca_lo_que_no_esta_en_el_inventario():
+    """Un medicamento que la clínica no tiene es válido en una receta, pero el
+    veterinario debería verlo señalado por si la IA lo entendió mal."""
+    assert not vocabulario.coincide_con_catalogo("Melosivet", CATALOGO)
+    assert not vocabulario.coincide_con_catalogo("Amoxicilina", CATALOGO)
+
+
+def test_sin_inventario_cargado_no_marca_nada():
+    """Con el catálogo vacío, señalar todo como desconocido sería puro ruido:
+    es el estado de una clínica que todavía no cargó sus productos."""
+    assert vocabulario.coincide_con_catalogo("Cualquier cosa", [])
+
+
+def test_el_bloque_de_prompt_lista_los_medicamentos():
+    texto = vocabulario.bloque_catalogo(CATALOGO)
+    assert "MELOXIVET 4MG x 10 TAB" in texto
+    assert "nombre EXACTO" in texto
+    # Y le dice que no invente: recetar algo fuera de stock es legítimo
+    assert "sin inventar" in texto
+
+
+def test_sin_catalogo_no_se_agrega_nada_al_prompt():
+    """Un prompt con una sección vacía de medicamentos solo gasta tokens y
+    confunde al modelo."""
+    assert vocabulario.bloque_catalogo([]) == ""

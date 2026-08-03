@@ -213,6 +213,21 @@ CASOS_RECETA = [
             "indicaciones_no_contiene": "0.5",
         },
     },
+    {
+        # El veterinario dicta la marca y la transcripción la parte en trozos.
+        # Sin el catálogo de la clínica en el prompt, "melo si vet" se copiaba
+        # tal cual a la receta y nadie sabía qué medicamento era.
+        #
+        # Se salta si el inventario no tiene medicamentos cargados: sin
+        # catálogo no hay nada contra qué reconocer.
+        "nombre": "reconoce una marca del inventario mal transcrita",
+        "texto": "Le doy melo si vet un cuarto de tableta cada 24 horas por 5 días.",
+        "necesita_catalogo": True,
+        "espera": {
+            "items": [{"medicamento_contiene": "meloxivet",
+                       "frecuencia_contiene": "24"}],
+        },
+    },
 ]
 
 
@@ -288,10 +303,36 @@ def _comprobar(datos, espera):
     return fallos
 
 
+def _catalogo_disponible() -> bool:
+    """¿La clínica ya cargó medicamentos en el inventario?
+
+    Algunos casos comprueban que una marca mal transcrita se reconozca contra
+    el catálogo de la clínica. Sin inventario cargado no hay catálogo que
+    consultar, así que esos casos se saltan en vez de reportar un fallo que
+    no lo es.
+    """
+    try:
+        from database import SessionLocal
+        from services.vocabulario import catalogo_medicamentos
+        db = SessionLocal()
+        try:
+            return bool(catalogo_medicamentos(db))
+        finally:
+            db.close()
+    except Exception:
+        return False
+
+
 def _correr(titulo, casos, extraer, sacar_datos):
     print(f"\n{'='*70}\n{titulo}\n{'='*70}")
+    hay_catalogo = _catalogo_disponible()
     ok = 0
+    saltados = 0
     for caso in casos:
+        if caso.get("necesita_catalogo") and not hay_catalogo:
+            print(f"  ~ {caso['nombre']}: saltado (inventario sin medicamentos)")
+            saltados += 1
+            continue
         try:
             datos = sacar_datos(extraer(caso["texto"]))
         except Exception as exc:
@@ -305,8 +346,10 @@ def _correr(titulo, casos, extraer, sacar_datos):
         else:
             ok += 1
             print(f"  ✓ {caso['nombre']}")
-    print(f"\n  {ok}/{len(casos)} casos correctos")
-    return ok, len(casos)
+    evaluados = len(casos) - saltados
+    print(f"\n  {ok}/{evaluados} casos correctos"
+          + (f" ({saltados} saltados)" if saltados else ""))
+    return ok, evaluados
 
 
 def main():
@@ -320,16 +363,27 @@ def main():
         settings.llm_model = args.modelo
     print(f"Modelo: {settings.llm_model}")
 
+    # Los extractores reciben la sesión para poder pasarle al modelo el
+    # catálogo de medicamentos de la clínica: sin eso, la medición no
+    # reflejaría lo que realmente pasa en producción.
+    from database import SessionLocal
+    db = SessionLocal()
+
     solo_uno = args.receta or args.historia
     ok = total = 0
-    if not solo_uno or args.historia:
-        a, b = _correr("HISTORIA CLÍNICA", CASOS_HISTORIA,
-                       historia_extractor.extraer_historia, lambda r: r["datos"])
-        ok += a; total += b
-    if not solo_uno or args.receta:
-        a, b = _correr("RECETA", CASOS_RECETA,
-                       receta_extractor.extraer_receta, lambda r: r)
-        ok += a; total += b
+    try:
+        if not solo_uno or args.historia:
+            a, b = _correr("HISTORIA CLÍNICA", CASOS_HISTORIA,
+                           lambda t: historia_extractor.extraer_historia(t, db=db),
+                           lambda r: r["datos"])
+            ok += a; total += b
+        if not solo_uno or args.receta:
+            a, b = _correr("RECETA", CASOS_RECETA,
+                           lambda t: receta_extractor.extraer_receta(t, db=db),
+                           lambda r: r)
+            ok += a; total += b
+    finally:
+        db.close()
 
     print(f"\n{'='*70}\nTOTAL: {ok}/{total}\n")
     return 0 if ok == total else 1

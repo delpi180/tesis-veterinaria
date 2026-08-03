@@ -19,6 +19,9 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from openai import OpenAI
 from core.config import settings
+from services.vocabulario import (
+    bloque_catalogo, catalogo_medicamentos, coincide_con_catalogo,
+)
 
 _LIMA_TZ = ZoneInfo("America/Lima")
 
@@ -358,7 +361,7 @@ def _validar_rangos(datos: dict) -> dict:
     return alertas
 
 
-def extraer_historia(texto: str) -> dict:
+def extraer_historia(texto: str, db=None) -> dict:
     """
     Llama al LLM para extraer los campos de la historia clínica usando
     salida estructurada (JSON Schema estricto).
@@ -382,10 +385,11 @@ def extraer_historia(texto: str) -> dict:
     today       = datetime.now(_LIMA_TZ).date()
     dia_semana  = _DIAS_ES[today.strftime("%A")]
     fecha_hoy   = f"{today.isoformat()} ({dia_semana})"
+    catalogo = catalogo_medicamentos(db)
     system_prompt = _SYSTEM_PROMPT_TPL.format(
         fecha_hoy=fecha_hoy,
         dia_semana=dia_semana,
-    )
+    ) + bloque_catalogo(catalogo)
 
     print(
         f"[GPT] Extrayendo historia — modelo={settings.llm_model} "
@@ -440,6 +444,15 @@ def extraer_historia(texto: str) -> dict:
     # Post-procesado: resolver expresiones de fecha relativas que el LLM no calculó.
     parsed = _patch_dates(parsed, today)
     parsed = _limpiar_vacios(parsed)
+
+    # Marcar los tratamientos que no coinciden con nada del inventario. Se
+    # comprueba acá y no se le pregunta al modelo: si se equivocó al reconocer
+    # la marca, también diría que la reconoció bien.
+    for item in (parsed.get("tratamiento_items") or []):
+        if isinstance(item, dict):
+            item["en_catalogo"] = coincide_con_catalogo(
+                item.get("medicamento", ""), catalogo
+            )
 
     # Validación de rangos fisiológicos.
     alertas_rango = _validar_rangos(parsed)
