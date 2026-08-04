@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #2e1065; }
+      body { font-family: "Inter", system-ui, sans-serif; }
+
+      #fondo {
+        position: absolute; inset: 0;
+        background: linear-gradient(120deg, #2e1065 0%, #4c1d95 100%);
+      }
+      #centro {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 18px;
+      }
+      #numero {
+        font-size: 26px; font-weight: 700; letter-spacing: 6px;
+        /* Violeta claro sobre el fondo oscuro: pasa AA con holgura. Un tono
+           más apagado se leía "elegante" en el editor y desaparecía en el
+           video comprimido. */
+        color: #c4b5fd;
+        text-transform: uppercase;
+      }
+      #texto {
+        font-size: 78px; font-weight: 800; color: #fff;
+        letter-spacing: -1px; text-align: center; max-width: 1500px;
+      }
+      #sub {
+        font-size: 30px; font-weight: 500; color: #ddd6fe;
+        text-align: center; max-width: 1200px;
+      }
+      #barra {
+        width: 0; height: 4px; border-radius: 2px; margin-top: 8px;
+        background: linear-gradient(90deg, #a855f7, #e9d5ff);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Cartel de sección. El texto se reemplaza desde armar.mjs con
+         marcadores, para no mantener tres archivos casi idénticos. -->
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="2.6"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="fondo" class="clip" data-start="0" data-duration="2.6" data-track-index="0"></div>
+      <div id="centro" class="clip" data-start="0" data-duration="2.6" data-track-index="1">
+        <div id="numero">__NUMERO__</div>
+        <div id="texto">__TITULO__</div>
+        <div id="barra"></div>
+        <div id="sub">__SUBTITULO__</div>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      tl.from("#numero", { opacity: 0, y: -18, duration: 0.45, ease: "power2.out" }, 0.1)
+        .from("#texto",  { opacity: 0, y: 30, duration: 0.55, ease: "power3.out" }, 0.25)
+        .to("#barra",    { width: 260, duration: 0.5, ease: "power2.inOut" }, 0.5)
+        .from("#sub",    { opacity: 0, y: 16, duration: 0.45, ease: "power2.out" }, 0.65)
+        // Fundido de salida: el corte al video de la aplicación queda suave.
+        .to("#centro",   { opacity: 0, duration: 0.35, ease: "power2.in" }, 2.25)
+        .to("#fondo",    { opacity: 0, duration: 0.35, ease: "power2.in" }, 2.25);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

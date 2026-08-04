@@ -228,8 +228,8 @@ async function grabar(nombre, guion) {
 
   const navegador = await chromium.launch({ headless: true })
   const contexto = await navegador.newContext({
-    viewport: { width: 1440, height: 900 },
-    recordVideo: { dir, size: { width: 1440, height: 900 } },
+    viewport: { width: 1920, height: 1080 },
+    recordVideo: { dir, size: { width: 1920, height: 1080 } },
     locale: 'es-PE',
     timezoneId: 'America/Lima',
     // Sin esto el cursor no aparece en el video y los clics se ven mágicos.

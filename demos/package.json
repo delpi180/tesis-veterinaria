@@ -10,6 +10,7 @@
     "convertir": "node convertir.mjs"
   },
   "devDependencies": {
+    "hyperframes": "^0.7.90",
     "playwright": "^1.62.1"
   }
 }

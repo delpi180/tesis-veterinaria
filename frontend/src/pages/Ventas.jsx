@@ -389,6 +389,10 @@ export default function Ventas() {
     setModalAbierto(false); setErrorModal(null); setPosVista('catalogo')
     setClienteId(''); setCliSelLabel(''); setCliBusq(''); setCliResultados([]); setSelectedClientObj(null)
   }
+  // Al resto de los modales se les puso Escape, pero este —el punto de venta,
+  // el que más se abre en el día— se había quedado afuera. Lo destapó el
+  // guion de grabación: quedaba abierto y tapaba el menú.
+  useCerrarConEscape(modalAbierto, cerrarModal)
 
   const lineaKey = (tipo, id) => `${tipo}-${id}`
 

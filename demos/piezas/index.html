@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es" data-resolution="landscape">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 1920px; height: 1080px; overflow: hidden;
+        /* El mismo morado del sistema: la intro tiene que verse parte del
+           producto, no una plantilla genérica pegada delante. */
+        background: #2e1065;
+      }
+      body { font-family: "Inter", system-ui, sans-serif; }
+
+      #fondo {
+        position: absolute; inset: 0;
+        background: radial-gradient(circle at 30% 25%, #4c1d95 0%, #2e1065 55%, #1c0a3e 100%);
+      }
+
+      /* Huella decorativa: el icono del sistema, muy tenue, para que el fondo
+         no sea un degradado plano. */
+      #huella {
+        position: absolute; right: -160px; bottom: -220px;
+        width: 900px; height: 900px; opacity: .07;
+      }
+
+      #centro {
+        position: absolute; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 26px;
+      }
+
+      #logo {
+        width: 132px; height: 132px; border-radius: 34px;
+        background: #7e22ce; color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 24px 70px rgba(0,0,0,.45);
+      }
+      #logo svg { width: 78px; height: 78px; }
+
+      #nombre {
+        font-size: 88px; font-weight: 800; color: #fff;
+        letter-spacing: -1.5px; text-align: center;
+      }
+      #bajada {
+        font-size: 34px; font-weight: 500; color: #ddd6fe;
+        text-align: center;
+      }
+      #linea {
+        width: 0; height: 4px; border-radius: 2px;
+        background: linear-gradient(90deg, #a855f7, #e9d5ff);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="4.5"
+      data-width="1920"
+      data-height="1080"
+    >
+      <div id="fondo" class="clip" data-start="0" data-duration="4.5" data-track-index="0"></div>
+
+      <svg id="huella" class="clip" data-start="0" data-duration="4.5" data-track-index="1"
+           viewBox="0 0 24 24" fill="#ffffff">
+        <path d="M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM5.5 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm13 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 10c-3.3 0-6 2.7-6 6 0 2.2 1.8 4 4 4h4c2.2 0 4-1.8 4-4 0-3.3-2.7-6-6-6z"/>
+      </svg>
+
+      <div id="centro" class="clip" data-start="0" data-duration="4.5" data-track-index="2">
+        <div id="logo">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm10 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM5.5 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm13 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM12 10c-3.3 0-6 2.7-6 6 0 2.2 1.8 4 4 4h4c2.2 0 4-1.8 4-4 0-3.3-2.7-6-6-6z"/>
+          </svg>
+        </div>
+        <div id="nombre">Sistema de gestión veterinaria</div>
+        <div id="linea"></div>
+        <div id="bajada">Historias clínicas por voz · Inventario · Caja</div>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // Entrada escalonada: el logo primero, después el texto. Todo junto se
+      // lee como un salto; escalonado se lee como una presentación.
+      tl.from("#logo",   { opacity: 0, scale: 0.7, duration: 0.8, ease: "back.out(1.6)" }, 0.15)
+        .from("#nombre", { opacity: 0, y: 34, duration: 0.7, ease: "power2.out" }, 0.55)
+        .to("#linea",    { width: 320, duration: 0.7, ease: "power2.inOut" }, 0.9)
+        .from("#bajada", { opacity: 0, y: 20, duration: 0.6, ease: "power2.out" }, 1.1)
+        // Deriva lentísima del fondo: da sensación de vivo sin distraer.
+        .to("#huella",   { rotation: 8, duration: 4.5, ease: "none" }, 0)
+        // Fundido al final para que el corte al video de la aplicación no golpee.
+        .to("#centro",   { opacity: 0, duration: 0.45, ease: "power2.in" }, 4.0)
+        .to("#fondo",    { opacity: 0, duration: 0.45, ease: "power2.in" }, 4.0);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>
