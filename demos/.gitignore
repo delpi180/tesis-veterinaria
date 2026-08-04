@@ -1,0 +1,5 @@
+# Videos y fotogramas generados: se regeneran con `node grabar.mjs`, no tiene
+# sentido versionarlos (son megas de binario que cambian en cada corrida).
+salida/
+fotogramas/
+node_modules/

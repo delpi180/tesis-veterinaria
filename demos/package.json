@@ -1,0 +1,15 @@
+{
+  "name": "veterinaria-demos",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Graba videos de demostración del sistema manejándolo solo, para material de venta.",
+  "scripts": {
+    "grabar": "node grabar.mjs",
+    "grabar:lento": "node grabar.mjs --lento",
+    "convertir": "node convertir.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}
