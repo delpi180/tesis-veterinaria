@@ -53,8 +53,14 @@ def contar_clientes(q: Optional[str] = Query(None), db: Session = Depends(get_db
     """Total de clientes (con filtro opcional), para la paginación."""
     query = db.query(func.count(Cliente.id))
     if q and q.strip():
+        # Mismo filtro que el listado (incluye nombre de mascota): si no, el
+        # contador de la paginación no coincide con lo que se ve en la tabla.
         like = f"%{q.strip()}%"
-        query = query.filter(or_(Cliente.nombre.ilike(like), Cliente.dni.ilike(like)))
+        query = query.filter(or_(
+            Cliente.nombre.ilike(like),
+            Cliente.dni.ilike(like),
+            Cliente.pacientes.any(Paciente.nombre.ilike(like)),
+        ))
     return {"total": query.scalar()}
 
 

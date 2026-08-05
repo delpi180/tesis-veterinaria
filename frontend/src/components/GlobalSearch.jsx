@@ -162,9 +162,14 @@ export default function GlobalSearch() {
                       title="Mascotas"
                       icon={<PawPrint size={14} />}
                       items={results.pacientes}
-                      onSelect={(item) => goTo(item.cliente_id ? `/clientes/${item.cliente_id}` : '/clientes')}
+                      onSelect={(item) => goTo(item.id ? `/pacientes/${item.id}/historial` : '/clientes')}
                       renderLabel={(item) => item.nombre || item.name || `Mascota #${item.id}`}
-                      renderSub={(item) => item.especie || item.raza || ''}
+                      // Con varias mascotas del mismo nombre, el dueño es lo que
+                      // permite elegir la correcta sin abrir las fichas una por una.
+                      renderSub={(item) => [
+                        [item.especie, item.raza].filter(Boolean).join(' · '),
+                        item.propietario ? `Dueño: ${item.propietario}` : '',
+                      ].filter(Boolean).join(' — ')}
                     />
                   )}
 

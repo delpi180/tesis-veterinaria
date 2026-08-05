@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Download } from 'lucide-react'
+import { Search, Download, PawPrint, Stethoscope } from 'lucide-react'
 import { api } from '../services/api'
 import { SkeletonFilas } from '../components/Skeleton'
 import { exportarCSV } from '../utils/exportUtils'
 import { useToast } from '../components/Toast'
+import { Spinner } from '../components/Cargando'
 
 // ── Iconos ────────────────────────────────────────────────────────────────
 const PlusIcon = () => (
@@ -22,13 +23,6 @@ const UsersIcon = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
   </svg>
 )
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-500">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-  </svg>
-)
-
 // ── Formulario ────────────────────────────────────────────────────────────
 const EMPTY_FORM = { dni: '', nombre: '', telefono: '', direccion: '' }
 
@@ -125,6 +119,11 @@ export default function Clientes() {
   const [pagina, setPagina] = useState(1)
   const [total,  setTotal]  = useState(0)
 
+  // Mascotas que coinciden con la búsqueda. En el mostrador se pregunta por el
+  // animal ("vengo con Pepita"), no por el dueño: se listan todas las Pepitas
+  // con su propietario al lado para poder distinguirlas.
+  const [mascotas, setMascotas] = useState([])
+
   const cargar = async (q, pag) => {
     setLoading(true); setError(null)
     try {
@@ -137,6 +136,16 @@ export default function Clientes() {
       ])
       setClientes(Array.isArray(data) ? data : [])
       setTotal(cont?.total ?? 0)
+      // Las mascotas se piden aparte y no bloquean la lista de dueños: si ese
+      // endpoint falla, la pantalla sigue sirviendo.
+      if (q.trim()) {
+        try {
+          const m = await api.get(`/api/pacientes/buscar?q=${encodeURIComponent(q.trim())}`)
+          setMascotas(Array.isArray(m) ? m : [])
+        } catch { setMascotas([]) }
+      } else {
+        setMascotas([])
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -236,6 +245,64 @@ export default function Clientes() {
           onCancel={() => setShowForm(false)}
         />
 
+        {/* Mascotas que coinciden con la búsqueda (con su dueño al lado) */}
+        {term && mascotas.length > 0 && (
+          <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-100 bg-emerald-50/60 flex items-center gap-3 flex-wrap">
+              <PawPrint className="w-5 h-5 text-emerald-600" />
+              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                Mascotas encontradas
+              </h2>
+              <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">
+                {mascotas.length}
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {mascotas.map(m => (
+                <div
+                  key={m.id}
+                  onClick={() => navigate(`/pacientes/${m.id}/historial`)}
+                  className="px-5 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 hover:bg-emerald-50/40 transition cursor-pointer"
+                >
+                  <div className="min-w-[140px]">
+                    <p className="font-semibold text-slate-800 text-sm">{m.nombre}</p>
+                    <p className="text-xs text-slate-500">
+                      {[m.especie, m.raza, m.sexo].filter(Boolean).join(' · ') || '—'}
+                    </p>
+                  </div>
+                  <div className="min-w-[180px]">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide block">Dueño</span>
+                    <button
+                      onClick={e => { e.stopPropagation(); navigate(`/clientes/${m.cliente_id}`) }}
+                      className="text-sm text-purple-700 hover:text-purple-900 font-medium underline-offset-2 hover:underline text-left"
+                    >
+                      {m.propietario || '—'}
+                    </button>
+                    <p className="text-xs text-slate-500">
+                      {[m.propietario_dni && `DNI ${m.propietario_dni}`, m.propietario_telefono]
+                        .filter(Boolean).join(' · ') || '—'}
+                    </p>
+                  </div>
+                  <div className="min-w-[120px]">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide block">Última consulta</span>
+                    <span className="text-xs text-slate-600">
+                      {m.ultima_consulta
+                        ? new Date(m.ultima_consulta).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : 'Sin consultas'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); navigate(`/pacientes/${m.id}/historial`) }}
+                    className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-900"
+                  >
+                    <Stethoscope className="w-3.5 h-3.5" /> Ver historia clínica
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Tabla */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {/* Cabecera de sección con buscador */}
@@ -255,7 +322,7 @@ export default function Clientes() {
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nombre o DNI…"
+                placeholder="Buscar por mascota, dueño o DNI…"
                 className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-52"
               />
             </div>
@@ -269,7 +336,7 @@ export default function Clientes() {
             </div>
           )}
 
-          {!loading && !error && clientes.length === 0 && (
+          {!loading && !error && clientes.length === 0 && !term && (
             <div className="flex flex-col items-center justify-center py-16 text-slate-400">
               <UsersIcon />
               <p className="text-sm font-medium mt-3">Aún no hay clientes registrados</p>
@@ -277,11 +344,11 @@ export default function Clientes() {
             </div>
           )}
 
-          {!loading && !error && clientes.length > 0 && clientesFiltrados.length === 0 && (
+          {!loading && !error && term && clientesFiltrados.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-slate-400">
               <Search className="w-8 h-8 mb-2 opacity-40" />
               <p className="text-sm font-medium">Sin resultados para "{searchTerm}"</p>
-              <p className="text-xs mt-1">Prueba con otro nombre o DNI</p>
+              <p className="text-xs mt-1">Prueba con el nombre de la mascota, del dueño o el DNI</p>
             </div>
           )}
 

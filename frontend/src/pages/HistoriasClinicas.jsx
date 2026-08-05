@@ -82,6 +82,16 @@ const toLocalDatetimeString = (v) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+// El historial va de la consulta más reciente a la más antigua por FECHA DE
+// ATENCIÓN, no por orden de tecleo: una consulta vieja que se digitaliza hoy
+// tiene que caer en su lugar, no arriba de todo.
+export const ordenarHistorias = (lista) =>
+  [...lista].sort((a, b) => {
+    const fa = new Date(a.fecha || a.creado_en).getTime();
+    const fb = new Date(b.fecha || b.creado_en).getTime();
+    return fb - fa || (b.id - a.id);
+  });
+
 // Campo → sección (para saltar a lo que la IA dejó por revisar)
 const FIELD_TO_SECTION = {
   motivo_consulta: "s1", tiempo_evolucion: "s1", derivado_por: "s1",
@@ -105,6 +115,9 @@ const TX_EMPTY = { medicamento: "", dosis: "", via: "", frecuencia: "", duracion
 const VX_EMPTY = { vacuna: "", lote: "", proxima_dosis: "" };
 
 const FORM_VACIO = {
+  // Vacío = "ahora" (el caso normal). Se llena para digitalizar una consulta
+  // vieja de papel o para corregir la fecha de una ya registrada.
+  fecha: "",
   motivo_consulta: "", tiempo_evolucion: "", derivado_por: "",
   detalle: "", alimentacion_tipo: "", alimentacion_cantidad_gr: "",
   antecedentes: "", tipo_consulta: "",
@@ -186,7 +199,7 @@ export function buildPayload(form) {
         const isFloat = ["temperatura_c", "peso_kg"].includes(k);
         out[k] = isFloat ? n : Math.round(n);
       }
-    } else if (k === "proxima_cita") {
+    } else if (k === "fecha" || k === "proxima_cita") {
       // Interpreta como hora LOCAL y la envía como instante UTC correcto (evita el corrimiento de 5h)
       out[k] = v ? new Date(v + ":00").toISOString() : null;
     } else {
@@ -217,7 +230,7 @@ function formFromHistoria(h) {
     if (["examen_particular", "tratamiento_items", "vacunas_items"].includes(k)) continue;
     const v = h[k];
     if (v !== null && v !== undefined)
-      f[k] = k === "proxima_cita" ? toLocalDatetimeString(v) : String(v);
+      f[k] = (k === "fecha" || k === "proxima_cita") ? toLocalDatetimeString(v) : String(v);
   }
   const ep = eopVacio();
   if (h.examen_particular && typeof h.examen_particular === "object") {
@@ -502,6 +515,14 @@ function HistoriaCard({ h, onEdit, onDelete }) {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
+  // Una consulta digitalizada después (o con la fecha corregida) deja ver
+  // cuándo se atendió y cuándo se cargó: son dos datos distintos del registro.
+  const cargada = h.creado_en ? new Date(h.creado_en) : null;
+  const atendida = new Date(h.fecha || h.creado_en);
+  const registradaDespues =
+    cargada && Math.abs(cargada - atendida) > 24 * 60 * 60 * 1000
+      ? cargada.toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" })
+      : null;
   const txItems = Array.isArray(h.tratamiento_items) ? h.tratamiento_items : [];
   const vxItems = Array.isArray(h.vacunas_items)     ? h.vacunas_items     : [];
   const epEntries = SISTEMAS_EOP.map(s => {
@@ -516,7 +537,12 @@ function HistoriaCard({ h, onEdit, onDelete }) {
   return (
     <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
       <div className="flex items-center justify-between px-4 py-2 bg-purple-700 text-white">
-        <span className="text-sm font-semibold">{fecha}</span>
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-sm font-semibold">{fecha}</span>
+          {registradaDespues && (
+            <span className="text-[11px] text-purple-200">registrada el {registradaDespues}</span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {h.tipo_consulta && (
             <span className="text-xs bg-white/20 px-2 py-0.5 rounded">
@@ -883,7 +909,9 @@ export default function HistoriasClinicas() {
 
     setForm(prev => {
       const next = { ...prev };
-      const SKIP = ["examen_particular", "tratamiento_items", "vacunas_items"];
+      // La fecha de la consulta la fija el usuario, no el dictado: si el doctor
+      // menciona una fecha al hablar, no debe reescribir cuándo fue la consulta.
+      const SKIP = ["fecha", "examen_particular", "tratamiento_items", "vacunas_items"];
       for (const k of Object.keys(FORM_VACIO)) {
         if (SKIP.includes(k)) continue;
         const val = datos[k];
@@ -1018,13 +1046,13 @@ export default function HistoriasClinicas() {
 
       if (editandoId) {
         const r = await api.put(`/api/pacientes/${id}/historias/${editandoId}`, payload);
-        setHistorias(p => p.map(h => h.id === editandoId ? r : h));
+        setHistorias(p => ordenarHistorias(p.map(h => h.id === editandoId ? r : h)));
       } else {
         // Métrica de tiempo: solo en registros nuevos
         payload.segundos_registro = Math.max(1, Math.round((Date.now() - inicioRegistro.current) / 1000));
         payload.metodo_registro = usoIA.current ? "ia" : "manual";
         const r = await api.post(`/api/pacientes/${id}/historias/`, payload);
-        setHistorias(p => [r, ...p]);
+        setHistorias(p => ordenarHistorias([r, ...p]));
         // Si se vino de "Atender" un turno, márcalo como atendido
         if (navState?.citaId) {
           try { await api.put(`/api/citas/${navState.citaId}`, { estado: "atendida" }); } catch { /* no crítico */ }
@@ -1201,7 +1229,21 @@ export default function HistoriasClinicas() {
 
           {/* S1 — Anamnesis */}
           <PanelSeccion activa={seccionActiva} id="s1" titulo="Anamnesis">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <Field label="Fecha de la consulta">
+                <input
+                  type="datetime-local"
+                  value={form.fecha}
+                  max={toLocalDatetimeString(new Date())}
+                  onChange={setF("fecha")}
+                  className={hlInput()}
+                />
+                <p className="mt-1 text-[11px] text-slate-400">
+                  {editandoId
+                    ? "Corrígela si la consulta se registró con otra fecha."
+                    : "Déjala vacía si la consulta es de ahora. Ponla para digitalizar una consulta anterior."}
+                </p>
+              </Field>
               <Field label="Tipo de consulta" hl={highlights.tipo_consulta}>
                 <Sel value={form.tipo_consulta} onChange={setF("tipo_consulta")} options={OPT.tipo_consulta} hl={highlights.tipo_consulta} />
               </Field>

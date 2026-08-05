@@ -42,7 +42,10 @@ def busqueda_global(q: str = Query(..., min_length=1), db: Session = Depends(get
             | Paciente.especie.ilike(patron)
             | Paciente.raza.ilike(patron)
         )
-        .limit(5)
+        .order_by(Paciente.nombre, Paciente.id)
+        # Un poco más que el resto: los nombres de mascota se repiten mucho
+        # (varias "Pepita") y cortar en 5 esconde justo la que se busca.
+        .limit(8)
         .all()
     )
     pacientes = [

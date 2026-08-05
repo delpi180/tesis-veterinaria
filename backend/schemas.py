@@ -1,6 +1,8 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Literal, Optional
-from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
+from pydantic import (
+    BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator,
+)
 
 from models import calcular_tardanza_min
 
@@ -21,6 +23,12 @@ class HistoriaClinicaResumen(BaseModel):
 
 class HistoriaClinicaCreate(BaseModel):
     """Todos los campos clínicos opcionales; paciente_id viene por la URL."""
+
+    # Fecha en que se ATENDIÓ la consulta. Si no viene, es "ahora": el caso
+    # normal de registrar mientras se atiende. Se manda cuando se digitaliza
+    # una consulta vieja de papel o se corrige una fecha mal puesta; la hora de
+    # tecleo real siempre queda aparte en creado_en.
+    fecha: Optional[datetime] = None
 
     # ANAMNESIS
     motivo_consulta:          Optional[str] = None
@@ -85,6 +93,23 @@ class HistoriaClinicaCreate(BaseModel):
     # llena la historia por el doctor; si escribe el propio veterinario se
     # ignora y firma él (nadie firma en nombre de otro).
     veterinario_id: Optional[int] = None
+
+    @field_validator("fecha")
+    @classmethod
+    def _fecha_no_futura(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """Se puede fechar hacia atrás (digitalizar papel), nunca hacia adelante:
+        una consulta que todavía no ocurrió es un turno, no una historia."""
+        if v is None:
+            return v
+        ahora = datetime.now(timezone.utc)
+        limite = ahora + timedelta(days=1)          # margen por husos horarios
+        referencia = v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+        if referencia > limite:
+            raise ValueError(
+                "La fecha de la consulta no puede ser futura. "
+                "Si es una visita programada, agéndala en Turnos."
+            )
+        return v
 
 
 class HistoriaClinicaOut(BaseModel):

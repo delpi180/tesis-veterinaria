@@ -7,7 +7,8 @@ from fastapi import (
     APIRouter, Depends, Form, HTTPException, Query, Request, Response,
     UploadFile, File, status,
 )
-from sqlalchemy.orm import Session
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import Cita, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Receta, Usuario
@@ -79,6 +80,67 @@ def _generar_cita_proxima(db: Session, historia: HistoriaClinica) -> None:
         notas=notas,
         veterinario_id=veterinario_id,   # el doctor que atendió, si está libre
     ))
+
+
+# ── Búsqueda por mascota ──────────────────────────────────────────────────────
+# Va ANTES de /{paciente_id} para que "buscar" no se intente leer como un id.
+
+@router.get("/buscar")
+def buscar_pacientes(
+    q: str = Query(..., min_length=1, description="Nombre de la mascota (o especie/raza/microchip)"),
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_db),
+):
+    """Busca mascotas por nombre y devuelve a su dueño al lado.
+
+    En la clínica se pregunta por el animal ("vengo con Pepita"), no por el
+    DNI del dueño. Como hay varias Pepitas, se listan todas con el propietario
+    y su teléfono para poder distinguirlas de un vistazo.
+    """
+    like = f"%{q.strip()}%"
+    filas = (
+        db.query(Paciente)
+        .options(joinedload(Paciente.cliente))
+        .filter(
+            Paciente.nombre.ilike(like)
+            | Paciente.microchip.ilike(like)
+            | Paciente.especie.ilike(like)
+            | Paciente.raza.ilike(like)
+        )
+        .order_by(Paciente.nombre, Paciente.id)
+        .limit(limit)
+        .all()
+    )
+
+    # Última consulta de cada mascota encontrada, en una sola consulta extra:
+    # con ella la recepcionista distingue "la Pepita que vino la semana pasada".
+    ultimas: dict[int, datetime] = {}
+    if filas:
+        ids = [p.id for p in filas]
+        ultimas = dict(
+            db.query(HistoriaClinica.paciente_id, func.max(HistoriaClinica.fecha))
+            .filter(HistoriaClinica.paciente_id.in_(ids))
+            .group_by(HistoriaClinica.paciente_id)
+            .all()
+        )
+
+    return [
+        {
+            "id": p.id,
+            "nombre": p.nombre,
+            "especie": p.especie,
+            "raza": p.raza,
+            "sexo": p.sexo,
+            "edad": p.edad,
+            "microchip": p.microchip,
+            "cliente_id": p.cliente_id,
+            "propietario": p.cliente.nombre if p.cliente else None,
+            "propietario_dni": p.cliente.dni if p.cliente else None,
+            "propietario_telefono": p.cliente.telefono if p.cliente else None,
+            "ultima_consulta": ultimas[p.id].isoformat() if ultimas.get(p.id) else None,
+        }
+        for p in filas
+    ]
 
 
 @router.get("/{paciente_id}", response_model=PacienteOut)
@@ -158,6 +220,10 @@ def crear_historia(
     request.state.actividad_detalle = paciente.nombre
     datos = payload.model_dump()
     vet_id = _resolver_veterinario(db, request, usuario, datos.pop("veterinario_id", None))
+    # Sin fecha explícita manda el default del modelo (ahora). Un None explícito
+    # dejaría la historia sin fecha y sin lugar en el orden del historial.
+    if datos.get("fecha") is None:
+        datos.pop("fecha", None)
     try:
         historia = HistoriaClinica(
             **datos,
@@ -212,6 +278,9 @@ def actualizar_historia(
         raise HTTPException(status_code=404, detail="Historia clínica no encontrada")
     cita_anterior = historia.proxima_cita
     datos = payload.model_dump(exclude_unset=True)
+    # La fecha solo se cambia si se manda una nueva; un None es "no la toques".
+    if "fecha" in datos and datos["fecha"] is None:
+        datos.pop("fecha")
     # Reasignar el veterinario responsable solo si viene explícito; editar
     # cualquier otro campo no debe cambiar de quién es la firma.
     if "veterinario_id" in datos:
