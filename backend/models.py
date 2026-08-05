@@ -131,6 +131,10 @@ class RegistroClinico(Base):
     paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
     tipo        = Column(String(20), nullable=False)   # antiparasitario | estetica | complementario
     fecha       = Column(Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
+    # Cuándo toca la siguiente. Desparasitar es lo más recurrente de una
+    # clínica y era lo único del sistema sin fecha de vencimiento: quedaba
+    # anotado que se hizo, y nadie se enteraba cuando tocaba repetirlo.
+    proxima_fecha = Column(Date)
     producto    = Column(String(200))                  # producto aplicado / servicio realizado
     notas       = Column(Text)
     registrado_por = Column(String(50))
@@ -650,10 +654,14 @@ class VacunaAvisada(Base):
     paciente_id   = Column(Integer, ForeignKey("pacientes.id", ondelete="CASCADE"), nullable=False)
     vacuna        = Column(String(150), nullable=False)
     proxima_dosis = Column(String(60), nullable=False)   # tal cual viene del item (fecha ISO o texto libre)
+    # 'vacuna' | 'antiparasitario'. La desparasitación se sigue en la misma
+    # bandeja, y sin esto un antiparasitario con el mismo nombre que una vacuna
+    # compartiría el "ya avisé".
+    tipo          = Column(String(20), nullable=False, default="vacuna", server_default="vacuna")
     avisado_en    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     avisado_por   = Column(String(50))
 
     __table_args__ = (
-        UniqueConstraint("paciente_id", "vacuna", "proxima_dosis", name="uq_vacuna_avisada"),
+        UniqueConstraint("paciente_id", "vacuna", "proxima_dosis", "tipo", name="uq_vacuna_avisada"),
     )
 

@@ -3,30 +3,71 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import (
     Asistencia, CierreCaja, Cita, Cliente, HistoriaClinica, Paciente, Producto,
-    Venta, VentaItem, Usuario, VacunaAvisada,
+    RegistroClinico, Venta, VentaItem, Usuario, VacunaAvisada,
 )
 from core.deps import usuario_actual, solo_admin
+from core.vacunas import normalizar as normalizar_vacuna
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
 
-def _avisos_existentes(db: Session) -> set[tuple[int, str, str]]:
-    """Claves (paciente_id, vacuna en minúscula, próxima_dosis) ya avisadas."""
+def _avisos_existentes(db: Session) -> set[tuple[int, str, str, str]]:
+    """Claves (paciente_id, nombre en minúscula, próxima fecha, tipo) ya avisadas."""
     return {
-        (a.paciente_id, a.vacuna.lower(), a.proxima_dosis)
+        (a.paciente_id, a.vacuna.lower(), a.proxima_dosis, a.tipo or "vacuna")
         for a in db.query(VacunaAvisada).all()
     }
 
 METODOS_PAGO = ["efectivo", "tarjeta", "yape", "plin"]
 
 DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+
+
+def _antiparasitarios_pendientes(db: Session) -> list[dict]:
+    """Última desparasitación de cada mascota que tenga próxima fecha anotada.
+
+    Devuelve la misma forma que un pendiente de vacuna (`vacuna`, `fecha`,
+    `proxima_dosis`…) para que recepción trabaje una sola lista y el frontend
+    no tenga que llevar dos modelos casi iguales.
+    """
+    filas = (
+        db.query(RegistroClinico)
+        .options(joinedload(RegistroClinico.paciente).joinedload(Paciente.cliente))
+        .filter(
+            RegistroClinico.tipo == "antiparasitario",
+            RegistroClinico.proxima_fecha.isnot(None),
+        )
+        .order_by(RegistroClinico.fecha.desc(), RegistroClinico.id.desc())
+        .all()
+    )
+    out: list[dict] = []
+    vistos: set[int] = set()
+    for r in filas:
+        if r.paciente_id in vistos:
+            continue
+        vistos.add(r.paciente_id)
+        pac = r.paciente
+        out.append({
+            "paciente_id": r.paciente_id,
+            "paciente": pac.nombre if pac else None,
+            "especie": pac.especie if pac else None,
+            "cliente_id": pac.cliente_id if pac else None,
+            "propietario": pac.cliente.nombre if pac and pac.cliente else None,
+            "telefono": pac.cliente.telefono if pac and pac.cliente else None,
+            "vacuna": r.producto or "Desparasitación",
+            "tipo": "antiparasitario",
+            "fecha_aplicada": r.fecha.isoformat() if r.fecha else None,
+            "proxima_dosis": r.proxima_fecha.isoformat(),
+            "fecha": r.proxima_fecha.isoformat(),
+        })
+    return out
 
 
 def _parse_fecha_libre(s: str | None) -> date | None:
@@ -83,11 +124,14 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         for c in citas_hoy
     ]
 
-    # ── Doctores en turno ahora (asistencia de hoy sin salida) ────────────────
-    presentes_rows = (
+    # ── Asistencias de hoy ────────────────────────────────────────────────────
+    # Quien está en turno ahora es un subconjunto de los que marcaron hoy: se
+    # traen una sola vez y se separan acá. Con la base en la nube cada consulta
+    # cuesta un viaje completo, y esta pantalla es la primera que todos abren.
+    asistencias_hoy_rows = (
         db.query(Asistencia)
         .options(joinedload(Asistencia.usuario))
-        .filter(Asistencia.fecha == hoy, Asistencia.hora_salida.is_(None))
+        .filter(Asistencia.fecha == hoy)
         .order_by(Asistencia.hora_ingreso)
         .all()
     )
@@ -97,17 +141,10 @@ def resumen_dashboard(db: Session = Depends(get_db)):
             "nombre": a.usuario.nombre if a.usuario else None,
             "hora_ingreso": a.hora_ingreso.isoformat() if a.hora_ingreso else None,
         }
-        for a in presentes_rows
+        for a in asistencias_hoy_rows
+        if a.hora_salida is None
     ]
 
-    # ── Todas las asistencias de hoy (para la tabla de marcación del dashboard) ──
-    asistencias_hoy_rows = (
-        db.query(Asistencia)
-        .options(joinedload(Asistencia.usuario))
-        .filter(Asistencia.fecha == hoy)
-        .order_by(Asistencia.hora_ingreso)
-        .all()
-    )
     asistencias_hoy = [
         {
             "id": a.id,
@@ -136,51 +173,67 @@ def resumen_dashboard(db: Session = Depends(get_db)):
     consultas_semana = [{"dia": DIAS[i], "consultas": conteo[i]} for i in range(7)]
     consultas_hoy = conteo[hoy.weekday()]
 
-    # ── Ventas: ingresos del día y del mes ────────────────────────────────────
+    # ── Cifras sueltas: ventas del día, del mes y totales generales ───────────
+    # Son cinco números independientes. Pedirlos por separado son cinco viajes
+    # a la base para traer cinco enteros; van en una sola consulta.
     # Las anuladas quedan fuera de TODOS los totales: si siguieran sumando,
     # anularlas no serviría de nada y la caja nunca cuadraría.
-    ingresos_dia = (
-        db.query(func.coalesce(func.sum(Venta.total), 0))
-        .filter(Venta.fecha >= hoy_ini, Venta.fecha < hoy_fin, Venta.anulada.is_(False))
-        .scalar()
-    )
-    ingresos_mes = (
-        db.query(func.coalesce(func.sum(Venta.total), 0))
-        .filter(Venta.fecha >= mes_ini, Venta.anulada.is_(False))
-        .scalar()
-    )
-    ventas_mes = (
-        db.query(func.count(Venta.id))
-        .filter(Venta.fecha >= mes_ini, Venta.anulada.is_(False))
-        .scalar()
+    def _suma_ventas(*condiciones):
+        return (
+            select(func.coalesce(func.sum(Venta.total), 0))
+            .where(Venta.anulada.is_(False), *condiciones)
+            .scalar_subquery()
+        )
+
+    ingresos_dia, ingresos_mes, ventas_mes, total_clientes, total_pacientes = db.execute(
+        select(
+            _suma_ventas(Venta.fecha >= hoy_ini, Venta.fecha < hoy_fin),
+            _suma_ventas(Venta.fecha >= mes_ini),
+            select(func.count(Venta.id))
+            .where(Venta.anulada.is_(False), Venta.fecha >= mes_ini)
+            .scalar_subquery(),
+            select(func.count(Cliente.id)).scalar_subquery(),
+            select(func.count(Paciente.id)).scalar_subquery(),
+        )
+    ).one()
+
+    # ── Inventario: stock bajo, vencidos y por vencer ─────────────────────────
+    # Las dos alertas salen de la misma tabla, así que se piden juntas y se
+    # separan acá. Un producto puede estar en las dos listas a la vez.
+    # Para vencimientos, 30 días alcanza para devolver al proveedor o rematar
+    # antes de perderlo. Sin stock no hay nada que retirar, así que no se avisa.
+    limite_venc = hoy + timedelta(days=30)
+    con_alerta = (
+        db.query(Producto)
+        .filter(
+            Producto.activo.is_(True),
+            or_(
+                Producto.stock <= Producto.stock_minimo,
+                (Producto.fecha_vencimiento.isnot(None))
+                & (Producto.fecha_vencimiento <= limite_venc)
+                & (Producto.stock > 0),
+            ),
+        )
+        .all()
     )
 
-    # ── Inventario: stock bajo ────────────────────────────────────────────────
-    stock_bajo = (
-        db.query(Producto)
-        .filter(Producto.activo.is_(True), Producto.stock <= Producto.stock_minimo)
-        .order_by(Producto.stock)
-        .all()
+    stock_bajo = sorted(
+        (p for p in con_alerta if p.stock <= p.stock_minimo),
+        key=lambda p: p.stock,
     )
     stock_bajo_out = [
         {"id": p.id, "codigo": p.codigo, "nombre": p.nombre, "stock": p.stock, "stock_minimo": p.stock_minimo}
         for p in stock_bajo
     ]
 
-    # ── Inventario: vencidos y por vencer ─────────────────────────────────────
-    # 30 días alcanza para devolver al proveedor o rematar antes de perderlo.
-    # Sin stock no hay nada que retirar, así que no se avisa.
-    limite_venc = hoy + timedelta(days=30)
-    por_vencer = (
-        db.query(Producto)
-        .filter(
-            Producto.activo.is_(True),
-            Producto.fecha_vencimiento.isnot(None),
-            Producto.fecha_vencimiento <= limite_venc,
-            Producto.stock > 0,
-        )
-        .order_by(Producto.fecha_vencimiento)
-        .all()
+    por_vencer = sorted(
+        (
+            p for p in con_alerta
+            if p.fecha_vencimiento is not None
+            and p.fecha_vencimiento <= limite_venc
+            and p.stock > 0
+        ),
+        key=lambda p: p.fecha_vencimiento,
     )
     por_vencer_out = [
         {
@@ -192,10 +245,6 @@ def resumen_dashboard(db: Session = Depends(get_db)):
         }
         for p in por_vencer
     ]
-
-    # ── Totales generales ─────────────────────────────────────────────────────
-    total_clientes = db.query(func.count(Cliente.id)).scalar()
-    total_pacientes = db.query(func.count(Paciente.id)).scalar()
 
     # ── Distribución por especie ──────────────────────────────────────────────
     especies_rows = (
@@ -256,7 +305,10 @@ def resumen_dashboard(db: Session = Depends(get_db)):
     vistos: set[tuple[int, str]] = set()  # (paciente_id, vacuna) — solo el registro más reciente
     for h in historias_vacunas:
         for item in (h.vacunas_items or []):
-            nombre_vac = (item.get("vacuna") or "").strip()
+            # Nombre canónico: "triple", "Triple felina" y "trivalente" son la
+            # misma vacuna, y contarlas aparte hacía que una mascota vacunada
+            # apareciera como pendiente para siempre.
+            nombre_vac = normalizar_vacuna((item.get("vacuna") or "").strip())
             prox = item.get("proxima_dosis")
             if not nombre_vac or not prox:
                 continue
@@ -267,7 +319,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
             # Este es el panel de "por hacer" de la recepción: una vez avisado
             # el dueño, desaparece de aquí (Vacunación conserva el historial
             # completo, avisadas incluidas).
-            if (h.paciente_id, nombre_vac.lower(), prox) in avisadas:
+            if (h.paciente_id, nombre_vac.lower(), prox, "vacuna") in avisadas:
                 continue
             fecha = _parse_fecha_libre(prox)
             pac = h.paciente
@@ -279,10 +331,20 @@ def resumen_dashboard(db: Session = Depends(get_db)):
                 "propietario": pac.cliente.nombre if pac and pac.cliente else None,
                 "telefono": pac.cliente.telefono if pac and pac.cliente else None,
                 "vacuna": nombre_vac,
+                "tipo": "vacuna",
                 "proxima_dosis": prox,
                 "fecha": fecha.isoformat() if fecha else None,
                 "vencida": bool(fecha and fecha < hoy),
             })
+
+    # ── Desparasitaciones con próxima fecha ───────────────────────────────────
+    # Misma bandeja: para recepción "a quién hay que llamar" es una sola lista,
+    # no una por módulo.
+    for reg in _antiparasitarios_pendientes(db):
+        if (reg["paciente_id"], reg["vacuna"].lower(), reg["proxima_dosis"], "antiparasitario") in avisadas:
+            continue
+        vacunas.append(reg | {"vencida": bool(reg["fecha"] and reg["fecha"] < hoy.isoformat())})
+
     # Primero las que tienen fecha (más urgentes), luego las de texto libre
     vacunas.sort(key=lambda v: (v["fecha"] is None, v["fecha"] or ""))
 
@@ -529,7 +591,9 @@ def vacunas(db: Session = Depends(get_db)):
     vistos: set[tuple[int, str]] = set()
     for h in historias:
         for item in (h.vacunas_items or []):
-            nombre = (item.get("vacuna") or "").strip()
+            # Ver core/vacunas.py: el nombre escrito era la identidad de la
+            # vacuna, así que las variantes de una misma nunca se agrupaban.
+            nombre = normalizar_vacuna((item.get("vacuna") or "").strip())
             if not nombre:
                 continue
             clave = (h.paciente_id, nombre.lower())
@@ -555,12 +619,27 @@ def vacunas(db: Session = Depends(get_db)):
                 "propietario": pac.cliente.nombre if pac and pac.cliente else None,
                 "telefono": pac.cliente.telefono if pac and pac.cliente else None,
                 "vacuna": nombre,
+                "tipo": "vacuna",
                 "fecha_aplicada": h.fecha.isoformat() if h.fecha else None,
                 "proxima_dosis": prox,
                 "fecha_proxima": fprox.isoformat() if fprox else None,
                 "estado": estado,
-                "avisado": bool(prox) and (h.paciente_id, nombre.lower(), prox) in avisadas,
+                "avisado": bool(prox) and (h.paciente_id, nombre.lower(), prox, "vacuna") in avisadas,
             })
+
+    # La desparasitación se sigue igual que una vacuna y se trabaja en la misma
+    # pantalla: para recepción es la misma tarea, llamar al dueño.
+    for reg in _antiparasitarios_pendientes(db):
+        fprox = _parse_fecha_libre(reg["proxima_dosis"])
+        estado = None
+        if fprox:
+            estado = "vencida" if fprox < hoy else ("proxima" if fprox <= pronto else "programada")
+        out.append(reg | {
+            "fecha_proxima": reg["fecha"],
+            "estado": estado,
+            "avisado": (reg["paciente_id"], reg["vacuna"].lower(), reg["proxima_dosis"], "antiparasitario") in avisadas,
+        })
+
     orden = {"vencida": 0, "proxima": 1, "programada": 2, None: 3}
     out.sort(key=lambda v: (orden.get(v["estado"], 3), v["fecha_proxima"] or "9999-99-99"))
     return out
@@ -570,6 +649,7 @@ class VacunaAvisoRequest(BaseModel):
     paciente_id: int
     vacuna: str
     proxima_dosis: str
+    tipo: str = "vacuna"
 
 
 @router.post("/vacunas/avisar", status_code=201)
@@ -586,6 +666,7 @@ def marcar_vacuna_avisada(
         paciente_id=payload.paciente_id,
         vacuna=payload.vacuna.strip(),
         proxima_dosis=payload.proxima_dosis,
+        tipo=payload.tipo if payload.tipo in ("vacuna", "antiparasitario") else "vacuna",
         avisado_por=usuario.usuario if usuario else None,
     )
     db.add(aviso)
@@ -602,6 +683,7 @@ def deshacer_vacuna_avisada(
     paciente_id: int = Query(...),
     vacuna: str = Query(...),
     proxima_dosis: str = Query(...),
+    tipo: str = Query("vacuna"),
     db: Session = Depends(get_db),
 ):
     """Deshace el aviso, por si se marcó por error."""
@@ -609,5 +691,6 @@ def deshacer_vacuna_avisada(
         VacunaAvisada.paciente_id == paciente_id,
         VacunaAvisada.vacuna == vacuna.strip(),
         VacunaAvisada.proxima_dosis == proxima_dosis,
+        VacunaAvisada.tipo == tipo,
     ).delete()
     db.commit()

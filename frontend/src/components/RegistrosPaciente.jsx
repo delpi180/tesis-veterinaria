@@ -14,6 +14,8 @@ const hoyStr = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+/** Se compara como texto ISO para no meter husos horarios en una fecha simple. */
+const vencida = (iso) => !!iso && iso < hoyStr()
 
 /**
  * Registro simple por mascota para antiparasitarios y estética.
@@ -26,6 +28,12 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
   const [items, setItems] = useState([])
   const [cargando, setCargando] = useState(true)
   const [fecha, setFecha] = useState(hoyStr())
+  // Cuándo toca repetirlo. Es lo que hace que la desparasitación entre en la
+  // bandeja de pendientes de recepción: antes quedaba anotado que se hizo y
+  // nadie se enteraba cuándo tocaba de nuevo.
+  const esAntiparasitario = tipo === 'antiparasitario'
+  const [proximaFecha, setProximaFecha] = useState('')
+  const [catalogo, setCatalogo] = useState([])
   const [producto, setProducto] = useState('')
   const [notas, setNotas] = useState('')
   const [archivo, setArchivo] = useState(null)
@@ -44,6 +52,27 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
   }
   useEffect(() => { if (pacienteId) cargar() }, [pacienteId, tipo])
 
+  useEffect(() => {
+    if (!esAntiparasitario) return
+    api.get('/api/catalogos/antiparasitarios')
+      .then(c => setCatalogo(Array.isArray(c) ? c : []))
+      .catch(() => setCatalogo([]))
+  }, [esAntiparasitario])
+
+  // Al elegir un producto del catálogo se propone la próxima fecha con su
+  // intervalo habitual; se puede corregir a mano.
+  const elegirProducto = (nombre) => {
+    setProducto(nombre)
+    const entrada = catalogo.find(c => c.nombre === nombre)
+    if (entrada?.intervalo_dias) {
+      const base = new Date(fecha || hoyStr())
+      if (!isNaN(base.getTime())) {
+        base.setDate(base.getDate() + entrada.intervalo_dias)
+        setProximaFecha(base.toISOString().slice(0, 10))
+      }
+    }
+  }
+
   const agregar = async (e) => {
     e.preventDefault()
     if (!producto.trim() && !notas.trim()) { toast.error('Ingresa al menos el producto o una nota.'); return }
@@ -51,6 +80,7 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
     try {
       let nuevo = await api.post(`/api/pacientes/${pacienteId}/registros/`, {
         tipo, fecha, producto: producto.trim() || null, notas: notas.trim() || null,
+        proxima_fecha: esAntiparasitario ? (proximaFecha || null) : null,
       })
       if (esComplementario && archivo) {
         const fd = new FormData()
@@ -66,7 +96,7 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
         }
       }
       setItems(prev => [nuevo, ...prev])
-      setProducto(''); setNotas(''); setFecha(hoyStr()); setArchivo(null)
+      setProducto(''); setNotas(''); setFecha(hoyStr()); setArchivo(null); setProximaFecha('')
       toast.success('Registro agregado.')
     } catch (err) {
       toast.error(err.message)
@@ -136,6 +166,16 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
         </div>
         <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
           <label className="text-xs font-semibold text-slate-500">{labelProducto}</label>
+          {esAntiparasitario && catalogo.length > 0 && (
+            <select
+              value={catalogo.some(c => c.nombre === producto) ? producto : ''}
+              onChange={e => e.target.value && elegirProducto(e.target.value)}
+              className="text-sm px-2 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+            >
+              <option value="">Elegir del catálogo…</option>
+              {catalogo.map(c => <option key={c.nombre} value={c.nombre}>{c.nombre}</option>)}
+            </select>
+          )}
           <input type="text" value={producto} onChange={e => setProducto(e.target.value)}
             placeholder={{
               antiparasitario: 'Ej. Bravecto, Drontal…',
@@ -150,6 +190,13 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
             placeholder="Opcional"
             className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
         </div>
+        {esAntiparasitario && (
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-semibold text-slate-500">Próxima aplicación</label>
+            <input type="date" value={proximaFecha} onChange={e => setProximaFecha(e.target.value)}
+              className="text-sm px-2 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+          </div>
+        )}
         {esComplementario && (
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-slate-500">Archivo (opcional)</label>
@@ -177,6 +224,7 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
             <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 bg-slate-50">
               <th className="text-left px-5 py-3 font-semibold">Fecha</th>
               <th className="text-left px-5 py-3 font-semibold">{labelProducto}</th>
+              {esAntiparasitario && <th className="text-left px-5 py-3 font-semibold">Próxima</th>}
               <th className="text-left px-5 py-3 font-semibold">Notas</th>
               {esComplementario && <th className="text-left px-5 py-3 font-semibold">Archivo</th>}
               <th className="px-5 py-3" />
@@ -187,6 +235,15 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
               <tr key={it.id} className="border-b border-slate-50">
                 <td className="px-5 py-3 text-slate-500 whitespace-nowrap">{fmtFecha(it.fecha)}</td>
                 <td className="px-5 py-3 font-medium text-slate-800">{it.producto || '—'}</td>
+                {esAntiparasitario && (
+                  <td className="px-5 py-3 whitespace-nowrap">
+                    {it.proxima_fecha
+                      ? <span className={vencida(it.proxima_fecha) ? 'text-rose-600 font-semibold' : 'text-slate-600'}>
+                          {fmtFecha(it.proxima_fecha)}{vencida(it.proxima_fecha) ? ' · vencida' : ''}
+                        </span>
+                      : <span className="text-slate-400">—</span>}
+                  </td>
+                )}
                 <td className="px-5 py-3 text-slate-500">{it.notas || '—'}</td>
                 {esComplementario && (
                   <td className="px-5 py-3">

@@ -26,12 +26,19 @@ const FILTROS = [
   { key: 'vencida',    label: 'Vencidas' },
   { key: 'proxima',    label: 'Próximas (30 días)' },
   { key: 'sin',        label: 'Sin próxima dosis' },
+  // La desparasitación se sigue igual que una vacuna: para recepción es la
+  // misma tarea (llamar al dueño), así que se trabaja en la misma lista.
+  { key: 'vacunas',        label: 'Solo vacunas' },
+  { key: 'antiparasitario', label: 'Solo desparasitación' },
 ]
 
-const waLink = (tel, propietario, paciente, vacuna) => {
+const waLink = (tel, propietario, paciente, vacuna, tipo) => {
   const num = (tel || '').replace(/\D/g, '')
   const intl = num.length === 9 ? `51${num}` : num
-  const msg = `Hola ${propietario || ''}, le recordamos que ${paciente || 'su mascota'} tiene pendiente la vacuna *${vacuna}* en ${clinicaActual().nombre}. ¡Le esperamos!`
+  const que = tipo === 'antiparasitario'
+    ? `la desparasitación (*${vacuna}*)`
+    : `la vacuna *${vacuna}*`
+  const msg = `Hola ${propietario || ''}, le recordamos que ${paciente || 'su mascota'} tiene pendiente ${que} en ${clinicaActual().nombre}. ¡Le esperamos!`
   return `https://wa.me/${intl}?text=${encodeURIComponent(msg)}`
 }
 
@@ -61,6 +68,7 @@ export default function Vacunacion() {
     try {
       await api.post('/api/dashboard/vacunas/avisar', {
         paciente_id: v.paciente_id, vacuna: v.vacuna, proxima_dosis: v.proxima_dosis,
+        tipo: v.tipo ?? 'vacuna',
       })
     } catch {
       setItems(prev => prev.map(x => x === v ? { ...x, avisado: false } : x))
@@ -72,6 +80,8 @@ export default function Vacunacion() {
     if (filtro === 'vencida'  && v.estado !== 'vencida') return false
     if (filtro === 'proxima'  && v.estado !== 'proxima') return false
     if (filtro === 'sin'      && v.estado !== null) return false
+    if (filtro === 'vacunas'  && (v.tipo ?? 'vacuna') !== 'vacuna') return false
+    if (filtro === 'antiparasitario' && v.tipo !== 'antiparasitario') return false
     if (term) {
       const txt = `${v.paciente ?? ''} ${v.propietario ?? ''} ${v.vacuna ?? ''}`.toLowerCase()
       if (!txt.includes(term)) return false
@@ -88,9 +98,10 @@ export default function Vacunacion() {
   const proximas = items.filter(v => v.estado === 'proxima').length
 
   const exportarCSV = () => {
-    const cab = ['Paciente', 'Especie', 'Vacuna', 'Aplicada', 'Proxima dosis', 'Estado', 'Dueno', 'Telefono']
+    const cab = ['Paciente', 'Especie', 'Tipo', 'Vacuna/Producto', 'Aplicada', 'Proxima dosis', 'Estado', 'Dueno', 'Telefono']
     const filas = filtrados.map(v => [
-      v.paciente, v.especie, v.vacuna, fmtFecha(v.fecha_aplicada), v.proxima_dosis ?? '',
+      v.paciente, v.especie, v.tipo === 'antiparasitario' ? 'Desparasitación' : 'Vacuna',
+      v.vacuna, fmtFecha(v.fecha_aplicada), v.proxima_dosis ?? '',
       (ESTADO[v.estado] ?? ESTADO.null).label, v.propietario, v.telefono ?? '',
     ].map(x => `"${String(x ?? '').replace(/"/g, '""')}"`).join(','))
     const csv = '﻿' + [cab.join(','), ...filas].join('\r\n')
@@ -195,7 +206,14 @@ export default function Vacunacion() {
                         </button>
                         <p className="text-xs text-slate-400">{v.especie}</p>
                       </td>
-                      <td className="px-5 py-3 text-slate-700">{v.vacuna}</td>
+                      <td className="px-5 py-3 text-slate-700">
+                        {v.vacuna}
+                        {v.tipo === 'antiparasitario' && (
+                          <span className="ml-2 text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-1.5 py-0.5 rounded">
+                            Desparasitación
+                          </span>
+                        )}
+                      </td>
                       <td className="px-5 py-3 text-slate-500">{fmtFecha(v.fecha_aplicada)}</td>
                       <td className="px-5 py-3 text-slate-600">{v.proxima_dosis || '—'}</td>
                       <td className="px-5 py-3 text-center">
@@ -219,7 +237,7 @@ export default function Vacunacion() {
                             </button>
                           )}
                           {v.telefono && (
-                            <a href={waLink(v.telefono, v.propietario, v.paciente, v.vacuna)} target="_blank" rel="noopener noreferrer"
+                            <a href={waLink(v.telefono, v.propietario, v.paciente, v.vacuna, v.tipo)} target="_blank" rel="noopener noreferrer"
                               title="Recordar por WhatsApp"
                               className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-green-600 hover:bg-green-500 text-white transition">
                               <MessageCircle className="w-3.5 h-3.5" />

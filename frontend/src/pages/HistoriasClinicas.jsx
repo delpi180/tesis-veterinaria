@@ -112,7 +112,7 @@ const FIELD_TO_SECTION = {
 const eopVacio = () =>
   Object.fromEntries(SISTEMAS_EOP.map(s => [s, { estado: "", detalle: "" }]));
 
-const TX_EMPTY = { medicamento: "", dosis: "", via: "", frecuencia: "", duracion: "" };
+const TX_EMPTY = { medicamento: "", dosis: "", via: "", frecuencia: "", duracion_dias: "" };
 const VX_EMPTY = { vacuna: "", lote: "", proxima_dosis: "" };
 
 const FORM_VACIO = {
@@ -215,8 +215,14 @@ export function buildPayload(form) {
   out.examen_particular = Object.keys(ep).length > 0 ? ep : null;
   const tx = (form.tratamiento_items || []).filter(i => i.medicamento?.trim());
   out.tratamiento_items = tx.length > 0
-    ? tx.map(i => ({ medicamento: i.medicamento||null, dosis: i.dosis||null,
-        via: i.via||null, frecuencia: i.frecuencia||null, duracion: i.duracion||null }))
+    ? tx.map(i => ({
+        medicamento: i.medicamento||null, dosis: i.dosis||null,
+        via: i.via||null, frecuencia: i.frecuencia||null,
+        duracion_dias: Number(i.duracion_dias) > 0 ? Math.round(Number(i.duracion_dias)) : null,
+        // Lo escrito antes a mano se conserva tal cual: es lo que dice la
+        // historia clínica de ese día y no se reescribe al editarla.
+        duracion: i.duracion||null,
+      }))
     : null;
   const vx = (form.vacunas_items || []).filter(i => i.vacuna?.trim());
   out.vacunas_items = vx.length > 0
@@ -247,7 +253,8 @@ function formFromHistoria(h) {
   f.tratamiento_items = Array.isArray(h.tratamiento_items)
     ? h.tratamiento_items.map(i => ({
         medicamento: i.medicamento||"", dosis: i.dosis||"",
-        via: i.via||"", frecuencia: i.frecuencia||"", duracion: i.duracion||"" }))
+        via: i.via||"", frecuencia: i.frecuencia||"",
+        duracion_dias: i.duracion_dias ?? "", duracion: i.duracion||"" }))
     : [];
   f.vacunas_items = Array.isArray(h.vacunas_items)
     ? h.vacunas_items.map(i => ({ vacuna: i.vacuna||"", lote: i.lote||"", proxima_dosis: i.proxima_dosis||"" }))
@@ -398,10 +405,20 @@ function LoQueSeOyo({ texto }) {
   );
 }
 
-function TratamientoList({ items, onChange }) {
+function TratamientoList({ items, onChange, desde }) {
   const add    = () => onChange([...items, { ...TX_EMPTY }]);
   const remove = i  => onChange(items.filter((_, idx) => idx !== i));
   const update = (i, f, v) => { const n = [...items]; n[i] = { ...n[i], [f]: v }; onChange(n); };
+  // Fecha de fin: se calcula desde la fecha de la consulta, no desde hoy —
+  // una consulta que se digitaliza días después no reinicia el tratamiento.
+  const fin = (item) => {
+    const dias = Number(item.duracion_dias);
+    if (!dias || dias < 1) return null;
+    const inicio = desde ? new Date(desde) : new Date();
+    if (isNaN(inicio.getTime())) return null;
+    inicio.setDate(inicio.getDate() + dias - 1);
+    return inicio.toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" });
+  };
   return (
     <div className="space-y-2">
       {items.map((item, i) => (
@@ -420,14 +437,32 @@ function TratamientoList({ items, onChange }) {
               <TIn value={item.frecuencia} onChange={e => update(i,"frecuencia",e.target.value)} placeholder="c/12h" />
             </Field>
             <div className="flex items-end gap-1.5 col-span-1 sm:col-span-1">
-              <Field label="Duración" cls="flex-1">
-                <TIn value={item.duracion} onChange={e => update(i,"duracion",e.target.value)} placeholder="5 días" />
+              {/* Duración en DÍAS, no en texto libre.
+                  Con "5 días", "cinco días" o "unos días" no hay forma de
+                  calcular cuándo termina el tratamiento, y sin eso no existe
+                  control: no se puede saber qué termina hoy ni quién lo dejó a
+                  medias. En la base real, 37 de 39 ítems no tenían duración y
+                  los otros dos estaban escritos a mano. */}
+              <Field label="Duración (días)" cls="flex-1">
+                <input
+                  type="number" min="1" max="365" inputMode="numeric"
+                  value={item.duracion_dias ?? ""}
+                  onChange={e => update(i, "duracion_dias", e.target.value)}
+                  placeholder="5"
+                  className={hlInput()}
+                />
               </Field>
               <button type="button" onClick={() => remove(i)}
                 className="mb-0.5 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
                 <Trash2 size={13} />
               </button>
             </div>
+            {fin(item) && (
+              <p className="col-span-1 sm:col-span-6 text-[11px] text-slate-500">
+                Termina el <strong className="text-slate-700">{fin(item)}</strong>
+                {item.duracion ? <span className="text-slate-400"> · antes decía “{item.duracion}”</span> : null}
+              </p>
+            )}
             <LoQueSeOyo texto={item.dicho} />
           </div>
         </div>
@@ -440,32 +475,102 @@ function TratamientoList({ items, onChange }) {
   );
 }
 
-function VacunaList({ items, onChange }) {
+/**
+ * Vacunas de la consulta.
+ *
+ * La vacuna se elige del catálogo (lo escrito a mano era la identidad de la
+ * vacuna: siete dosis registradas tenían siete nombres distintos, y el
+ * consolidado "última dosis de cada vacuna" no agrupaba nada) y la próxima
+ * dosis es una FECHA, no texto. El campo aceptaba texto libre y el motor de
+ * avisos solo entiende fechas: "En 1 año" —el propio ejemplo que sugería el
+ * formulario— nunca generó un recordatorio.
+ */
+function VacunaList({ items, onChange, catalogo, especie, desde }) {
   const add    = () => onChange([...items, { ...VX_EMPTY }]);
   const remove = i  => onChange(items.filter((_, idx) => idx !== i));
   const update = (i, f, v) => { const n = [...items]; n[i] = { ...n[i], [f]: v }; onChange(n); };
+
+  const esp = (especie || "").toLowerCase();
+  const sugeridas = catalogo.filter(v => !v.especie || !esp || esp.startsWith(v.especie));
+  const otras     = catalogo.filter(v => !sugeridas.includes(v));
+
+  // Al elegir la vacuna se propone la próxima dosis con el intervalo del
+  // catálogo. Se puede corregir: es una propuesta, no una imposición.
+  const elegir = (i, nombre) => {
+    const entrada = catalogo.find(v => v.nombre === nombre);
+    const n = [...items];
+    n[i] = { ...n[i], vacuna: nombre };
+    if (entrada?.intervalo_dias && !n[i].proxima_dosis) {
+      const base = desde ? new Date(desde) : new Date();
+      if (!isNaN(base.getTime())) {
+        base.setDate(base.getDate() + entrada.intervalo_dias);
+        n[i].proxima_dosis = base.toISOString().slice(0, 10);
+      }
+    }
+    onChange(n);
+  };
+
   return (
     <div className="space-y-2">
-      {items.map((item, i) => (
+      {items.map((item, i) => {
+        const enCatalogo = catalogo.some(v => v.nombre === item.vacuna);
+        const nota = catalogo.find(v => v.nombre === item.vacuna)?.nota;
+        return (
         <div key={i} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end p-2.5 bg-slate-50 border border-slate-200 rounded-md">
           <Field label="Vacuna">
-            <TIn value={item.vacuna} onChange={e => update(i,"vacuna",e.target.value)} placeholder="Antirrábica" />
+            <select
+              value={enCatalogo ? item.vacuna : (item.vacuna ? "__otra__" : "")}
+              onChange={e => e.target.value === "__otra__"
+                ? update(i, "vacuna", item.vacuna && !enCatalogo ? item.vacuna : " ")
+                : elegir(i, e.target.value)}
+              className={hlInput()}
+            >
+              <option value="">Elegir…</option>
+              {sugeridas.map(v => <option key={v.nombre} value={v.nombre}>{v.nombre}</option>)}
+              {otras.length > 0 && (
+                <optgroup label="Otras especies">
+                  {otras.map(v => <option key={v.nombre} value={v.nombre}>{v.nombre}</option>)}
+                </optgroup>
+              )}
+              <option value="__otra__">Otra (escribir)…</option>
+            </select>
+            {/* Lo dictado o lo ya guardado que no está en el catálogo se
+                conserva y se puede corregir a mano; nunca se descarta. */}
+            {item.vacuna && !enCatalogo && (
+              <TIn value={item.vacuna.trim() === "" ? "" : item.vacuna}
+                onChange={e => update(i, "vacuna", e.target.value)}
+                placeholder="Nombre de la vacuna" className="mt-1" />
+            )}
           </Field>
           <Field label="Lote">
             <TIn value={item.lote} onChange={e => update(i,"lote",e.target.value)} placeholder="AB12345" />
           </Field>
           <div className="flex items-end gap-1.5">
             <Field label="Próxima dosis" cls="flex-1">
-              <TIn value={item.proxima_dosis} onChange={e => update(i,"proxima_dosis",e.target.value)} placeholder="En 1 año" />
+              <input
+                type="date"
+                value={/^\d{4}-\d{2}-\d{2}$/.test(item.proxima_dosis || "") ? item.proxima_dosis : ""}
+                onChange={e => update(i, "proxima_dosis", e.target.value)}
+                className={hlInput()}
+              />
             </Field>
             <button type="button" onClick={() => remove(i)}
               className="mb-0.5 p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
               <Trash2 size={13} />
             </button>
           </div>
+          {/* Lo guardado antes como texto ("En 1 año") no se borra: se muestra
+              para que quien edite la consulta pueda convertirlo en fecha. */}
+          {item.proxima_dosis && !/^\d{4}-\d{2}-\d{2}$/.test(item.proxima_dosis) && (
+            <p className="sm:col-span-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+              Estaba anotado como “{item.proxima_dosis}”: sin una fecha no se puede avisar al dueño.
+            </p>
+          )}
+          {nota && <p className="sm:col-span-3 text-[11px] text-slate-500">{nota}</p>}
           <LoQueSeOyo texto={item.dicho} />
         </div>
-      ))}
+        );
+      })}
       <button type="button" onClick={add}
         className="flex items-center gap-1.5 text-xs font-medium text-purple-700 hover:text-purple-900 border border-dashed border-purple-300 rounded-md px-3 py-1.5 hover:bg-purple-50 transition-colors">
         <Plus size={13} /> Agregar vacuna
@@ -599,7 +704,10 @@ function HistoriaCard({ h, onEdit, onDelete }) {
           <DRow label="Exámenes" value={h.examenes_solicitados} />
           {txItems.map((t, i) => (
             <DRow key={i} label={`Tto ${i+1}`}
-              value={[t.medicamento,t.dosis,t.via,t.frecuencia,t.duracion].filter(Boolean).join(" · ")} />
+              value={[
+                t.medicamento, t.dosis, t.via, t.frecuencia,
+                t.duracion_dias ? `${t.duracion_dias} día${t.duracion_dias > 1 ? "s" : ""}` : t.duracion,
+              ].filter(Boolean).join(" · ")} />
           ))}
           {vxItems.map((v, i) => (
             <DRow key={i} label={`Vac ${i+1}`}
@@ -742,6 +850,7 @@ export default function HistoriasClinicas() {
   const llenaRecepcion = !esVeterinario();
   const [doctores, setDoctores] = useState([]);
   const [vetId, setVetId] = useState("");
+  const [catalogoVacunas, setCatalogoVacunas] = useState([]);
 
   // ── Métrica de tiempo: cuándo empezó el registro y si se usó IA
   const inicioRegistro = useRef(Date.now());
@@ -760,6 +869,15 @@ export default function HistoriasClinicas() {
       .catch(() => setError("No se pudo cargar el paciente."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Catálogo de vacunas. Vive en el backend porque es el mismo que usa la
+  // consolidación para agrupar; si falla, el desplegable queda vacío y la
+  // vacuna se sigue pudiendo escribir a mano ("Otra").
+  useEffect(() => {
+    api.get("/api/catalogos/vacunas")
+      .then(v => setCatalogoVacunas(Array.isArray(v) ? v : []))
+      .catch(() => setCatalogoVacunas([]));
+  }, []);
 
   // ── Salir con la consulta a medio llenar ───────────────────────────────────
   // El borrador la salva, pero nadie lo sabe en el momento: sin aviso, cerrar
@@ -1347,12 +1465,13 @@ export default function HistoriasClinicas() {
             </Field>
             <div>
               <p className={lCls}>Medicamentos</p>
-              <TratamientoList items={form.tratamiento_items}
+              <TratamientoList items={form.tratamiento_items} desde={form.fecha || undefined}
                 onChange={v => { setForm(p => ({ ...p, tratamiento_items: v })); }} />
             </div>
             <div>
               <p className={lCls}>Vacunas aplicadas</p>
-              <VacunaList items={form.vacunas_items}
+              <VacunaList items={form.vacunas_items} catalogo={catalogoVacunas}
+                especie={paciente?.especie} desde={form.fecha || undefined}
                 onChange={v => { setForm(p => ({ ...p, vacunas_items: v })); }} />
             </div>
             <Field label="Indicaciones al propietario" hl={highlights.indicaciones}>

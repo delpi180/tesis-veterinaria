@@ -498,6 +498,7 @@ def crear_registro(
         paciente_id=paciente_id,
         tipo=payload.tipo,
         fecha=datos.get("fecha"),  # si viene None, el default del modelo pone hoy
+        proxima_fecha=datos.get("proxima_fecha"),
         producto=(payload.producto or None),
         notas=(payload.notas or None),
         registrado_por=usuario.usuario if usuario else None,

@@ -843,6 +843,9 @@ class DocumentoOut(BaseModel):
 class RegistroClinicoCreate(BaseModel):
     tipo:     Literal["antiparasitario", "estetica", "complementario"]
     fecha:    Optional[date] = None
+    # Cuándo toca repetirlo. Es lo que mete a la desparasitación en la bandeja
+    # de pendientes de recepción, igual que una vacuna.
+    proxima_fecha: Optional[date] = None
     producto: Optional[str] = None
     notas:    Optional[str] = None
 
@@ -852,6 +855,7 @@ class RegistroClinicoOut(BaseModel):
     paciente_id:    int
     tipo:           str
     fecha:          date
+    proxima_fecha:  Optional[date] = None
     producto:       Optional[str] = None
     notas:          Optional[str] = None
     registrado_por: Optional[str] = None
