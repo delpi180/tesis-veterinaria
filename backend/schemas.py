@@ -581,6 +581,9 @@ class VentaItemCreate(BaseModel):
 
 class VentaCreate(BaseModel):
     cliente_id:    int
+    # Para cuál de sus mascotas. Opcional: la comida y los accesorios son del
+    # dueño. Cuando se indica, la entrega queda atada al tratamiento.
+    paciente_id:   Optional[int] = None
     metodo_pago:   Literal['efectivo', 'tarjeta', 'yape', 'plin'] = 'efectivo'
     descuento_pct: float = Field(0, ge=0, le=100)   # % de descuento sobre el subtotal
     items:         list[VentaItemCreate] = Field(min_length=1)
@@ -631,6 +634,8 @@ class VentaOut(BaseModel):
     cliente_id:    int
     cliente_nombre: Optional[str] = None
     cliente_dni:    Optional[str] = None
+    paciente_id:    Optional[int] = None
+    paciente_nombre: Optional[str] = None
     fecha:         datetime
     total:         float                      # total final (con descuento)
     descuento_pct: float = 0

@@ -112,7 +112,7 @@ const FIELD_TO_SECTION = {
 const eopVacio = () =>
   Object.fromEntries(SISTEMAS_EOP.map(s => [s, { estado: "", detalle: "" }]));
 
-const TX_EMPTY = { medicamento: "", dosis: "", via: "", frecuencia: "", duracion_dias: "" };
+const TX_EMPTY = { medicamento: "", producto_id: null, dosis: "", via: "", frecuencia: "", duracion_dias: "" };
 const VX_EMPTY = { vacuna: "", lote: "", proxima_dosis: "" };
 
 const FORM_VACIO = {
@@ -216,7 +216,8 @@ export function buildPayload(form) {
   const tx = (form.tratamiento_items || []).filter(i => i.medicamento?.trim());
   out.tratamiento_items = tx.length > 0
     ? tx.map(i => ({
-        medicamento: i.medicamento||null, dosis: i.dosis||null,
+        medicamento: i.medicamento||null, producto_id: i.producto_id ?? null,
+        dosis: i.dosis||null,
         via: i.via||null, frecuencia: i.frecuencia||null,
         duracion_dias: Number(i.duracion_dias) > 0 ? Math.round(Number(i.duracion_dias)) : null,
         // Lo escrito antes a mano se conserva tal cual: es lo que dice la
@@ -252,8 +253,8 @@ function formFromHistoria(h) {
   f.examen_particular = ep;
   f.tratamiento_items = Array.isArray(h.tratamiento_items)
     ? h.tratamiento_items.map(i => ({
-        medicamento: i.medicamento||"", dosis: i.dosis||"",
-        via: i.via||"", frecuencia: i.frecuencia||"",
+        medicamento: i.medicamento||"", producto_id: i.producto_id ?? null,
+        dosis: i.dosis||"", via: i.via||"", frecuencia: i.frecuencia||"",
         duracion_dias: i.duracion_dias ?? "", duracion: i.duracion||"" }))
     : [];
   f.vacunas_items = Array.isArray(h.vacunas_items)
@@ -405,10 +406,25 @@ function LoQueSeOyo({ texto }) {
   );
 }
 
-function TratamientoList({ items, onChange, desde }) {
+function TratamientoList({ items, onChange, desde, medicamentos = [] }) {
   const add    = () => onChange([...items, { ...TX_EMPTY }]);
   const remove = i  => onChange(items.filter((_, idx) => idx !== i));
   const update = (i, f, v) => { const n = [...items]; n[i] = { ...n[i], [f]: v }; onChange(n); };
+
+  // Al escribir el medicamento se busca en el inventario de la clínica. Si
+  // coincide, queda enlazado al producto: así se puede avisar del vencimiento
+  // aquí mismo y saber después si el dueño llegó a llevárselo. Si no coincide,
+  // no pasa nada: se receta lo que el animal necesita, no solo lo que hay en
+  // el estante.
+  const escribirMedicamento = (i, texto) => {
+    const encontrado = medicamentos.find(
+      p => p.nombre.toLowerCase() === texto.trim().toLowerCase());
+    const n = [...items];
+    n[i] = { ...n[i], medicamento: texto, producto_id: encontrado ? encontrado.id : null };
+    onChange(n);
+  };
+  const producto = (item) => medicamentos.find(p => p.id === item.producto_id);
+  const hoyISO = new Date().toISOString().slice(0, 10);
   // Fecha de fin: se calcula desde la fecha de la consulta, no desde hoy —
   // una consulta que se digitaliza días después no reinicia el tratamiento.
   const fin = (item) => {
@@ -425,7 +441,13 @@ function TratamientoList({ items, onChange, desde }) {
         <div key={i} className="p-2.5 bg-slate-50 border border-slate-200 rounded-md">
           <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
             <Field label="Medicamento" cls="col-span-1 sm:col-span-2">
-              <TIn value={item.medicamento} onChange={e => update(i,"medicamento",e.target.value)} placeholder="Metronidazol" />
+              <input
+                list="inventario-medicamentos"
+                value={item.medicamento}
+                onChange={e => escribirMedicamento(i, e.target.value)}
+                placeholder="Metronidazol"
+                className={hlInput()}
+              />
             </Field>
             <Field label="Dosis" cls="col-span-1 sm:col-span-1">
               <TIn value={item.dosis} onChange={e => update(i,"dosis",e.target.value)} placeholder="15 mg/kg" />
@@ -457,6 +479,29 @@ function TratamientoList({ items, onChange, desde }) {
                 <Trash2 size={13} />
               </button>
             </div>
+            {(() => {
+              const p = producto(item);
+              if (!p) return null;
+              const vencido = p.fecha_vencimiento && p.fecha_vencimiento <= hoyISO;
+              const sinStock = (p.stock ?? 0) <= 0;
+              if (!vencido && !sinStock) {
+                return (
+                  <p className="col-span-1 sm:col-span-6 text-[11px] text-emerald-700">
+                    En inventario · {p.stock} {p.unidad || 'u'} disponible{p.stock === 1 ? '' : 's'}
+                  </p>
+                );
+              }
+              // Avisa, no bloquea: el doctor puede indicarlo igual y que el
+              // dueño lo compre afuera. Lo que no puede pasar es que nadie se
+              // entere hasta que el cliente está en el mostrador.
+              return (
+                <p className="col-span-1 sm:col-span-6 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                  {vencido
+                    ? `Ojo: el lote de ${p.nombre} venció el ${p.fecha_vencimiento.split('-').reverse().join('/')}. No se podrá entregar.`
+                    : `Ojo: no queda stock de ${p.nombre} en la clínica.`}
+                </p>
+              );
+            })()}
             {fin(item) && (
               <p className="col-span-1 sm:col-span-6 text-[11px] text-slate-500">
                 Termina el <strong className="text-slate-700">{fin(item)}</strong>
@@ -467,6 +512,9 @@ function TratamientoList({ items, onChange, desde }) {
           </div>
         </div>
       ))}
+      <datalist id="inventario-medicamentos">
+        {medicamentos.map(p => <option key={p.id} value={p.nombre} />)}
+      </datalist>
       <button type="button" onClick={add}
         className="flex items-center gap-1.5 text-xs font-medium text-purple-700 hover:text-purple-900 border border-dashed border-purple-300 rounded-md px-3 py-1.5 hover:bg-purple-50 transition-colors">
         <Plus size={13} /> Agregar medicamento
@@ -851,6 +899,7 @@ export default function HistoriasClinicas() {
   const [doctores, setDoctores] = useState([]);
   const [vetId, setVetId] = useState("");
   const [catalogoVacunas, setCatalogoVacunas] = useState([]);
+  const [medicamentos, setMedicamentos] = useState([]);
 
   // ── Métrica de tiempo: cuándo empezó el registro y si se usó IA
   const inicioRegistro = useRef(Date.now());
@@ -877,6 +926,11 @@ export default function HistoriasClinicas() {
     api.get("/api/catalogos/vacunas")
       .then(v => setCatalogoVacunas(Array.isArray(v) ? v : []))
       .catch(() => setCatalogoVacunas([]));
+    // Medicamentos del inventario, para enlazar lo recetado con lo que la
+    // clínica tiene. Si falla, el campo sigue siendo texto libre.
+    api.get("/api/productos/?categoria=medicamento&limit=500")
+      .then(p => setMedicamentos(Array.isArray(p) ? p : []))
+      .catch(() => setMedicamentos([]));
   }, []);
 
   // ── Salir con la consulta a medio llenar ───────────────────────────────────
@@ -1466,6 +1520,7 @@ export default function HistoriasClinicas() {
             <div>
               <p className={lCls}>Medicamentos</p>
               <TratamientoList items={form.tratamiento_items} desde={form.fecha || undefined}
+                medicamentos={medicamentos}
                 onChange={v => { setForm(p => ({ ...p, tratamiento_items: v })); }} />
             </div>
             <div>

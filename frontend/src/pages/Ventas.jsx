@@ -214,6 +214,11 @@ export default function Ventas() {
   // ── Modal nueva venta (POS) ────────────────────────────────────────────────
   const [modalAbierto, setModalAbierto] = useState(false)
   const [clienteId,    setClienteId]    = useState('')
+  // Para cuál de sus mascotas. Opcional: la comida y los accesorios son del
+  // dueño. Cuando se indica, la entrega del medicamento queda atada al
+  // tratamiento y Tratamientos puede mostrar quién ya pasó a recogerlo.
+  const [pacienteId,   setPacienteId]   = useState('')
+  const [mascotas,     setMascotas]     = useState([])
   const [cliBusq,       setCliBusq]       = useState('')
   const [cliBuscando,   setCliBuscando]   = useState(false)
   const [cliResultados, setCliResultados] = useState([])
@@ -319,12 +324,22 @@ export default function Ventas() {
     setSelectedClientObj(c)
     setCliSelLabel(`${c.nombre}${c.dni ? ` (${c.dni})` : ''}`)
     setCliBusq(''); setCliResultados([])
+    setPacienteId('')
+    api.get(`/api/clientes/${c.id}/pacientes/`)
+      .then(m => {
+        const lista = Array.isArray(m) ? m : []
+        setMascotas(lista)
+        // Con una sola mascota no tiene sentido preguntar.
+        if (lista.length === 1) setPacienteId(String(lista[0].id))
+      })
+      .catch(() => setMascotas([]))
   }
 
   const limpiarCliente = () => {
     setClienteId('')
     setSelectedClientObj(null)
     setCliSelLabel('')
+    setPacienteId(''); setMascotas([])
   }
 
 
@@ -381,6 +396,7 @@ export default function Ventas() {
   // ── Carrito (POS) ──────────────────────────────────────────────────────────
   const abrirModal = () => {
     setClienteId(''); setCliSelLabel(''); setCliBusq(''); setCliResultados([]); setSelectedClientObj(null)
+    setPacienteId(''); setMascotas([])
     setMetodoPago('efectivo'); setDescuentoPct(''); setCarrito([]); setTab('producto')
     setCatBusqueda(''); setCatCategoria(''); setErrorModal(null); setPosVista('catalogo')
     setModalAbierto(true)
@@ -457,6 +473,7 @@ export default function Ventas() {
     try {
       const venta = await api.post('/api/ventas/', {
         cliente_id:    parseInt(clienteId, 10),
+        paciente_id:   pacienteId ? parseInt(pacienteId, 10) : null,
         metodo_pago:   metodoPago,
         descuento_pct: descPct,
         items: carrito.map(l => l.tipo === 'producto'
@@ -698,12 +715,30 @@ export default function Ventas() {
               <p className="text-sm font-bold text-slate-800 whitespace-nowrap">Nueva Venta</p>
               <div className="flex-1 max-w-xs relative">
                 {clienteId ? (
-                  <div className="flex items-center justify-between gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5 text-xs">
-                    <span className="text-slate-800 font-semibold truncate flex-1 min-w-0">
-                      {cliSelLabel}
-                    </span>
-                    <button type="button" onClick={limpiarCliente}
-                      className="text-purple-600 hover:text-purple-800 font-semibold shrink-0">Cambiar</button>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5 text-xs">
+                      <span className="text-slate-800 font-semibold truncate flex-1 min-w-0">
+                        {cliSelLabel}
+                      </span>
+                      <button type="button" onClick={limpiarCliente}
+                        className="text-purple-600 hover:text-purple-800 font-semibold shrink-0">Cambiar</button>
+                    </div>
+                    {/* Para cuál de sus mascotas. Con una sola no se pregunta
+                        (ya viene elegida) y con ninguna no se muestra: sirve
+                        para que la entrega del medicamento quede atada al
+                        tratamiento del animal. */}
+                    {mascotas.length > 1 && (
+                      <select
+                        value={pacienteId}
+                        onChange={e => setPacienteId(e.target.value)}
+                        className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+                      >
+                        <option value="">¿Para qué mascota? (opcional)</option>
+                        {mascotas.map(m => (
+                          <option key={m.id} value={m.id}>{m.nombre} · {m.especie}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 ) : (
                   <>

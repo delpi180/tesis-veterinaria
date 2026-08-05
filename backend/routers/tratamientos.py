@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Cita, HistoriaClinica, Paciente, Tratamiento, Usuario
+from models import Cita, HistoriaClinica, Paciente, Tratamiento, Usuario, Venta, VentaItem
 from core.deps import usuario_actual
 
 router = APIRouter(prefix="/api/tratamientos", tags=["Tratamientos"])
@@ -22,10 +22,12 @@ router = APIRouter(prefix="/api/tratamientos", tags=["Tratamientos"])
 ESTADOS_CERRABLES = ("terminado", "suspendido")
 
 
-def _salida(t: Tratamiento, hoy: date, sin_control_ids: set[int]) -> dict:
+def _salida(t: Tratamiento, hoy: date, sin_control_ids: set[int],
+            entregados: set[int] = frozenset()) -> dict:
     pac = t.paciente
     estado = t.estado_actual
     dias_restantes = (t.fin - hoy).days if (t.fin and estado == "en_curso") else None
+    prod = t.producto
     return {
         "id": t.id,
         "paciente_id": t.paciente_id,
@@ -36,6 +38,13 @@ def _salida(t: Tratamiento, hoy: date, sin_control_ids: set[int]) -> dict:
         "telefono": pac.cliente.telefono if pac and pac.cliente else None,
         "historia_id": t.historia_id,
         "medicamento": t.medicamento,
+        # Del inventario: para avisar al recetar si está vencido o agotado, y
+        # para saber si el dueño llegó a llevárselo.
+        "producto_id": t.producto_id,
+        "stock": prod.stock if prod else None,
+        "vencido": bool(prod and prod.fecha_vencimiento and prod.fecha_vencimiento < hoy),
+        "vence_el": prod.fecha_vencimiento.isoformat() if prod and prod.fecha_vencimiento else None,
+        "entregado": t.id in entregados,
         "dosis": t.dosis,
         "via": t.via,
         "frecuencia": t.frecuencia,
@@ -50,6 +59,42 @@ def _salida(t: Tratamiento, hoy: date, sin_control_ids: set[int]) -> dict:
         # consulta ni un turno posterior. Es el que hay que llamar.
         "sin_control": estado == "terminado" and t.estado != "suspendido" and t.id in sin_control_ids,
     }
+
+
+def _entregados(db: Session, tratamientos: list[Tratamiento]) -> set[int]:
+    """Ids de tratamientos cuyo medicamento ya se cobró para esa mascota.
+
+    Se apoya en la venta, que es donde de verdad sale el producto del estante:
+    no se inventa un segundo camino de "dispensar" que descuente stock por su
+    cuenta y termine descuadrando el inventario contra la caja.
+    """
+    con_producto = [t for t in tratamientos if t.producto_id]
+    if not con_producto:
+        return set()
+
+    filas = (
+        db.query(Venta.paciente_id, VentaItem.producto_id, Venta.fecha)
+        .join(VentaItem, VentaItem.venta_id == Venta.id)
+        .filter(
+            Venta.anulada.is_(False),
+            Venta.paciente_id.in_({t.paciente_id for t in con_producto}),
+            VentaItem.producto_id.in_({t.producto_id for t in con_producto}),
+        )
+        .all()
+    )
+    ventas: dict[tuple[int, int], list[date]] = {}
+    for pid, prod_id, cuando in filas:
+        if cuando:
+            ventas.setdefault((pid, prod_id), []).append(cuando.date())
+
+    out = set()
+    for t in con_producto:
+        # Una venta anterior al tratamiento es de otra vez; solo cuenta la que
+        # ocurre desde que se indicó.
+        fechas = ventas.get((t.paciente_id, t.producto_id), [])
+        if any(f >= t.inicio for f in fechas):
+            out.add(t.id)
+    return out
 
 
 def _sin_control_posterior(db: Session, tratamientos: list[Tratamiento]) -> set[int]:
@@ -95,7 +140,8 @@ def listar(
     q = (
         db.query(Tratamiento)
         .options(joinedload(Tratamiento.paciente).joinedload(Paciente.cliente),
-                 joinedload(Tratamiento.veterinario))
+                 joinedload(Tratamiento.veterinario),
+                 joinedload(Tratamiento.producto))
     )
     if paciente_id:
         q = q.filter(Tratamiento.paciente_id == paciente_id)
@@ -106,7 +152,8 @@ def listar(
 
     filas = q.order_by(Tratamiento.fin.asc().nullslast(), Tratamiento.id.desc()).all()
     sin_control_ids = _sin_control_posterior(db, filas)
-    salida = [_salida(t, hoy, sin_control_ids) for t in filas]
+    entregados = _entregados(db, filas)
+    salida = [_salida(t, hoy, sin_control_ids, entregados) for t in filas]
     if estado:
         salida = [s for s in salida if s["estado"] == estado]
     return salida

@@ -18,6 +18,15 @@ from sqlalchemy.orm import Session
 from models import HistoriaClinica, Tratamiento
 
 
+def _producto_id(item: dict) -> Optional[int]:
+    """Producto del inventario elegido, si se eligió uno."""
+    try:
+        pid = int(item.get("producto_id"))
+    except (TypeError, ValueError):
+        return None
+    return pid or None
+
+
 def _dias(item: dict) -> Optional[int]:
     """Duración en días del ítem, si está anotada y es razonable."""
     valor = item.get("duracion_dias")
@@ -75,6 +84,7 @@ def sincronizar_desde_historia(db: Session, historia: HistoriaClinica) -> None:
             paciente_id=historia.paciente_id,
             historia_id=historia.id,
             medicamento=med[:200],
+            producto_id=_producto_id(item),
             dosis=(item.get("dosis") or None),
             via=(item.get("via") or None),
             frecuencia=(item.get("frecuencia") or None),

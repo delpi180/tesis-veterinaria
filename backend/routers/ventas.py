@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session, selectinload, joinedload
 
 from database import get_db
 from models import (
-    CierreCaja, Cliente, MovimientoInventario, Producto, Servicio, Usuario,
-    Venta, VentaItem,
+    CierreCaja, Cliente, MovimientoInventario, Paciente, Producto, Servicio,
+    Usuario, Venta, VentaItem,
 )
 from schemas import VentaAnular, VentaCreate, VentaOut
 from core.deps import usuario_actual, solo_admin
@@ -51,6 +51,16 @@ def crear_venta(payload: VentaCreate, db: Session = Depends(get_db)):
     # Verificar cliente
     if not db.get(Cliente, payload.cliente_id):
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    # La mascota, si se indicó, tiene que ser de ese dueño: si no, la entrega
+    # quedaría atada al animal equivocado, que es peor que no atarla a ninguno.
+    if payload.paciente_id:
+        pac = db.get(Paciente, payload.paciente_id)
+        if not pac or pac.cliente_id != payload.cliente_id:
+            raise HTTPException(
+                status_code=422,
+                detail="La mascota indicada no pertenece a ese cliente.",
+            )
 
     # ── FASE 1: validar TODAS las líneas antes de tocar nada ─────────────────
     lineas: list[dict] = []                       # líneas resueltas
@@ -158,6 +168,7 @@ def crear_venta(payload: VentaCreate, db: Session = Depends(get_db)):
 
         venta = Venta(
             cliente_id=payload.cliente_id,
+            paciente_id=payload.paciente_id,
             total=total,
             descuento_pct=pct,
             metodo_pago=payload.metodo_pago,

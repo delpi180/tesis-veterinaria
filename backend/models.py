@@ -123,6 +123,11 @@ class Tratamiento(Base):
     historia_id = Column(Integer, ForeignKey("historias_clinicas.id", ondelete="CASCADE"), nullable=True, index=True)
 
     medicamento = Column(String(200), nullable=False)
+    # Producto del inventario, cuando la clínica lo tiene en catálogo. Es
+    # opcional a propósito: el veterinario receta lo que el animal necesita,
+    # no solo lo que hay en el estante. Cuando existe, se puede avisar del
+    # vencimiento y del stock, y ver si el dueño llegó a llevárselo.
+    producto_id = Column(Integer, ForeignKey("productos.id"), nullable=True)
     dosis       = Column(String(100))
     via         = Column(String(60))
     frecuencia  = Column(String(100))
@@ -144,6 +149,7 @@ class Tratamiento(Base):
     paciente    = relationship("Paciente", back_populates="tratamientos")
     historia    = relationship("HistoriaClinica", back_populates="tratamientos")
     veterinario = relationship("Usuario")
+    producto    = relationship("Producto")
 
     @property
     def veterinario_nombre(self):
@@ -581,6 +587,10 @@ class Venta(Base):
 
     id            = Column(Integer, primary_key=True)
     cliente_id    = Column(Integer, ForeignKey("clientes.id"), nullable=False)
+    # Para cuál de sus mascotas. Opcional: la comida y los accesorios son del
+    # dueño, no de un animal. Cuando se indica, la entrega del medicamento
+    # queda atada al tratamiento y se puede saber quién no pasó a recogerlo.
+    paciente_id   = Column(Integer, ForeignKey("pacientes.id"), nullable=True)
     fecha         = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     total         = Column(Numeric(10, 2), nullable=False)   # total FINAL (con descuento aplicado)
     descuento_pct = Column(Numeric(5, 2), default=0)         # % de descuento aplicado a la venta
@@ -596,7 +606,8 @@ class Venta(Base):
     anulada_por      = Column(String(50))
     motivo_anulacion = Column(String(200))
 
-    cliente = relationship("Cliente")
+    cliente  = relationship("Cliente")
+    paciente = relationship("Paciente")
 
     # El nombre del cliente va embebido en la respuesta para que el frontend
     # no dependa de tener cargado el catálogo completo de clientes solo para
@@ -609,6 +620,10 @@ class Venta(Base):
     @property
     def cliente_dni(self):
         return self.cliente.dni if self.cliente else None
+
+    @property
+    def paciente_nombre(self):
+        return self.paciente.nombre if self.paciente else None
     items   = relationship("VentaItem", back_populates="venta", cascade="all, delete-orphan")
 
 

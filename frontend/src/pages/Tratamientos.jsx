@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Pill, RefreshCw, Search, AlertTriangle, CheckCircle2, Clock,
-  MessageCircle, Download, Ban, Undo2, CalendarClock,
+  MessageCircle, Download, Ban, Undo2, CalendarClock, PackageCheck,
 } from 'lucide-react'
 import { api } from '../services/api'
 import { Cargando } from '../components/Cargando'
@@ -239,6 +239,23 @@ export default function Tratamientos() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        {t.entregado && (
+                          <span title="Se cobró este medicamento para esta mascota"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+                            <PackageCheck className="w-3 h-3" /> Entregado
+                          </span>
+                        )}
+                        {t.producto_id && t.vencido && (
+                          <span title={`El lote vence el ${fmt(t.vence_el)}`}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                            <AlertTriangle className="w-3 h-3" /> Lote vencido
+                          </span>
+                        )}
+                        {t.producto_id && !t.vencido && t.stock === 0 && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                            <AlertTriangle className="w-3 h-3" /> Sin stock
+                          </span>
+                        )}
                         {t.sin_control && (
                           <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
                             <AlertTriangle className="w-3 h-3" /> Sin control
