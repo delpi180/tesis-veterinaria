@@ -4,6 +4,7 @@ import {
   LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, LogOut, Wallet, UserCog,
   Clock, ClipboardList, History, PieChart, ConciergeBell, Syringe, Menu, X, Bug,
+  Pill,
 } from 'lucide-react'
 import { api, getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
 import GlobalSearch from './GlobalSearch'
@@ -23,6 +24,8 @@ const SECCION_CLINICA = [
   { label: 'Mi panel',   to: '/mi-panel',   Icon: ClipboardList, vet: true },
   { label: 'Clientes',   to: '/clientes',   Icon: Users },
   { label: 'Turnos',     to: '/turnos',     Icon: Calendar },
+  // La ve el doctor (qué está medicado) y también recepción (a quién llamar).
+  { label: 'Tratamientos', to: '/tratamientos', Icon: Pill },
 ]
 const SECCION_ADMIN = [
   { label: 'Inventario',        to: '/inventario', Icon: Package,     admin: true },

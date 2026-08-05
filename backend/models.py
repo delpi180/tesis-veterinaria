@@ -87,6 +87,83 @@ class Paciente(Base):
         back_populates="paciente",
         cascade="all, delete-orphan",
     )
+    tratamientos = relationship(
+        "Tratamiento",
+        back_populates="paciente",
+        cascade="all, delete-orphan",
+    )
+
+
+class Tratamiento(Base):
+    """Un medicamento indicado en una consulta, con su ventana de tiempo.
+
+    Por qué existe
+    --------------
+    El tratamiento vivía como JSON dentro de la historia clínica. Eso está bien
+    para *lo que se escribió ese día* —la historia es un documento y no se
+    reescribe—, pero no sirve para hacerle seguimiento: no se puede preguntar
+    "¿qué mascotas están medicadas hoy?", "¿cuáles terminan esta semana?" ni
+    "¿a quién no volvimos a ver?". Además, la duración era texto libre ("unos
+    días"), así que ni siquiera había una fecha de fin que consultar.
+
+    Acá vive la capa operativa: una fila por medicamento, con inicio, fin y
+    estado. Se genera desde la historia al guardarla y se vuelve a generar si
+    la historia se corrige, de modo que el documento clínico sigue siendo la
+    única fuente de lo indicado; esto es lo que permite trabajarlo.
+
+    El estado guardado es solo lo que decidió una persona: `suspendido` (se
+    cortó antes) o `terminado` (se cerró a mano). Que un tratamiento haya
+    llegado a su fecha de fin no se guarda —se calcula—, porque el tiempo pasa
+    solo y una fila no puede quedar desactualizada por no haber corrido nada.
+    """
+    __tablename__ = "tratamientos"
+
+    id          = Column(Integer, primary_key=True)
+    paciente_id = Column(Integer, ForeignKey("pacientes.id", ondelete="CASCADE"), nullable=False, index=True)
+    historia_id = Column(Integer, ForeignKey("historias_clinicas.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    medicamento = Column(String(200), nullable=False)
+    dosis       = Column(String(100))
+    via         = Column(String(60))
+    frecuencia  = Column(String(100))
+
+    dias   = Column(Integer)          # duración indicada; None = no se anotó
+    inicio = Column(Date, nullable=False)
+    fin    = Column(Date)             # None cuando no hay duración anotada
+
+    # 'en_curso' | 'terminado' | 'suspendido'. Ver el docstring: 'terminado'
+    # es un cierre manual, no el simple paso del tiempo.
+    estado         = Column(String(20), nullable=False, default="en_curso", server_default="en_curso")
+    motivo_corte   = Column(String(200))
+    cerrado_por    = Column(String(50))
+    cerrado_en     = Column(DateTime(timezone=True))
+
+    veterinario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    creado_en      = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    paciente    = relationship("Paciente", back_populates="tratamientos")
+    historia    = relationship("HistoriaClinica", back_populates="tratamientos")
+    veterinario = relationship("Usuario")
+
+    @property
+    def veterinario_nombre(self):
+        return self.veterinario.nombre if self.veterinario else None
+
+    @property
+    def estado_actual(self) -> str:
+        """Estado de verdad, mirando también el calendario.
+
+        - Lo que una persona cerró o suspendió manda.
+        - Si ya pasó su fecha de fin, está terminado aunque nadie lo tocara.
+        - Sin duración anotada no se puede saber: queda 'sin_duracion' para que
+          aparezca en la pantalla y alguien lo complete, en vez de fingir que
+          sigue en curso para siempre.
+        """
+        if self.estado in ("terminado", "suspendido"):
+            return self.estado
+        if self.fin is None:
+            return "sin_duracion"
+        return "terminado" if self.fin < datetime.now(timezone.utc).date() else "en_curso"
 
 
 class DocumentoPaciente(Base):
@@ -239,6 +316,7 @@ class HistoriaClinica(Base):
     paciente    = relationship("Paciente", back_populates="historias")
     veterinario = relationship("Usuario")
     documentos  = relationship("DocumentoPaciente", back_populates="historia", cascade="all, delete-orphan")
+    tratamientos = relationship("Tratamiento", back_populates="historia", cascade="all, delete-orphan")
 
     @property
     def veterinario_nombre(self):

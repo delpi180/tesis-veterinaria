@@ -23,6 +23,7 @@ const DetalleCliente    = lazy(() => import('./pages/DetalleCliente'))
 const HistoriasClinicas = lazy(() => import('./pages/HistoriasClinicas'))
 const HistorialPaciente = lazy(() => import('./pages/HistorialPaciente'))
 const Turnos            = lazy(() => import('./pages/Turnos'))
+const Tratamientos      = lazy(() => import('./pages/Tratamientos'))
 const Inventario        = lazy(() => import('./pages/Inventario'))
 const Servicios         = lazy(() => import('./pages/Servicios'))
 const Ventas            = lazy(() => import('./pages/Ventas'))
@@ -75,6 +76,9 @@ function AppProtegida() {
           {/* Ficha del paciente: ambos roles la VEN; las acciones de escritura van gateadas adentro */}
           <Route path="/pacientes/:pacienteId/historial" element={<HistorialPaciente />} />
           <Route path="/turnos"                 element={<Turnos />} />
+          {/* Seguimiento de lo indicado: el doctor ve qué está medicado y
+              recepción a quién hay que llamar. Ambos roles. */}
+          <Route path="/tratamientos"           element={<Tratamientos />} />
           <Route path="/inventario"             element={<SoloAdmin><Inventario /></SoloAdmin>} />
           <Route path="/servicios"              element={<SoloAdmin><Servicios /></SoloAdmin>} />
           <Route path="/ventas"                 element={<SoloAdmin><Ventas /></SoloAdmin>} />

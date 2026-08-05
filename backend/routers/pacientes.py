@@ -20,6 +20,7 @@ from schemas import (
     RecetaCreate, RecetaUpdate, RecetaOut,
 )
 from core.deps import usuario_actual
+from services.tratamientos import sincronizar_desde_historia as sincronizar_tratamientos
 
 router = APIRouter(prefix="/api/pacientes", tags=["Pacientes"])
 logger = logging.getLogger("vetlospinos")
@@ -237,6 +238,9 @@ def crear_historia(
         db.flush()  # obtener historia.id antes de generar la cita
         # Si la consulta fijó una próxima cita, agéndala en Turnos automáticamente
         _generar_cita_proxima(db, historia)
+        # Y los medicamentos indicados pasan a la lista de tratamientos en
+        # curso: escritos en la historia son un texto, acá son seguibles.
+        sincronizar_tratamientos(db, historia)
         db.commit()
         db.refresh(historia)
         return historia
@@ -295,6 +299,9 @@ def actualizar_historia(
     # Si la próxima cita cambió a un valor nuevo, agéndala en Turnos
     if historia.proxima_cita and historia.proxima_cita != cita_anterior:
         _generar_cita_proxima(db, historia)
+    # Corregir la consulta corrige también sus tratamientos; lo que ya se
+    # cerró o suspendió a mano no se reabre (ver services/tratamientos.py).
+    sincronizar_tratamientos(db, historia)
     request.state.actividad_detalle = historia.paciente.nombre if historia.paciente else f"historia #{historia_id}"
     db.commit()
     db.refresh(historia)
