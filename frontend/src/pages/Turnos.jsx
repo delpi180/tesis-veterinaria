@@ -434,12 +434,14 @@ export default function Turnos() {
           <h1 className="text-xl font-bold text-slate-800">Turnos y Agenda</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{displayDate}</p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* `min-w-0` + `flex-1` en el select: con nombres largos de doctor el
+            filtro empujaba la página de lado en el celular. */}
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           <span className="text-xs font-semibold text-slate-500">Doctor:</span>
           <select
             value={filtroDoctor}
             onChange={e => setFiltroDoctor(e.target.value)}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 min-w-0 flex-1 sm:flex-none max-w-full"
           >
             <option value="">Todos</option>
             {doctores.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}

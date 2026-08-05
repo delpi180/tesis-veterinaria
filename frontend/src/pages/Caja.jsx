@@ -6,6 +6,7 @@ import { api } from '../services/api'
 import { useToast } from '../components/Toast'
 import { clinicaActual } from '../services/clinica'
 import { calcularArqueo } from '../utils/dinero'
+import { Cargando } from '../components/Cargando'
 
 const fmtMoneda = (n) => `S/ ${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtHora = (iso) => new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
@@ -22,13 +23,6 @@ const METODO_INFO = {
   yape:     { label: 'Yape',     Icon: Smartphone,  color: 'text-purple-600',  bg: 'bg-purple-50',  border: 'border-purple-200' },
   plin:     { label: 'Plin',     Icon: Smartphone,  color: 'text-cyan-600',    bg: 'bg-cyan-50',    border: 'border-cyan-200' },
 }
-
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-400">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 /**
  * Arqueo del día: cuánto efectivo hay realmente en el cajón.
@@ -237,7 +231,7 @@ export default function Caja() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between static md:sticky md:top-0 md:z-10">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between flex-wrap gap-3 static md:sticky md:top-0 md:z-10">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Cierre de Caja</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
@@ -254,9 +248,7 @@ export default function Caja() {
 
       <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-20 gap-3 text-slate-400">
-            <Spinner /> <span className="text-sm">Cargando caja…</span>
-          </div>
+          <Cargando texto="Cargando caja…" />
         ) : (
           <>
             {/* Total del día */}

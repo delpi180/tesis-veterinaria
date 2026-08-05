@@ -333,15 +333,19 @@ export default function Clientes() {
               {total}{term ? ' encontrados' : ''}
             </span>
 
-            {/* Buscador */}
-            <div className="ml-auto relative">
+            {/* Buscador. En el celular ocupa su propia línea completa: es lo
+                que más se usa de esta pantalla y con 208 px quedaba apretado
+                contra el título. */}
+            <div className="w-full sm:w-auto sm:ml-auto relative">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Buscar por mascota, dueño o DNI…"
-                className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-52"
+                // text-base en el celular: por debajo de 16px el navegador hace
+                // zoom al enfocar el campo y descuadra la pantalla.
+                className="text-base sm:text-xs pl-8 pr-3 py-2 sm:py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-full sm:w-52"
               />
             </div>
           </div>

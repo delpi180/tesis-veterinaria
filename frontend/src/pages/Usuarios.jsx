@@ -8,6 +8,7 @@ import { useToast } from '../components/Toast'
 import { useConfirmar } from '../components/Confirmar'
 import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import DatosClinica from '../components/DatosClinica'
+import { Cargando } from '../components/Cargando'
 
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
@@ -26,13 +27,6 @@ const DIAS = [
   ['lun', 'Lun'], ['mar', 'Mar'], ['mie', 'Mié'], ['jue', 'Jue'],
   ['vie', 'Vie'], ['sab', 'Sáb'], ['dom', 'Dom'],
 ]
-
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-400">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 /**
  * Descarga de los datos de la clínica.
@@ -201,7 +195,7 @@ export default function Usuarios() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between static md:sticky md:top-0 md:z-10">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between flex-wrap gap-3 static md:sticky md:top-0 md:z-10">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Usuarios y Roles</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
@@ -230,11 +224,55 @@ export default function Usuarios() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
-              <Spinner /> <span className="text-sm">Cargando…</span>
-            </div>
+            <Cargando />
           ) : (
-            <div className="overflow-x-auto"><table className="w-full text-sm">
+            <>
+            {/* Celular: una tarjeta por usuario. La tabla mide 779 px y en un
+                teléfono obligaba a arrastrarla de lado para ver el rol o los
+                botones — el mismo trato que ya reciben Clientes y Ventas. */}
+            <div className="block md:hidden divide-y divide-slate-100">
+              {usuarios.map(u => (
+                <div key={u.id} className="px-4 py-3 flex flex-col gap-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-800 text-sm truncate flex items-center gap-1.5">
+                        <User className="w-4 h-4 text-slate-300 shrink-0" />
+                        {u.usuario}
+                        {u.usuario === yo && <span className="text-xs text-purple-500">(tú)</span>}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">{u.nombre}</p>
+                    </div>
+                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full shrink-0 ${u.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                      {u.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${ROL_PILL[u.rol] ?? 'bg-slate-100 text-slate-600'}`}>
+                      {u.rol}
+                    </span>
+                    <span className="text-xs text-slate-500">DNI {u.dni || '—'}</span>
+                    <div className="ml-auto flex items-center gap-1">
+                      <button onClick={() => navigate(`/usuarios/${u.id}/perfil`)} aria-label="Ver perfil"
+                        className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition">
+                        <IdCard className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => abrirEditar(u)} aria-label="Editar"
+                        className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      {u.usuario !== yo && (
+                        <button onClick={() => eliminar(u)} aria-label="Eliminar"
+                          className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
                   <th className="text-left px-5 py-3 font-semibold">Usuario</th>
@@ -288,6 +326,7 @@ export default function Usuarios() {
                 ))}
               </tbody>
             </table></div>
+            </>
           )}
         </section>
       </main>

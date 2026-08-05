@@ -544,12 +544,14 @@ export default function Inventario() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between static md:sticky md:top-0 md:z-10">
+      {/* `flex-wrap`: los tres botones no entran a lo ancho de un celular y
+          empujaban la página entera de lado (478 px en una pantalla de 375). */}
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between flex-wrap gap-3 static md:sticky md:top-0 md:z-10">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Inventario y Productos</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={exportar}
             className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-lg transition"

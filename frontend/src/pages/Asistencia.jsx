@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast'
 import { useConfirmar } from '../components/Confirmar'
 import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
+import { Cargando } from '../components/Cargando'
 
 const inputCls = 'border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
 
@@ -43,13 +44,6 @@ function fmtFecha(f) {
   const [y, m, d] = f.split('-')
   return new Date(y, m - 1, d).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
 }
-
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-400">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 export default function Asistencia() {
   const confirmar = useConfirmar()
@@ -193,7 +187,7 @@ export default function Asistencia() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex items-center justify-between gap-3">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Control de Asistencia</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
@@ -214,9 +208,7 @@ export default function Asistencia() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-12 gap-3 text-slate-400">
-              <Spinner /> <span className="text-sm">Cargando…</span>
-            </div>
+            <Cargando alto={180} />
           ) : doctores.length === 0 ? (
             <p className="text-sm text-slate-400 px-5 py-10 text-center">
               No hay doctores registrados. Crea cuentas de veterinario en <strong>Usuarios</strong>.

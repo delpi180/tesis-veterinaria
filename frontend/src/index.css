@@ -75,6 +75,20 @@ body {
   outline-offset: 2px;
 }
 
+/* En el celular, ningún campo por debajo de 16px.
+ *
+ * Safari y Chrome de Android hacen zoom sobre cualquier campo con letra más
+ * chica al tocarlo, y al salir dejan la página corrida de lado: se escribe el
+ * DNI, se levanta la vista y media pantalla está fuera. Las pantallas usan
+ * `text-xs`/`text-sm` en formularios densos, que en escritorio está bien y en
+ * el teléfono dispara justo eso. El tamaño solo se fuerza en pantallas chicas.
+ */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

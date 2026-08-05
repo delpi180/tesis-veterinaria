@@ -117,7 +117,7 @@ export default function Inicio() {
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
 
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex items-center justify-between">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Panel de Control</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>

@@ -5,6 +5,7 @@ import { useToast } from '../components/Toast'
 import { useConfirmar } from '../components/Confirmar'
 import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
+import { Cargando } from '../components/Cargando'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 const EJEMPLO_SERV = 'consulta general 50 soles, baño y corte 40, vacunación 35, cirugía precio variable'
@@ -21,13 +22,6 @@ const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm te
 const labelCls = 'text-xs font-semibold text-slate-600'
 
 const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-500">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 function ServiciosIAModal({ onClose, onAplicado }) {
   const toast = useToast()
@@ -311,7 +305,7 @@ export default function Servicios() {
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between static md:sticky md:top-0 md:z-10">
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between flex-wrap gap-3 static md:sticky md:top-0 md:z-10">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Servicios</h1>
           <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
@@ -364,7 +358,7 @@ export default function Servicios() {
 
         {/* Tabla */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+          <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <Stethoscope className="w-4 h-4 text-sky-500" />
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Catálogo de servicios</h2>
@@ -372,22 +366,22 @@ export default function Servicios() {
                 {filtrados.length}{term ? ` de ${servicios.length}` : ''}
               </span>
             </div>
-            <div className="relative">
+            {/* En el celular el buscador ocupa su propia línea completa: apretado
+                contra el título se salía de la pantalla. */}
+            <div className="relative w-full sm:w-auto">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
                 placeholder="Buscar servicio…"
-                className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-48"
+                className="text-base sm:text-xs pl-8 pr-3 py-2 sm:py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-full sm:w-48"
               />
             </div>
           </div>
 
           {loading && (
-            <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
-              <Spinner /> <span className="text-sm">Cargando servicios…</span>
-            </div>
+            <Cargando texto="Cargando servicios…" />
           )}
 
           {!loading && !error && servicios.length === 0 && (
