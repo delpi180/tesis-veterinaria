@@ -3,6 +3,7 @@ import { Plus, Trash2, Loader2, Paperclip, Eye } from 'lucide-react'
 import { api, authHeaders } from '../services/api'
 import { useToast } from './Toast'
 import { useConfirmar } from './Confirmar'
+import { Cargando } from './Cargando'
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
@@ -167,7 +168,7 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
 
       {/* Lista */}
       {cargando ? (
-        <p className="text-xs text-slate-400 text-center py-8">Cargando…</p>
+        <Cargando alto={140} />
       ) : items.length === 0 ? (
         <p className="text-sm text-slate-400 text-center py-8">Sin registros todavía</p>
       ) : (

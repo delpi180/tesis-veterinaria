@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { RefreshCw, Check, Monitor, Server, ChevronDown, ChevronRight } from 'lucide-react'
 import { api } from '../services/api'
 import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
+import { Cargando } from '../components/Cargando'
 
 const INTERVALO_MS = 30000
 
@@ -91,7 +92,7 @@ export default function Errores() {
         </p>
 
         {loading ? (
-          <p className="text-sm text-slate-500 text-center py-12">Cargando…</p>
+          <Cargando />
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-500 bg-white rounded-xl border border-slate-200">
             <Check className="w-8 h-8 mb-2 text-emerald-500" />

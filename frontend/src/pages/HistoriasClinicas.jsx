@@ -9,6 +9,7 @@ import { api, esVeterinario } from "../services/api";
 import { useConfirmar } from "../components/Confirmar";
 import VoiceTextProcessor from "../components/VoiceTextProcessor";
 import DocumentosPaciente from "../components/DocumentosPaciente";
+import { CargandoPantalla } from "../components/Cargando";
 import { nombresSimilares } from "../utils/similitud";
 
 // ── Catálogos ────────────────────────────────────────────────────────────────
@@ -1088,7 +1089,7 @@ export default function HistoriasClinicas() {
   // ── Contador de inferidos pendientes
   const numInferidos = Object.values(highlights).filter(v => v === "inferido").length;
 
-  if (loading) return <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Cargando…</div>;
+  if (loading) return <CargandoPantalla />;
   if (error)   return <div className="m-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">{error}</div>;
 
   return (

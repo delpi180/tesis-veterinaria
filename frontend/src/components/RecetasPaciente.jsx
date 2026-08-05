@@ -8,6 +8,7 @@ import { useConfirmar } from './Confirmar'
 import { clinicaActual } from '../services/clinica'
 import { nombresSimilares } from '../utils/similitud'
 import VoiceTextProcessor from './VoiceTextProcessor'
+import { Cargando } from './Cargando'
 
 const ITEM_VACIO = { medicamento: '', dosis: '', via: '', frecuencia: '', duracion: '' }
 
@@ -460,7 +461,7 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
 
       {/* Lista */}
       {cargando ? (
-        <p className="text-xs text-slate-400 text-center py-8">Cargando…</p>
+        <Cargando texto="Cargando recetas…" alto={160} />
       ) : recetas.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 text-slate-400">
           <Pill className="w-7 h-7 mb-2 opacity-40" />

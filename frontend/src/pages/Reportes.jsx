@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BarChart3, Package, Stethoscope, Filter, Download, Coins, ShoppingCart } from 'lucide-react'
 import { api } from '../services/api'
+import { Cargando } from '../components/Cargando'
 
 const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -12,13 +13,6 @@ function inicioMesStr() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
-
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 animate-spin text-purple-400">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 function TablaTop({ title, Icon, rows, money }) {
   return (
@@ -111,7 +105,7 @@ export default function Reportes() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20 gap-3 text-slate-400"><Spinner /> <span className="text-sm">Cargando…</span></div>
+          <Cargando />
         ) : error ? (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">{error}</div>
         ) : data && (

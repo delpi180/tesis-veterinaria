@@ -4,6 +4,7 @@ import { Syringe, Search, AlertTriangle, Clock, CheckCircle2, MessageCircle, Dow
 import { api } from '../services/api'
 import Paginacion from '../components/Paginacion'
 import { clinicaActual } from '../services/clinica'
+import { Cargando } from '../components/Cargando'
 
 const POR_PAGINA = 50
 
@@ -33,13 +34,6 @@ const waLink = (tel, propietario, paciente, vacuna) => {
   const msg = `Hola ${propietario || ''}, le recordamos que ${paciente || 'su mascota'} tiene pendiente la vacuna *${vacuna}* en ${clinicaActual().nombre}. ¡Le esperamos!`
   return `https://wa.me/${intl}?text=${encodeURIComponent(msg)}`
 }
-
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6 animate-spin text-purple-400">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 export default function Vacunacion() {
   const navigate = useNavigate()
@@ -171,7 +165,7 @@ export default function Vacunacion() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16 gap-3 text-slate-400"><Spinner /> <span className="text-sm">Cargando…</span></div>
+            <Cargando />
           ) : error ? (
             <div className="m-4 text-sm text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-4 py-3">{error}</div>
           ) : filtrados.length === 0 ? (

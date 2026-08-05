@@ -5,6 +5,7 @@ import {
   ClipboardList, PawPrint, CalendarCheck, BadgeCheck,
 } from 'lucide-react'
 import { api, esVeterinario } from '../services/api'
+import { Cargando } from '../components/Cargando'
 
 const DIA_LABEL = { lun: 'Lun', mar: 'Mar', mie: 'Mié', jue: 'Jue', vie: 'Vie', sab: 'Sáb', dom: 'Dom' }
 
@@ -14,13 +15,6 @@ const fmtFecha = (iso) => iso ? new Date(iso).toLocaleDateString('es-PE', {
 const fmtHora = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', {
   hour: '2-digit', minute: '2-digit',
 }) : '—'
-
-const Spinner = () => (
-  <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5 animate-spin text-purple-400">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
 
 function DatoPersonal({ Icon, label, value }) {
   return (
@@ -75,8 +69,8 @@ export default function PerfilDoctor() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center min-h-screen bg-slate-50 gap-3 text-slate-400">
-        <Spinner /> <span className="text-sm">Cargando perfil…</span>
+      <div className="flex-1 flex min-h-screen bg-slate-50">
+        <Cargando texto="Cargando perfil…" alto="100vh" className="w-full" />
       </div>
     )
   }

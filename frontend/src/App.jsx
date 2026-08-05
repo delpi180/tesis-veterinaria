@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import { ToastProvider } from './components/Toast'
 import { ConfirmarProvider } from './components/Confirmar'
+import { CargandoPantalla } from './components/Cargando'
 import { ClinicaProvider } from './services/clinica'
 import Login from './pages/Login'
 import { getToken, esVeterinario, esAdmin } from './services/api'
@@ -34,15 +35,6 @@ const Reportes          = lazy(() => import('./pages/Reportes'))
 const PanelRecepcion    = lazy(() => import('./pages/PanelRecepcion'))
 const Vacunacion        = lazy(() => import('./pages/Vacunacion'))
 const Errores           = lazy(() => import('./pages/Errores'))
-
-function CargandoPantalla() {
-  return (
-    <div className="flex-1 flex items-center justify-center py-24 text-slate-500 text-sm gap-3">
-      <span className="w-4 h-4 rounded-full border-2 border-purple-200 border-t-purple-600 animate-spin" />
-      Cargando…
-    </div>
-  )
-}
 
 // Ruta solo para veterinarios; recepcionista es redirigida al inicio
 function SoloVet({ children }) {

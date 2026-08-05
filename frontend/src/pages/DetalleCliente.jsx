@@ -10,13 +10,7 @@ import { useConfirmar } from '../components/Confirmar'
 import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
 import DocumentosPaciente from '../components/DocumentosPaciente'
-
-const Spinner = ({ className = 'text-purple-400' }) => (
-  <svg viewBox="0 0 24 24" fill="none" className={`w-5 h-5 animate-spin ${className}`}>
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-)
+import { Spinner, Cargando } from '../components/Cargando'
 
 const ESPECIE_COLORS = {
   canino:  'bg-amber-100 text-amber-700',
@@ -158,7 +152,7 @@ function PacienteForm({ clienteId, onSuccess, onCancel, visible }) {
         </button>
         <button type="submit" disabled={saving}
           className="flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition disabled:opacity-60">
-          {saving ? <Spinner className="text-white" /> : null}
+          {saving ? <Spinner color="text-white" /> : null}
           {saving ? 'Guardando…' : 'Registrar Mascota'}
         </button>
       </div>
@@ -670,8 +664,8 @@ export default function DetalleCliente() {
   }
 
   if (loading) return (
-    <div className="flex-1 flex items-center justify-center bg-slate-50 gap-3 text-slate-400">
-      <Spinner /> <span className="text-sm">Cargando…</span>
+    <div className="flex-1 flex bg-slate-50">
+      <Cargando alto="60vh" className="w-full" />
     </div>
   )
 
