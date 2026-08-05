@@ -148,7 +148,9 @@ export default function Sidebar() {
         {/* Nav */}
         <nav className="flex-1 px-3 py-5 flex flex-col gap-1 overflow-y-auto">
           <div className="mb-2">
-            <GlobalSearch />
+            {/* Al abrir el buscador se cierra el menú: en el celular el cajón
+                tapaba media pantalla detrás del modal. */}
+            <GlobalSearch onAbrir={cerrar} />
           </div>
           <Seccion titulo="Clínica" items={visible(SECCION_CLINICA)} onNavegar={cerrar} />
           <Seccion titulo="Administración" items={visible(SECCION_ADMIN)} onNavegar={cerrar}
