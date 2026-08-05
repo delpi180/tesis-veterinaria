@@ -66,6 +66,19 @@ def test_buscar_por_mascota_devuelve_todas_con_su_dueno(client, admin, duenos_co
         assert m["propietario_dni"]
 
 
+def test_buscar_mascotas_no_responde_a_especie_ni_raza(client, admin, duenos_con_pepita):
+    """El bloque de mascotas solo debe salir cuando se busca un nombre.
+
+    Si "canino" o "criollo" devolvieran mascotas, media clínica aparecería
+    encima de la lista de dueños cada vez que se busca otra cosa.
+    """
+    for termino in ("Canino", "Criollo"):
+        r = client.get(f"/api/pacientes/buscar?q={termino}", headers=admin)
+        assert r.status_code == 200, r.text
+        ids = {m["id"] for m in r.json()}
+        assert not ids & {pid for _, pid in duenos_con_pepita}, termino
+
+
 def test_buscar_clientes_por_nombre_de_mascota_cuadra_con_el_contador(client, admin, duenos_con_pepita):
     """La tabla de dueños y el contador de la paginación filtran igual."""
     lista = client.get("/api/clientes/?q=QAPepita", headers=admin).json()

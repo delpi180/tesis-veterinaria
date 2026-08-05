@@ -87,15 +87,20 @@ def _generar_cita_proxima(db: Session, historia: HistoriaClinica) -> None:
 
 @router.get("/buscar")
 def buscar_pacientes(
-    q: str = Query(..., min_length=1, description="Nombre de la mascota (o especie/raza/microchip)"),
+    q: str = Query(..., min_length=1, description="Nombre de la mascota (o su microchip)"),
     limit: int = Query(50, le=200),
     db: Session = Depends(get_db),
 ):
-    """Busca mascotas por nombre y devuelve a su dueño al lado.
+    """Busca mascotas por NOMBRE y devuelve a su dueño al lado.
 
     En la clínica se pregunta por el animal ("vengo con Pepita"), no por el
     DNI del dueño. Como hay varias Pepitas, se listan todas con el propietario
     y su teléfono para poder distinguirlas de un vistazo.
+
+    A propósito no busca por especie ni raza: escribir "canino" devolvería
+    media clínica y taparía la búsqueda por dueño, que es la otra mitad del
+    buscador. Solo el nombre — y el microchip, que identifica a un animal
+    concreto igual que el nombre.
     """
     like = f"%{q.strip()}%"
     filas = (
@@ -104,8 +109,6 @@ def buscar_pacientes(
         .filter(
             Paciente.nombre.ilike(like)
             | Paciente.microchip.ilike(like)
-            | Paciente.especie.ilike(like)
-            | Paciente.raza.ilike(like)
         )
         .order_by(Paciente.nombre, Paciente.id)
         .limit(limit)
