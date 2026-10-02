@@ -1,16 +1,16 @@
 n,codigo,tipo_atencion,habla_doctor_mmss,procesamiento_ia_mmss,total_min
-1,AT-V001,Vacunación,02:22,00:16,2.63
-2,AT-V002,Control,02:24,00:15,2.65
+1,AT-V001,Medicina general,02:22,00:16,2.63
+2,AT-V002,Medicina general,02:24,00:15,2.65
 3,AT-V003,Medicina general,02:30,00:17,2.78
-4,AT-V004,Control,01:49,00:10,1.98
-5,AT-V005,Control,02:30,00:15,2.75
+4,AT-V004,Medicina general,01:49,00:10,1.98
+5,AT-V005,Medicina general,02:30,00:15,2.75
 6,AT-V006,Medicina general,02:45,00:17,3.03
 7,AT-V007,Medicina general,01:48,00:09,1.95
-8,AT-V008,Control,02:22,00:12,2.57
+8,AT-V008,Medicina general,02:22,00:12,2.57
 9,AT-V009,Medicina general,01:43,00:09,1.87
 10,AT-V010,Medicina general,02:33,00:18,2.85
-11,AT-V011,Desparasitación,01:30,00:17,1.78
-12,AT-V012,Desparasitación,02:15,00:15,2.50
+11,AT-V011,Medicina general,01:30,00:17,1.78
+12,AT-V012,Medicina general,02:15,00:15,2.50
 13,AT-V013,Medicina general,02:43,00:18,3.02
 14,AT-V014,Medicina general,01:45,00:17,2.03
 15,AT-V015,Medicina general,01:26,00:16,1.70
@@ -23,9 +23,9 @@ n,codigo,tipo_atencion,habla_doctor_mmss,procesamiento_ia_mmss,total_min
 22,AT-V022,Medicina general,02:31,00:11,2.70
 23,AT-V023,Medicina general,02:02,00:15,2.28
 24,AT-V024,Medicina general,01:25,00:18,1.72
-25,AT-V025,Vacunación,01:35,00:15,1.83
+25,AT-V025,Medicina general,01:35,00:15,1.83
 26,AT-V026,Medicina general,02:00,00:14,2.23
-27,AT-V027,Vacunación,02:35,00:09,2.73
+27,AT-V027,Medicina general,02:35,00:09,2.73
 28,AT-V028,Medicina general,01:57,00:13,2.17
 29,AT-V029,Medicina general,01:54,00:16,2.17
-30,AT-V030,Desparasitación,02:01,00:08,2.15
+30,AT-V030,Medicina general,02:01,00:08,2.15
