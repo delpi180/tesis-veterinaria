@@ -134,16 +134,31 @@ def metricas_tiempo(db: Session = Depends(get_db)):
     Tiempo de registro de historias clínicas, comparando método manual vs IA.
     Métrica central de la tesis (eficiencia documental).
     """
-    filas = (
+    todas = (
         db.query(HistoriaClinica)
         .options(joinedload(HistoriaClinica.paciente))
         .filter(HistoriaClinica.segundos_registro.isnot(None))
         .order_by(HistoriaClinica.creado_en.desc())
         .all()
     )
+    # Definición de la medición:
+    #   manual → lo que tardó en llenar la historia a mano
+    #   IA     → grabación + procesamiento
+    # Los registros con IA anteriores a esta definición midieron otra cosa
+    # (todo el rato frente al formulario) y no son comparables: se dejan fuera
+    # y se cuentan aparte para que no desaparezcan sin aviso.
+    def _es_ia_valida(h):
+        return (h.metodo_registro == "ia"
+                and h.segundos_grabacion is not None
+                and h.segundos_procesamiento is not None)
+
+    filas = [h for h in todas if h.metodo_registro == "manual" or _es_ia_valida(h)]
+    ia_excluidos = sum(1 for h in todas if h.metodo_registro == "ia" and not _es_ia_valida(h))
 
     vals_manual = [h.segundos_registro for h in filas if h.metodo_registro == "manual"]
     vals_ia     = [h.segundos_registro for h in filas if h.metodo_registro == "ia"]
+    vals_grab   = [h.segundos_grabacion for h in filas if h.metodo_registro == "ia"]
+    vals_proc   = [h.segundos_procesamiento for h in filas if h.metodo_registro == "ia"]
 
     def _stats(vals):
         d = descriptivos(vals)
@@ -154,7 +169,9 @@ def metricas_tiempo(db: Session = Depends(get_db)):
         }
 
     manual = _stats(vals_manual)
-    ia     = _stats(vals_ia)
+    ia     = {**_stats(vals_ia),
+              "grabacion": _stats(vals_grab),
+              "procesamiento": _stats(vals_proc)}
 
     # % de ahorro de la IA respecto al método manual
     ahorro_pct = None
@@ -170,6 +187,8 @@ def metricas_tiempo(db: Session = Depends(get_db)):
             "paciente": h.paciente.nombre if h.paciente else f"#{h.paciente_id}",
             "metodo": h.metodo_registro,
             "segundos": h.segundos_registro,
+            "grabacion": h.segundos_grabacion,
+            "procesamiento": h.segundos_procesamiento,
             "fecha": h.creado_en.isoformat() if h.creado_en else None,
         }
         for h in filas[:30]
@@ -177,6 +196,7 @@ def metricas_tiempo(db: Session = Depends(get_db)):
 
     return {
         "total": len(filas),
+        "ia_excluidos": ia_excluidos,
         "manual": manual,
         "ia": ia,
         "ahorro_pct": ahorro_pct,

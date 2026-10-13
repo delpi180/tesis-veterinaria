@@ -46,10 +46,12 @@ def test_vacio():
 
 @requiere_tesis
 def test_metricas_tiempo(client, admin, doctor):
-    cli = client.get("/api/clientes/", headers=admin).json()
-    if not cli or not cli[0]["pacientes"]:
-        pytest.skip("Sin pacientes para probar")
-    pid = cli[0]["pacientes"][0]["id"]
+    import uuid
+    dni = f"9{uuid.uuid4().int % 10_000_000:07d}"
+    dueno = client.post("/api/clientes/", json={"nombre": "Dueño Tiempos", "dni": dni},
+                        headers=admin).json()
+    pid = client.post(f"/api/clientes/{dueno['id']}/pacientes/",
+                      json={"nombre": "Tiempos", "especie": "Canino"}, headers=admin).json()["id"]
 
     ids = []
     try:
@@ -59,8 +61,13 @@ def test_metricas_tiempo(client, admin, doctor):
         }, headers=doctor).json()
         h2 = client.post(f"/api/pacientes/{pid}/historias/", json={
             "motivo_consulta": "test ia", "segundos_registro": 90, "metodo_registro": "ia",
+            "segundos_grabacion": 60, "segundos_procesamiento": 30,
         }, headers=doctor).json()
-        ids = [h1["id"], h2["id"]]
+        # una con IA de antes de separar grabación y procesamiento: no compara
+        h3 = client.post(f"/api/pacientes/{pid}/historias/", json={
+            "motivo_consulta": "test ia antigua", "segundos_registro": 5000, "metodo_registro": "ia",
+        }, headers=doctor).json()
+        ids = [h1["id"], h2["id"], h3["id"]]
 
         r = client.get("/api/encuestas/tiempos", headers=admin)
         assert r.status_code == 200
@@ -68,11 +75,17 @@ def test_metricas_tiempo(client, admin, doctor):
         assert d["manual"]["n"] >= 1 and d["ia"]["n"] >= 1
         # con 300 manual y 90 IA, el ahorro debe ser positivo
         assert d["ahorro_pct"] is not None and d["ahorro_pct"] > 0
+        # grabación + procesamiento suman el tiempo con IA, y la antigua queda fuera
+        assert d["ia"]["grabacion"]["n"] == d["ia"]["n"] >= 1
+        assert d["ia"]["procesamiento"]["promedio_seg"] is not None
+        assert d["ia_excluidos"] >= 1
+        assert all(x["segundos"] != 5000 for x in d["recientes"])
     finally:
         db = SessionLocal()
         for hid in ids:
             db.execute(text("DELETE FROM historias_clinicas WHERE id=:h"), {"h": hid})
         db.commit(); db.close()
+        client.delete(f"/api/clientes/{dueno['id']}", headers=admin)
 
 
 # ── Próxima cita → genera turno en la agenda ─────────────────────────────────

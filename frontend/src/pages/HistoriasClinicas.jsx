@@ -12,6 +12,7 @@ import DocumentosPaciente from "../components/DocumentosPaciente";
 import ResumenIA from "../components/ResumenIA";
 import { SelloFirma, BotonFirmar, NotasCorreccion } from "../components/FirmaConsulta";
 import { calcularDosis } from "../utils/dosis";
+import { tiemposDeRegistro, sumarDictado } from "../utils/tiempos";
 import { CargandoPantalla } from "../components/Cargando";
 import { nombresSimilares } from "../utils/similitud";
 
@@ -927,6 +928,7 @@ export default function HistoriasClinicas() {
   // ── Métrica de tiempo: cuándo empezó el registro y si se usó IA
   const inicioRegistro = useRef(Date.now());
   const usoIA = useRef(false);
+  const tiemposIA = useRef({ grabacion: 0, procesamiento: 0 });   // grabación + espera, acumulados
 
 
 
@@ -1028,6 +1030,7 @@ export default function HistoriasClinicas() {
     // Reinicia la medición de tiempo para el siguiente registro
     inicioRegistro.current = Date.now();
     usoIA.current = false;
+    tiemposIA.current = { grabacion: 0, procesamiento: 0 };
   };
 
   // Traer un borrador viejo que se dejó sin tocar
@@ -1247,8 +1250,10 @@ export default function HistoriasClinicas() {
         setHistorias(p => ordenarHistorias(p.map(h => h.id === editandoId ? r : h)));
       } else {
         // Métrica de tiempo: solo en registros nuevos
-        payload.segundos_registro = Math.max(1, Math.round((Date.now() - inicioRegistro.current) / 1000));
-        payload.metodo_registro = usoIA.current ? "ia" : "manual";
+        Object.assign(payload, tiemposDeRegistro({
+          usoIA: usoIA.current, ia: tiemposIA.current,
+          inicioMs: inicioRegistro.current, ahoraMs: Date.now(),
+        }));
         const r = await api.post(`/api/pacientes/${id}/historias/`, payload);
         setHistorias(p => ordenarHistorias([r, ...p]));
         // Si se vino de "Atender" un turno, márcalo como atendido
@@ -1316,8 +1321,9 @@ export default function HistoriasClinicas() {
 
         {/* ── Panel IA / Voz ──────────────────────────────────────────────── */}
         <VoiceTextProcessor
-          onResult={({ datos, inferencias, alertas_rango, transcripcion, resumen, ajustes_nombre }) => {
+          onResult={({ datos, inferencias, alertas_rango, transcripcion, resumen, ajustes_nombre, tiempos }) => {
             usoIA.current = true;
+            tiemposIA.current = sumarDictado(tiemposIA.current, tiempos);
             setTranscripcionIA(transcripcion);
             setDatosIA(datos);
             setInferenciasBrut(inferencias);

@@ -311,8 +311,14 @@ class HistoriaClinica(Base):
     creado_en     = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     # Métricas de registro (tesis): cuánto tardó y con qué método
-    segundos_registro = Column(Integer)            # tiempo total de llenado
+    # manual: lo que tardó en llenarla a mano.
+    # ia: grabación + procesamiento (no cuenta el rato de revisar el formulario).
+    segundos_registro = Column(Integer)
     metodo_registro   = Column(String(10))         # 'manual' | 'ia'
+    # Solo con IA: cuánto se grabó y cuánto esperó el resultado (transcripción
+    # + estructuración). segundos_registro es la suma de ambos.
+    segundos_grabacion     = Column(Integer)
+    segundos_procesamiento = Column(Integer)
 
     # Autoría: qué doctor veterinario llenó la historia (la hora es creado_en)
     veterinario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)

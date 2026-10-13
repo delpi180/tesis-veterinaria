@@ -127,6 +127,7 @@ export default function VoiceTextProcessor({
     setResumen(null);
     updateAiState("transcribing");
     setAiError(null);
+    const inicioProc = performance.now();
     try {
       // 1. Transcribir con Deepgram
       const fd = new FormData();
@@ -147,7 +148,13 @@ export default function VoiceTextProcessor({
       updateAiState("processing");
       const resultado = await api.post(endpoint, { texto: transcripcion });
 
-      onResult?.({ ...resultado, transcripcion });
+      // Tiempos para la tesis: lo grabado y lo que se esperó el resultado
+      // (transcripción + estructuración). En un reintento no se vuelve a grabar.
+      const tiempos = {
+        grabacion_seg: duracionSeg ?? 0,
+        procesamiento_seg: Math.round((performance.now() - inicioProc) / 1000),
+      };
+      onResult?.({ ...resultado, transcripcion, tiempos });
       setResumen(resumirResultado?.({ ...resultado, transcripcion }) ?? null);
       updateAiState("done");
     } catch (e) {
@@ -194,10 +201,14 @@ export default function VoiceTextProcessor({
     setResumen(null);
     updateAiState("processing");
     setAiError(null);
+    const inicioProc = performance.now();
     try {
       const resultado = await api.post(endpoint, { texto: textoManual });
       setTranscripcionIA(resultado.transcripcion);
-      onResult?.(resultado);
+      onResult?.({
+        ...resultado,
+        tiempos: { grabacion_seg: 0, procesamiento_seg: Math.round((performance.now() - inicioProc) / 1000) },
+      });
       setResumen(resumirResultado?.(resultado) ?? null);
       updateAiState("done");
     } catch (e) {

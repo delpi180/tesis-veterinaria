@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Cell,
 } from 'recharts'
-import { CheckCircle, ClipboardList, BarChart3, Cpu, Check, RefreshCw, Sparkles, Zap, Timer, Clock, Target, Hand, Gauge, ShieldCheck, AlertTriangle, Sigma, Download } from 'lucide-react'
+import { CheckCircle, ClipboardList, BarChart3, Cpu, Check, RefreshCw, Sparkles, Zap, Timer, Clock, Hand, ShieldCheck, AlertTriangle, Sigma, Download } from 'lucide-react'
 import { api } from '../services/api'
 import { exportarCSV } from '../utils/exportUtils'
 
@@ -159,6 +159,26 @@ function TiemposPanel() {
         </div>
       </div>
 
+      {/* Desglose del tiempo con IA */}
+      {d.ia.n > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white border border-slate-200 rounded-xl px-4 py-3">
+            <p className="text-xs text-slate-500">Grabación (promedio)</p>
+            <p className="text-xl font-bold text-slate-800">{fmtSeg(d.ia.grabacion.promedio_seg)}</p>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-xl px-4 py-3">
+            <p className="text-xs text-slate-500">Procesamiento (promedio)</p>
+            <p className="text-xl font-bold text-slate-800">{fmtSeg(d.ia.procesamiento.promedio_seg)}</p>
+          </div>
+        </div>
+      )}
+      {d.ia_excluidos > 0 && (
+        <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+          {d.ia_excluidos} registro{d.ia_excluidos > 1 ? 's' : ''} con IA anterior{d.ia_excluidos > 1 ? 'es' : ''} a esta
+          medición no se incluye{d.ia_excluidos > 1 ? 'n' : ''}: no separaban grabación y procesamiento.
+        </p>
+      )}
+
       {/* Significancia estadística (prueba t de Welch) */}
       {d.prueba_t && (
         <div className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${d.prueba_t.significativo ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
@@ -210,8 +230,8 @@ function TiemposPanel() {
               if (d.recientes.length === 0) return
               exportarCSV(
                 'Tiempos de documentacion manual vs IA',
-                ['ID', 'Fecha', 'Paciente', 'Metodo', 'Segundos'],
-                d.recientes.map(h => [h.id, h.fecha ? new Date(h.fecha).toISOString() : '', h.paciente, h.metodo === 'ia' ? 'IA' : 'Manual', h.segundos]),
+                ['ID', 'Fecha', 'Paciente', 'Metodo', 'Grabacion (s)', 'Procesamiento (s)', 'Total (s)'],
+                d.recientes.map(h => [h.id, h.fecha ? new Date(h.fecha).toISOString() : '', h.paciente, h.metodo === 'ia' ? 'IA' : 'Manual', h.grabacion ?? '', h.procesamiento ?? '', h.segundos]),
               )
             }}
             disabled={d.recientes.length === 0}
@@ -227,7 +247,9 @@ function TiemposPanel() {
                 <th className="text-left px-5 py-2.5 font-semibold">Fecha</th>
                 <th className="text-left px-5 py-2.5 font-semibold">Paciente</th>
                 <th className="text-center px-5 py-2.5 font-semibold">Método</th>
-                <th className="text-right px-5 py-2.5 font-semibold">Tiempo</th>
+                <th className="text-right px-5 py-2.5 font-semibold">Grabación</th>
+                <th className="text-right px-5 py-2.5 font-semibold">Procesamiento</th>
+                <th className="text-right px-5 py-2.5 font-semibold">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -242,6 +264,8 @@ function TiemposPanel() {
                       {h.metodo === 'ia' ? 'Con IA' : 'Manual'}
                     </span>
                   </td>
+                  <td className="px-5 py-2.5 text-right text-slate-600">{h.metodo === 'ia' ? fmtSeg(h.grabacion) : '—'}</td>
+                  <td className="px-5 py-2.5 text-right text-slate-600">{h.metodo === 'ia' ? fmtSeg(h.procesamiento) : '—'}</td>
                   <td className="px-5 py-2.5 text-right font-bold text-slate-700">{fmtSeg(h.segundos)}</td>
                 </tr>
               ))}
@@ -250,209 +274,6 @@ function TiemposPanel() {
         </div>
       </div>
     </div>
-  )
-}
-
-// ── Panel: Exactitud vs. referencia ──────────────────────────────────────────
-const ACC_CAMPOS = [
-  { k: 'motivo_consulta',        l: 'Motivo de consulta' },
-  { k: 'diagnostico_presuntivo', l: 'Dx presuntivo' },
-  { k: 'temperatura_c',          l: 'Temperatura (°C)' },
-  { k: 'peso_kg',                l: 'Peso (kg)' },
-  { k: 'frecuencia_cardiaca',    l: 'Frec. cardiaca' },
-  { k: 'mucosas',                l: 'Mucosas' },
-  { k: 'hidratacion',            l: 'Hidratación' },
-  { k: 'indicaciones',           l: 'Indicaciones' },
-]
-const ACC_EJEMPLO = 'Perro labrador viene por vómitos y diarrea hace dos días. Temperatura 39.2, mucosas pálidas, un poco deshidratado. Sospecho gastroenteritis. Le indico dieta blanda y reposo.'
-const ESTADO_ACC = {
-  correcto:    { pill: 'bg-emerald-100 text-emerald-700', label: 'Correcto' },
-  omitido:     { pill: 'bg-amber-100 text-amber-700',     label: 'Omitido' },
-  extra:       { pill: 'bg-sky-100 text-sky-700',         label: 'Extra' },
-  incorrecto:  { pill: 'bg-rose-100 text-rose-700',       label: 'Incorrecto' },
-  '—':         { pill: 'bg-slate-100 text-slate-400',     label: '—' },
-}
-
-function ExactitudPanel() {
-  const [texto, setTexto] = useState(ACC_EJEMPLO)
-  const [ref, setRef] = useState({
-    motivo_consulta: 'vómitos y diarrea', diagnostico_presuntivo: 'gastroenteritis',
-    temperatura_c: '39.2', mucosas: 'palidas', hidratacion: 'leve_5',
-    indicaciones: 'dieta blanda y reposo',
-  })
-  const [res, setRes] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-
-  const evaluar = async () => {
-    if (!texto.trim()) { setError('Ingresa la transcripción.'); return }
-    setLoading(true); setError(null); setRes(null)
-    try {
-      const referencia = Object.fromEntries(Object.entries(ref).filter(([, v]) => v !== ''))
-      setRes(await api.post('/api/comparar-exactitud', { texto, referencia }))
-    } catch (e) { setError(e.message) } finally { setLoading(false) }
-  }
-
-  const Metrica = ({ label, val, suf = '' }) => (
-    <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 text-center">
-      <p className="text-2xl font-black text-slate-800">{val != null ? `${val}${suf}` : '—'}</p>
-      <p className="text-xs text-slate-400 mt-0.5">{label}</p>
-    </div>
-  )
-
-  return (
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <Target className="w-5 h-5 text-emerald-600" />
-        <h3 className="text-sm font-bold text-slate-800">Exactitud vs. referencia (gold-standard)</h3>
-      </div>
-      <p className="text-xs text-slate-500 -mt-2">
-        Escribe la transcripción y los valores correctos esperados; la IA extrae y se compara campo por campo (precisión / recall / F1).
-      </p>
-
-      <textarea rows={3} value={texto} onChange={e => setTexto(e.target.value)}
-        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white resize-none"
-        placeholder="Transcripción de la consulta…" />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        {ACC_CAMPOS.map(({ k, l }) => (
-          <div key={k} className="flex items-center gap-2">
-            <label className="text-xs text-slate-500 w-32 shrink-0">{l}</label>
-            <input type="text" value={ref[k] ?? ''} onChange={e => setRef(r => ({ ...r, [k]: e.target.value }))}
-              placeholder="(vacío = no esperado)"
-              className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white" />
-          </div>
-        ))}
-      </div>
-
-      {error && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">{error}</p>}
-      <button onClick={evaluar} disabled={loading}
-        className="self-start flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow transition disabled:opacity-50">
-        <Gauge className="w-4 h-4" /> {loading ? 'Evaluando…' : 'Evaluar exactitud'}
-      </button>
-
-      {res && (
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Metrica label="Exactitud" val={res.exactitud_pct} suf="%" />
-            <Metrica label="Precisión" val={res.precision} />
-            <Metrica label="Recall" val={res.recall} />
-            <Metrica label="F1-score" val={res.f1} />
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto"><table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
-                  <th className="text-left px-4 py-2 font-semibold">Campo</th>
-                  <th className="text-left px-4 py-2 font-semibold">Referencia</th>
-                  <th className="text-left px-4 py-2 font-semibold">IA extrajo</th>
-                  <th className="text-center px-4 py-2 font-semibold">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {res.detalle.map((d, i) => {
-                  const e = ESTADO_ACC[d.estado] ?? ESTADO_ACC['—']
-                  return (
-                    <tr key={i} className={`border-b border-slate-50 ${i % 2 ? 'bg-slate-50/30' : ''}`}>
-                      <td className="px-4 py-2 font-medium text-slate-700">{d.campo}</td>
-                      <td className="px-4 py-2 text-slate-500">{d.referencia ?? '—'}</td>
-                      <td className="px-4 py-2 text-slate-500">{d.ia ?? '—'}</td>
-                      <td className="px-4 py-2 text-center">
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${e.pill}`}>{e.label}</span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table></div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Comparativa IA vs. método léxico (evaluación de tesis) ───────────────────
-const TEXTO_EJEMPLO =
-  'El paciente llega por vómitos y diarrea desde hace dos días. Está decaído y no quiere comer. ' +
-  'Temperatura 39.5 grados, frecuencia cardiaca 120. Mucosas pálidas. ' +
-  'Sospecho de gastroenteritis. Le indico dieta blanda y metronidazol cada 12 horas por 5 días.'
-
-function ComparativaIA() {
-  const [texto, setTexto] = useState(TEXTO_EJEMPLO)
-  const [res, setRes] = useState(null)
-  const [cargando, setCargando] = useState(false)
-  const [error, setError] = useState(null)
-
-  const comparar = async () => {
-    if (!texto.trim()) { setError('Ingresa un texto de consulta.'); return }
-    setCargando(true); setError(null); setRes(null)
-    try {
-      setRes(await api.post('/api/comparar-extraccion', { texto }))
-    } catch (e) { setError(e.message) } finally { setCargando(false) }
-  }
-
-  const Tarjeta = ({ titulo, Icon, color, dato }) => {
-    const pct = dato.total_campos ? Math.round((dato.campos_completados / dato.total_campos) * 100) : 0
-    return (
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${color.bg}`}>
-            <Icon className={`w-5 h-5 ${color.text}`} />
-          </div>
-          <h4 className="text-sm font-bold text-slate-800">{titulo}</h4>
-        </div>
-        {dato.error ? (
-          <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">{dato.error}</p>
-        ) : (
-          <>
-            <div>
-              <div className="flex justify-between items-end mb-1">
-                <span className="text-xs text-slate-400">Campos completados</span>
-                <span className="text-lg font-bold text-slate-800">{dato.campos_completados}/{dato.total_campos}</span>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-2">
-                <div className={`h-2 rounded-full ${color.bar}`} style={{ width: `${pct}%` }} />
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Timer className="w-3.5 h-3.5" /> {dato.tiempo_ms != null ? `${dato.tiempo_ms} ms` : '—'}
-            </div>
-          </>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <section className="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col gap-4 mt-8">
-      <div className="flex items-center gap-2">
-        <Sparkles className="w-5 h-5 text-purple-600" />
-        <h3 className="text-sm font-bold text-slate-800">Comparativa: IA vs. método léxico</h3>
-      </div>
-      <p className="text-xs text-slate-500 -mt-2">
-        Procesa el mismo texto con ambos métodos y compara cuántos campos clínicos completa cada uno y su tiempo.
-      </p>
-      <textarea
-        rows={4} value={texto} onChange={e => setTexto(e.target.value)}
-        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white resize-none"
-        placeholder="Pega aquí la transcripción de una consulta…"
-      />
-      {error && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">{error}</p>}
-      <button onClick={comparar} disabled={cargando}
-        className="self-start flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition disabled:opacity-50">
-        <Zap className="w-4 h-4" /> {cargando ? 'Comparando…' : 'Comparar métodos'}
-      </button>
-
-      {res && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Tarjeta titulo="Método léxico (reglas)" Icon={ClipboardList}
-            color={{ bg: 'bg-amber-100', text: 'text-amber-600', bar: 'bg-amber-500' }} dato={res.lexico} />
-          <Tarjeta titulo="Método IA (GPT)" Icon={Cpu}
-            color={{ bg: 'bg-purple-100', text: 'text-purple-600', bar: 'bg-purple-600' }} dato={res.ia} />
-        </div>
-      )}
-    </section>
   )
 }
 
@@ -1193,12 +1014,10 @@ export default function Mediciones() {
                 <Clock className="w-4 h-4 text-purple-600" /> Tiempo de registro — Manual vs. IA
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                Eficiencia documental: cuánto se tarda en llenar una historia con cada método (medido automáticamente).
+                Se mide automáticamente. Manual: el tiempo de llenar la historia a mano. Con IA: el tiempo de grabar más el de procesar (transcripción y estructuración).
               </p>
             </div>
             <TiemposPanel />
-            <ComparativaIA />
-            <ExactitudPanel />
           </div>
         )}
 
