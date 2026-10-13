@@ -9,6 +9,7 @@ import { api, esVeterinario } from "../services/api";
 import { useConfirmar } from "../components/Confirmar";
 import VoiceTextProcessor from "../components/VoiceTextProcessor";
 import DocumentosPaciente from "../components/DocumentosPaciente";
+import ResumenIA from "../components/ResumenIA";
 import { CargandoPantalla } from "../components/Cargando";
 import { nombresSimilares } from "../utils/similitud";
 
@@ -891,6 +892,7 @@ export default function HistoriasClinicas() {
   const [transcripcionIA, setTranscripcionIA] = useState("");
   const [datosIA,       setDatosIA]       = useState(null);
   const [inferenciasBrut, setInferenciasBrut] = useState({});
+  const [resumenIA, setResumenIA] = useState(null);
   const [highlights,    setHighlights]    = useState({});
 
   // ── Quién atendió. El doctor firma su propia consulta; la recepcionista
@@ -997,6 +999,7 @@ export default function HistoriasClinicas() {
     setTranscripcionIA("");
     setDatosIA(null);
     setInferenciasBrut({});
+    setResumenIA(null);
     setSeccionActiva("s1");
     setSeccionesConAviso(new Set());
     setVetId("");
@@ -1291,11 +1294,12 @@ export default function HistoriasClinicas() {
 
         {/* ── Panel IA / Voz ──────────────────────────────────────────────── */}
         <VoiceTextProcessor
-          onResult={({ datos, inferencias, alertas_rango, transcripcion }) => {
+          onResult={({ datos, inferencias, alertas_rango, transcripcion, resumen, ajustes_nombre }) => {
             usoIA.current = true;
             setTranscripcionIA(transcripcion);
             setDatosIA(datos);
             setInferenciasBrut(inferencias);
+            setResumenIA(resumen ? { resumen, ajustes: ajustes_nombre || [] } : null);
             applyIA(datos, inferencias, alertas_rango);
           }}
           resumirResultado={({ datos }) => {
@@ -1305,6 +1309,8 @@ export default function HistoriasClinicas() {
             return n ? `${n} campo${n > 1 ? "s" : ""} completado${n > 1 ? "s" : ""}` : "No se detectaron datos";
           }}
         />
+
+        {resumenIA && <ResumenIA resumen={resumenIA.resumen} ajustes={resumenIA.ajustes} />}
 
         {/* Badge de inferidos pendientes */}
         {numInferidos > 0 && (

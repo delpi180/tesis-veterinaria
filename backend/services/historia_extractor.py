@@ -22,6 +22,9 @@ from core.config import settings
 from services.vocabulario import (
     bloque_catalogo, catalogo_medicamentos, coincide_con_catalogo,
 )
+from services.revision_historia import (
+    ajustar_a_catalogo, rescatar_constantes, resumen_campos,
+)
 
 _LIMA_TZ = ZoneInfo("America/Lima")
 
@@ -445,6 +448,11 @@ def extraer_historia(texto: str, db=None) -> dict:
     parsed = _patch_dates(parsed, today)
     parsed = _limpiar_vacios(parsed)
 
+    # Revisión determinista: constantes que se dictaron pero la IA dejó vacías,
+    # y marcas casi iguales a las del inventario.
+    rescatados = rescatar_constantes(texto, parsed)
+    ajustes = ajustar_a_catalogo(parsed.get("tratamiento_items") or [], catalogo)
+
     # Marcar los tratamientos que no coinciden con nada del inventario. Se
     # comprueba acá y no se le pregunta al modelo: si se equivocó al reconocer
     # la marca, también diría que la reconoció bien.
@@ -463,5 +471,7 @@ def extraer_historia(texto: str, db=None) -> dict:
         "datos":         parsed,
         "inferencias":   inferencias,
         "alertas_rango": alertas_rango,
+        "resumen":       resumen_campos(parsed, inferencias, alertas_rango, rescatados),
+        "ajustes_nombre": ajustes,
         "transcripcion": texto,
     }
