@@ -16,7 +16,7 @@ import models  # registra todos los modelos en Base.metadata
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
-    busqueda, inventario, asistencia, mi_panel, actividad, configuracion, glosario, errores,
+    busqueda, inventario, asistencia, mi_panel, actividad, configuracion, glosario, contactos, errores,
     respaldo, catalogos, tratamientos,
 )
 from core import ratelimit
@@ -117,6 +117,7 @@ _ACCIONES = {
     ("PUT", "/api/configuracion"): "Actualizó los datos de la clínica",
     ("POST", "/api/pacientes/{id}/historias/{id}/firmar"): "Firmó una consulta",
     ("POST", "/api/pacientes/{id}/historias/{id}/addendum"): "Agregó una nota de corrección a una consulta",
+    ("POST", "/api/contactos"): "Registró un contacto con el dueño",
     ("POST", "/api/glosario"): "Agregó una palabra al glosario del dictado",
     ("PUT", "/api/glosario/{id}"): "Editó una palabra del glosario",
     ("DELETE", "/api/glosario/{id}"): "Quitó una palabra del glosario",
@@ -325,6 +326,7 @@ app.include_router(mi_panel.router)
 app.include_router(actividad.router)
 app.include_router(configuracion.router)
 app.include_router(glosario.router)
+app.include_router(contactos.router)
 app.include_router(errores.router)
 app.include_router(respaldo.router)
 app.include_router(catalogos.router)

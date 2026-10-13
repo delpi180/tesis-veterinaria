@@ -820,3 +820,47 @@ class AddendumHistoria(Base):
     creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     historia = relationship("HistoriaClinica", back_populates="addendums")
+
+
+class ContactoCliente(Base):
+    """Cada vez que la clínica intentó comunicarse con un dueño.
+
+    Las pantallas de vacunas y tratamientos ya generaban enlaces de WhatsApp,
+    pero no quedaba rastro: nadie sabía si a ese dueño ya se le escribió, si
+    contestó o si hay que insistir. Acá queda cada intento, con su resultado.
+
+    `clave` identifica el pendiente que motivó el contacto (p. ej. una dosis
+    concreta de una vacuna), no a la persona: así, tras contestar, ese
+    pendiente sale de la lista, y si mañana aparece otro distinto para el mismo
+    dueño, vuelve a salir.
+    """
+    __tablename__ = "contactos_cliente"
+
+    id          = Column(Integer, primary_key=True)
+    cliente_id  = Column(Integer, ForeignKey("clientes.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    paciente_id = Column(Integer, ForeignKey("pacientes.id", ondelete="SET NULL"))
+    # 'vacuna' | 'antiparasitario' | 'tratamiento' | 'control' | 'cita' | 'otro'
+    motivo      = Column(String(20), nullable=False)
+    clave       = Column(String(200), index=True)
+    # 'whatsapp' | 'llamada'
+    canal       = Column(String(15), nullable=False)
+    # 'enviado' | 'contesto' | 'no_contesto' | 'agendo' | 'no_interesa'
+    resultado   = Column(String(15), nullable=False)
+    nota        = Column(Text)
+    mensaje     = Column(Text)
+    creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    creado_por  = Column(String(50))
+
+
+class PlantillaContacto(Base):
+    """Texto del mensaje de cada motivo, cuando la clínica lo cambió.
+
+    Sin fila para un motivo se usa el texto por defecto (services/contactos.py).
+    """
+    __tablename__ = "plantillas_contacto"
+
+    motivo          = Column(String(20), primary_key=True)
+    texto           = Column(Text, nullable=False)
+    actualizado_en  = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    actualizado_por = Column(String(50))

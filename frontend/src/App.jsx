@@ -34,6 +34,7 @@ const Asistencia        = lazy(() => import('./pages/Asistencia'))
 const Actividad         = lazy(() => import('./pages/Actividad'))
 const Reportes          = lazy(() => import('./pages/Reportes'))
 const PanelRecepcion    = lazy(() => import('./pages/PanelRecepcion'))
+const Contactos         = lazy(() => import('./pages/Contactos'))
 const Vacunacion        = lazy(() => import('./pages/Vacunacion'))
 const Errores           = lazy(() => import('./pages/Errores'))
 
@@ -87,6 +88,7 @@ function AppProtegida() {
           <Route path="/actividad"              element={<SoloAdmin><Actividad /></SoloAdmin>} />
           <Route path="/reportes"               element={<SoloAdmin><Reportes /></SoloAdmin>} />
           <Route path="/recepcion"              element={<SoloAdmin><PanelRecepcion /></SoloAdmin>} />
+          <Route path="/contactos"              element={<SoloAdmin><Contactos /></SoloAdmin>} />
           <Route path="/vacunacion"             element={<SoloAdmin><Vacunacion /></SoloAdmin>} />
           <Route path="/usuarios"               element={<SoloAdmin><Usuarios /></SoloAdmin>} />
           <Route path="/errores"                element={<SoloAdmin><Errores /></SoloAdmin>} />

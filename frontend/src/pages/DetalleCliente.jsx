@@ -10,6 +10,7 @@ import { useConfirmar } from '../components/Confirmar'
 import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
 import DocumentosPaciente from '../components/DocumentosPaciente'
+import HistorialContactos from '../components/HistorialContactos'
 import { Spinner, Cargando } from '../components/Cargando'
 
 const ESPECIE_COLORS = {
@@ -709,6 +710,8 @@ export default function DetalleCliente() {
             ))}
           </div>
         </section>
+
+        {esAdmin() && <HistorialContactos clienteId={id} pacientes={pacientes} />}
 
         {/* Formulario nueva mascota */}
         <PacienteForm
