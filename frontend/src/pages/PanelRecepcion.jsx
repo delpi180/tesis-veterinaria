@@ -60,10 +60,10 @@ export default function PanelRecepcion() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Panel de Recepción — {nombre}</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{hoy}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{hoy}</p>
         </div>
         <button onClick={refrescar} disabled={refrescando}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+          className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
         </button>
       </header>
@@ -98,13 +98,13 @@ export default function PanelRecepcion() {
               </button>
 
               <button onClick={() => navigate('/caja')}
-                className="text-left rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-5 py-4 transition">
+                className="text-left rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-5 py-4 transition">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Caja de hoy</p>
-                  <Coins className="w-5 h-5 text-emerald-500" />
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Caja de hoy</p>
+                  <Coins className="w-5 h-5 text-slate-300" />
                 </div>
-                <p className="text-2xl font-bold mt-1 text-emerald-800">{fmtMoneda(cajaTotal)}</p>
-                <p className="text-xs text-emerald-600 mt-0.5">{cajaVentas} venta(s)</p>
+                <p className="text-2xl font-bold mt-1 text-slate-800">{fmtMoneda(cajaTotal)}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{cajaVentas} venta(s)</p>
               </button>
             </div>
 
@@ -154,11 +154,11 @@ export default function PanelRecepcion() {
             <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-purple-500" />
+                  <Clock className="w-4 h-4 text-brand-500" />
                   <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Turnos de hoy</h2>
-                  <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{activas.length}</span>
+                  <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{activas.length}</span>
                 </div>
-                <button onClick={() => navigate('/turnos')} className="text-xs text-purple-600 hover:text-purple-800 font-semibold">Ir a la agenda →</button>
+                <button onClick={() => navigate('/turnos')} className="text-xs text-brand-600 hover:text-brand-800 font-semibold">Ir a la agenda →</button>
               </div>
 
               {citasHoy.length === 0 ? (
@@ -170,7 +170,7 @@ export default function PanelRecepcion() {
                     const cancelada = c.estado === 'cancelada'
                     return (
                       <li key={c.id} className={`px-5 py-3 flex flex-wrap items-center gap-3 ${cancelada ? 'opacity-50' : ''}`}>
-                        <span className="text-sm font-bold text-purple-700 w-14 shrink-0">{fmtHora(c.fecha_hora)}</span>
+                        <span className="text-sm font-bold text-brand-700 w-14 shrink-0">{fmtHora(c.fecha_hora)}</span>
                         <button onClick={() => c.cliente_id && navigate(`/clientes/${c.cliente_id}`)} className="min-w-0 flex-1 text-left">
                           <p className="text-sm font-semibold text-slate-800 truncate">{c.motivo || '(sin motivo)'}</p>
                           <p className="text-xs text-slate-500 truncate flex items-center gap-1">
@@ -178,7 +178,7 @@ export default function PanelRecepcion() {
                             <span className="text-slate-300">·</span>
                             <User className="w-3 h-3" />{c.propietario}
                           </p>
-                          {c.veterinario && <p className="text-xs text-purple-600 flex items-center gap-1"><Stethoscope className="w-3 h-3" />{c.veterinario}</p>}
+                          {c.veterinario && <p className="text-xs text-brand-600 flex items-center gap-1"><Stethoscope className="w-3 h-3" />{c.veterinario}</p>}
                         </button>
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${pill}`}>{estadoLabel(c.estado)}</span>
                         {/* Acciones rápidas */}
@@ -191,7 +191,7 @@ export default function PanelRecepcion() {
                           )}
                           {c.estado !== 'atendida' && c.estado !== 'cancelada' && (
                             <button onClick={() => cambiarEstado(c.id, 'atendida')} title="Marcar atendida"
-                              className="px-2 py-1 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition">
+                              className="px-2 py-1 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg hover:bg-brand-100 transition">
                               Atendida
                             </button>
                           )}
@@ -224,7 +224,7 @@ export default function PanelRecepcion() {
                   <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Asistencia de hoy</h2>
                   <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">{asistenciasHoy.length}</span>
                 </div>
-                <button onClick={() => navigate('/asistencia')} className="text-xs text-purple-600 hover:text-purple-800 font-semibold">Ver historial completo →</button>
+                <button onClick={() => navigate('/asistencia')} className="text-xs text-brand-600 hover:text-brand-800 font-semibold">Ver historial completo →</button>
               </div>
 
               {asistenciasHoy.length === 0 ? (

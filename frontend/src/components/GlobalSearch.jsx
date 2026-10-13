@@ -84,7 +84,7 @@ export default function GlobalSearch({ onAbrir }) {
       <button
         onClick={() => setOpen(true)}
         className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm
-                   text-purple-200 bg-purple-900/50 hover:bg-purple-800 border border-purple-800
+                   text-brand-200 bg-brand-900/50 hover:bg-brand-800 border border-brand-800
                    transition-colors cursor-pointer"
         title="Búsqueda global (Ctrl+K)"
       >
@@ -92,7 +92,7 @@ export default function GlobalSearch({ onAbrir }) {
         <span className="flex-1 text-left">Buscar...</span>
         {/* El atajo solo tiene sentido con teclado */}
         <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-xs font-mono
-                        bg-purple-950 border border-purple-700 text-purple-300">
+                        bg-brand-950 border border-brand-700 text-brand-300">
           Ctrl+K
         </kbd>
       </button>

@@ -18,7 +18,7 @@ const FORM_INICIAL = {
   activo:          true,
 }
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
+const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
 
 const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -90,7 +90,7 @@ function ServiciosIAModal({ onClose, onAplicado }) {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-500" /> Agregar servicios por voz/texto
+            <Sparkles className="w-4 h-4 text-brand-500" /> Agregar servicios por voz/texto
           </p>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400">
             <X className="w-4 h-4" />
@@ -104,7 +104,7 @@ function ServiciosIAModal({ onClose, onAplicado }) {
           <textarea
             rows={3} value={texto} onChange={e => setTexto(e.target.value)}
             placeholder={`Ej: ${EJEMPLO_SERV}`}
-            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white resize-none"
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white resize-none"
           />
           <div className="flex items-center gap-2">
             <button onClick={grabar} disabled={cargando}
@@ -112,7 +112,7 @@ function ServiciosIAModal({ onClose, onAplicado }) {
               {isRecording ? <><StopCircle className="w-4 h-4" /> Detener ({seconds}s)</> : <><Mic className="w-4 h-4" /> Dictar</>}
             </button>
             <button onClick={interpretarTexto} disabled={cargando || isRecording}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
+              className="flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
               <Sparkles className="w-4 h-4" /> {cargando ? 'Interpretando…' : 'Interpretar'}
             </button>
             {micError && <span className="text-xs text-rose-600">{micError}</span>}
@@ -140,18 +140,18 @@ function ServiciosIAModal({ onClose, onAplicado }) {
                       <tr key={i} className="border-b border-slate-50">
                         <td className="px-3 py-2">
                           <input value={it.nombre} onChange={e => setItem(i, 'nombre', e.target.value)}
-                            className="w-full text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300" />
+                            className="w-full text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-300" />
                           {it.descripcion && <span className="text-xs text-slate-400">{it.descripcion}</span>}
                         </td>
                         <td className="px-3 py-2 text-right">
                           <input type="number" min="0" step="0.01" value={it.precio ?? ''} disabled={it.precio_variable}
                             onChange={e => setItem(i, 'precio', e.target.value)}
-                            className="w-24 text-sm text-right border border-slate-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300 disabled:bg-slate-100 disabled:text-slate-300" />
+                            className="w-24 text-sm text-right border border-slate-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-brand-300 disabled:bg-slate-100 disabled:text-slate-300" />
                         </td>
                         <td className="px-3 py-2 text-center">
                           <input type="checkbox" checked={!!it.precio_variable}
                             onChange={e => setItem(i, 'precio_variable', e.target.checked)}
-                            className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-300" />
+                            className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300" />
                         </td>
                         <td className="px-3 py-2 text-center">
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${it.accion === 'nuevo' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
@@ -175,7 +175,7 @@ function ServiciosIAModal({ onClose, onAplicado }) {
         <div className="px-5 py-4 border-t border-slate-100 flex gap-3 justify-end">
           <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">Cancelar</button>
           <button onClick={aplicar} disabled={!items || items.length === 0 || aplicando}
-            className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+            className="px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
             {aplicando ? 'Guardando…' : 'Confirmar y guardar'}
           </button>
         </div>
@@ -308,18 +308,18 @@ export default function Servicios() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between flex-wrap gap-3 static md:sticky md:top-0 md:z-10">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Servicios</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{today}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setVoiceIA(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 hover:bg-purple-50 text-sm font-semibold rounded-lg transition"
+            className="flex items-center gap-2 px-4 py-2 border border-brand-200 text-brand-700 hover:bg-brand-50 text-sm font-semibold rounded-lg transition"
           >
             <Sparkles className="w-4 h-4" /> Por voz/texto
           </button>
           <button
             onClick={abrirNuevo}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
+            className="flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow transition"
           >
             + Nuevo Servicio
           </button>
@@ -362,7 +362,7 @@ export default function Servicios() {
             <div className="flex items-center gap-2">
               <Stethoscope className="w-4 h-4 text-sky-500" />
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Catálogo de servicios</h2>
-              <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">
                 {filtrados.length}{term ? ` de ${servicios.length}` : ''}
               </span>
             </div>
@@ -375,7 +375,7 @@ export default function Servicios() {
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
                 placeholder="Buscar servicio…"
-                className="text-base sm:text-xs pl-8 pr-3 py-2 sm:py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-full sm:w-48"
+                className="text-base sm:text-xs pl-8 pr-3 py-2 sm:py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white w-full sm:w-48"
               />
             </div>
           </div>
@@ -433,7 +433,7 @@ export default function Servicios() {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => abrirEditar(s)} title="Editar"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition">
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition">
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button onClick={() => handleEliminar(s)} title="Eliminar"
@@ -532,7 +532,7 @@ export default function Servicios() {
                 <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-300"
+                    className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300"
                     checked={form.activo}
                     onChange={e => setForm(f => ({ ...f, activo: e.target.checked }))}
                   />
@@ -555,7 +555,7 @@ export default function Servicios() {
                 </button>
                 <button
                   type="submit" disabled={guardando}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50"
                 >
                   {guardando ? 'Guardando…' : editId ? 'Guardar Cambios' : 'Crear Servicio'}
                 </button>

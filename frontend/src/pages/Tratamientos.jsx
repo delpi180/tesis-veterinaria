@@ -140,7 +140,7 @@ export default function Tratamientos() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between flex-wrap gap-3 static md:sticky md:top-0 md:z-10">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Tratamientos</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{hoy}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{hoy}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={exportarCSV} disabled={filtrados.length === 0}
@@ -148,7 +148,7 @@ export default function Tratamientos() {
             <Download className="w-4 h-4" /> Excel
           </button>
           <button onClick={refrescar} disabled={refrescando}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
           </button>
         </div>
@@ -176,9 +176,9 @@ export default function Tratamientos() {
 
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-4 md:px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-3 flex-wrap">
-            <Pill className="w-4 h-4 text-purple-500 shrink-0" />
+            <Pill className="w-4 h-4 text-brand-500 shrink-0" />
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Seguimiento</h2>
-            <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">
               {filtrados.length}
             </span>
             <div className="relative w-full sm:w-auto sm:ml-auto">
@@ -186,7 +186,7 @@ export default function Tratamientos() {
               <input
                 type="text" value={busq} onChange={e => setBusq(e.target.value)}
                 placeholder="Mascota, dueño o medicamento…"
-                className="text-base sm:text-xs pl-8 pr-3 py-2 sm:py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-full sm:w-56"
+                className="text-base sm:text-xs pl-8 pr-3 py-2 sm:py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white w-full sm:w-56"
               />
             </div>
           </div>
@@ -195,7 +195,7 @@ export default function Tratamientos() {
             {FILTROS.map(f => (
               <button key={f.key} onClick={() => setFiltro(f.key)}
                 className={`text-xs font-semibold px-3 py-2 sm:py-1.5 rounded-full whitespace-nowrap transition ${
-                  filtro === f.key ? 'bg-purple-700 text-white' : 'text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+                  filtro === f.key ? 'bg-brand-700 text-white' : 'text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
                 {f.label}
               </button>
             ))}
@@ -227,7 +227,7 @@ export default function Tratamientos() {
                     <div className="flex items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0">
                         <button onClick={() => navigate(`/pacientes/${t.paciente_id}/historial`)}
-                          className="font-semibold text-slate-800 hover:text-purple-700 transition text-left">
+                          className="font-semibold text-slate-800 hover:text-brand-700 transition text-left">
                           {t.paciente}
                         </button>
                         <span className="text-xs text-slate-400"> · {t.especie}</span>
@@ -302,7 +302,7 @@ export default function Tratamientos() {
                           </>
                         ) : (
                           <button onClick={() => reabrir(t)} title="Reabrir"
-                            className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-purple-700 hover:border-purple-300 hover:bg-purple-50 transition">
+                            className="w-10 h-10 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-brand-700 hover:border-brand-300 hover:bg-brand-50 transition">
                             <Undo2 className="w-4 h-4" />
                           </button>
                         )}

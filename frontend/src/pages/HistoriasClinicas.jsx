@@ -276,7 +276,7 @@ const hlInput = (hl) => {
   if (hl === "alerta")   return `${base} border-2 border-rose-400 bg-rose-50 focus:ring-rose-200 focus:border-rose-500`;
   if (hl === "ok")       return `${base} border border-emerald-300 bg-emerald-50 focus:ring-emerald-200 focus:border-emerald-400`;
   if (hl === "inferido") return `${base} border border-amber-400 bg-amber-50 focus:ring-amber-200 focus:border-amber-500`;
-  return `${base} border border-slate-200 bg-white focus:ring-purple-300 focus:border-purple-300`;
+  return `${base} border border-slate-200 bg-white focus:ring-brand-300 focus:border-brand-300`;
 };
 
 function HlLabel({ hl }) {
@@ -358,14 +358,14 @@ function BarraSecciones({ activa, onCambiar, llenas, avisos }) {
               "flex items-center gap-1.5 px-3 py-2 text-sm font-semibold whitespace-nowrap",
               "border-b-2 -mb-px transition-colors",
               esActiva
-                ? "border-purple-700 text-purple-800"
+                ? "border-brand-700 text-brand-800"
                 : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200",
             ].join(" ")}
           >
             <span className={[
               "w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center shrink-0",
-              esActiva ? "bg-purple-700 text-white"
-                : llenas.has(sec.id) ? "bg-purple-100 text-purple-700"
+              esActiva ? "bg-brand-700 text-white"
+                : llenas.has(sec.id) ? "bg-brand-100 text-brand-700"
                 : "bg-slate-100 text-slate-400",
             ].join(" ")}>
               {sec.num}
@@ -532,7 +532,7 @@ function TratamientoList({ items, onChange, desde, medicamentos = [], pesoKg }) 
         {medicamentos.map(p => <option key={p.id} value={p.nombre} />)}
       </datalist>
       <button type="button" onClick={add}
-        className="flex items-center gap-1.5 text-xs font-medium text-purple-700 hover:text-purple-900 border border-dashed border-purple-300 rounded-md px-3 py-1.5 hover:bg-purple-50 transition-colors">
+        className="flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-900 border border-dashed border-brand-300 rounded-md px-3 py-1.5 hover:bg-brand-50 transition-colors">
         <Plus size={13} /> Agregar medicamento
       </button>
     </div>
@@ -636,7 +636,7 @@ function VacunaList({ items, onChange, catalogo, especie, desde }) {
         );
       })}
       <button type="button" onClick={add}
-        className="flex items-center gap-1.5 text-xs font-medium text-purple-700 hover:text-purple-900 border border-dashed border-purple-300 rounded-md px-3 py-1.5 hover:bg-purple-50 transition-colors">
+        className="flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-900 border border-dashed border-brand-300 rounded-md px-3 py-1.5 hover:bg-brand-50 transition-colors">
         <Plus size={13} /> Agregar vacuna
       </button>
     </div>
@@ -658,7 +658,7 @@ function DSec({ title, show, children }) {
   if (!show) return null;
   return (
     <div className="pt-2 first:pt-0">
-      <p className="text-xs font-semibold uppercase tracking-wide text-purple-700 mb-1">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-brand-700 mb-1">{title}</p>
       <div className="space-y-0.5 pl-1">{children}</div>
     </div>
   );
@@ -706,11 +706,11 @@ function HistoriaCard({ h, pacienteId, onEdit, onDelete, onActualizada }) {
 
   return (
     <div className="border border-slate-200 rounded-md overflow-hidden bg-white">
-      <div className="flex items-center justify-between px-4 py-2 bg-purple-700 text-white">
+      <div className="flex items-center justify-between px-4 py-2 bg-brand-700 text-white">
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-sm font-semibold">{fecha}</span>
           {registradaDespues && (
-            <span className="text-[11px] text-purple-200">registrada el {registradaDespues}</span>
+            <span className="text-[11px] text-brand-200">registrada el {registradaDespues}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -1298,14 +1298,14 @@ export default function HistoriasClinicas() {
     <div className="min-h-screen bg-slate-50">
 
       {/* Header */}
-      <div className="bg-purple-700 text-white px-5 py-3 flex items-center justify-between">
+      <div className="bg-brand-700 text-white px-5 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={salir} className="hover:bg-white/20 p-1 rounded transition-colors">
             <ArrowLeft size={18} />
           </button>
           <div>
             <h1 className="text-base font-bold leading-tight">{paciente?.nombre}</h1>
-            <p className="text-xs text-purple-200">
+            <p className="text-xs text-brand-200">
               {paciente?.especie}{paciente?.raza ? ` · ${paciente.raza}` : ""}
               {paciente?.cliente ? ` · ${paciente.cliente.nombre}` : ""}
             </p>
@@ -1387,16 +1387,16 @@ export default function HistoriasClinicas() {
           )}
 
           {llenaRecepcion && (
-            <div className="flex flex-wrap items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
-              <Stethoscope size={14} className="text-purple-600 shrink-0" />
-              <label htmlFor="vet-atendio" className="text-xs font-semibold text-purple-800">
+            <div className="flex flex-wrap items-center gap-2 bg-brand-50 border border-brand-200 rounded-lg px-3 py-2">
+              <Stethoscope size={14} className="text-brand-600 shrink-0" />
+              <label htmlFor="vet-atendio" className="text-xs font-semibold text-brand-800">
                 Atendió el doctor:
               </label>
               <select
                 id="vet-atendio"
                 value={vetId}
                 onChange={e => setVetId(e.target.value)}
-                className="text-xs border border-purple-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="text-xs border border-brand-200 rounded-lg px-2 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300"
               >
                 <option value="">Selecciona…</option>
                 {doctores.map(d => (
@@ -1418,7 +1418,7 @@ export default function HistoriasClinicas() {
                   key={tpl.id}
                   type="button"
                   onClick={() => aplicarPlantilla(tpl)}
-                  className="text-xs font-semibold px-3 py-1 rounded-full border border-purple-200 text-purple-700 bg-white hover:bg-purple-50 transition"
+                  className="text-xs font-semibold px-3 py-1 rounded-full border border-brand-200 text-brand-700 bg-white hover:bg-brand-50 transition"
                 >
                   {tpl.label}
                 </button>
@@ -1575,7 +1575,7 @@ export default function HistoriasClinicas() {
               <Field label="Próxima cita">
                 <input type="datetime-local" value={form.proxima_cita}
                   onChange={setF("proxima_cita")}
-                  className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-purple-300 focus:border-purple-300" />
+                  className="w-full rounded-md border border-slate-200 px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-brand-300 focus:border-brand-300" />
               </Field>
             </div>
           </PanelSeccion>
@@ -1585,7 +1585,7 @@ export default function HistoriasClinicas() {
           )}
 
           <button onClick={handleSave} disabled={guardando}
-            className="w-full flex items-center justify-center gap-2 bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-md py-2.5 text-sm font-semibold transition-colors">
+            className="w-full flex items-center justify-center gap-2 bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white rounded-md py-2.5 text-sm font-semibold transition-colors">
             {guardadoOk
               ? <><Check size={15} /> Guardado</>
               : guardando ? "Guardando…"

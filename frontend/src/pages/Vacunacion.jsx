@@ -118,7 +118,7 @@ export default function Vacunacion() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Vacunación</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{hoy}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{hoy}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={exportarCSV} disabled={filtrados.length === 0}
@@ -126,7 +126,7 @@ export default function Vacunacion() {
             <Download className="w-4 h-4" /> Exportar
           </button>
           <button onClick={refrescar} disabled={refrescando}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
           </button>
         </div>
@@ -154,8 +154,8 @@ export default function Vacunacion() {
           {FILTROS.map(f => (
             <button key={f.key} onClick={() => setFiltro(f.key)}
               className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${filtro === f.key
-                ? 'bg-purple-600 text-white border-purple-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300'}`}>
+                ? 'bg-brand-600 text-white border-brand-600'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-brand-300'}`}>
               {f.label}
             </button>
           ))}
@@ -163,16 +163,16 @@ export default function Vacunacion() {
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" value={busq} onChange={e => setBusq(e.target.value)}
               placeholder="Buscar mascota, dueño o vacuna…"
-              className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-56" />
+              className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white w-56" />
           </div>
         </div>
 
         {/* Tabla */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <Syringe className="w-4 h-4 text-purple-500" />
+            <Syringe className="w-4 h-4 text-brand-500" />
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Vacunas</h2>
-            <span className="ml-auto text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{filtrados.length}</span>
+            <span className="ml-auto text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{filtrados.length}</span>
           </div>
 
           {loading ? (
@@ -201,7 +201,7 @@ export default function Vacunacion() {
                     <tr key={i} className={`border-b border-slate-50 hover:bg-slate-50/60 transition ${i % 2 ? 'bg-slate-50/30' : ''}`}>
                       <td className="px-5 py-3">
                         <button onClick={() => v.cliente_id && navigate(`/clientes/${v.cliente_id}`)}
-                          className="font-semibold text-slate-800 hover:text-purple-700 transition text-left">
+                          className="font-semibold text-slate-800 hover:text-brand-700 transition text-left">
                           {v.paciente}
                         </button>
                         <p className="text-xs text-slate-400">{v.especie}</p>

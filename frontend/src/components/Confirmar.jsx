@@ -108,7 +108,7 @@ export function ConfirmarProvider({ children }) {
                 className={`px-4 py-2 text-sm font-semibold text-white rounded-lg transition ${
                   pedido.peligroso
                     ? 'bg-rose-600 hover:bg-rose-700'
-                    : 'bg-purple-700 hover:bg-purple-800'}`}
+                    : 'bg-brand-700 hover:bg-brand-800'}`}
               >
                 {pedido.confirmarTexto}
               </button>

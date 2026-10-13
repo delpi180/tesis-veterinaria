@@ -3,7 +3,7 @@ import autoTable from "jspdf-autotable";
 import { clinicaActual } from '../services/clinica'
 
 // Colores e info de tamaño
-const _PDF_W = 210, _PDF_M = 14, _PDF_MORADO = [88, 28, 135];
+const _PDF_W = 210, _PDF_M = 14, _PDF_MORADO = [33, 61, 90];
 
 const SISTEMAS_EOP = [
   "tegumentario", "cardiovascular", "respiratorio", "digestivo",

@@ -162,7 +162,7 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
         <div className="flex flex-col gap-1">
           <label className="text-xs font-semibold text-slate-500">Fecha</label>
           <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-            className="text-sm px-2 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            className="text-sm px-2 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
         </div>
         <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
           <label className="text-xs font-semibold text-slate-500">{labelProducto}</label>
@@ -170,7 +170,7 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
             <select
               value={catalogo.some(c => c.nombre === producto) ? producto : ''}
               onChange={e => e.target.value && elegirProducto(e.target.value)}
-              className="text-sm px-2 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+              className="text-sm px-2 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300"
             >
               <option value="">Elegir del catálogo…</option>
               {catalogo.map(c => <option key={c.nombre} value={c.nombre}>{c.nombre}</option>)}
@@ -182,19 +182,19 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
               estetica: 'Ej. Baño, corte, limpieza dental…',
               complementario: 'Ej. Citología, ecografía, hemograma…',
             }[tipo] ?? ''}
-            className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
         </div>
         <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
           <label className="text-xs font-semibold text-slate-500">Notas</label>
           <input type="text" value={notas} onChange={e => setNotas(e.target.value)}
             placeholder="Opcional"
-            className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            className="text-sm px-3 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
         </div>
         {esAntiparasitario && (
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-slate-500">Próxima aplicación</label>
             <input type="date" value={proximaFecha} onChange={e => setProximaFecha(e.target.value)}
-              className="text-sm px-2 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              className="text-sm px-2 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
           </div>
         )}
         {esComplementario && (
@@ -203,12 +203,12 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
             <input
               type="file"
               onChange={e => setArchivo(e.target.files?.[0] ?? null)}
-              className="text-xs file:mr-2 file:rounded-md file:border-0 file:bg-purple-100 file:text-purple-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:cursor-pointer max-w-[220px]"
+              className="text-xs file:mr-2 file:rounded-md file:border-0 file:bg-brand-100 file:text-brand-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:cursor-pointer max-w-[220px]"
             />
           </div>
         )}
         <button type="submit" disabled={guardando}
-          className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
+          className="flex items-center gap-1.5 px-4 py-1.5 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
           {guardando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Agregar
         </button>
       </form>
@@ -253,7 +253,7 @@ export default function RegistrosPaciente({ pacienteId, tipo, labelProducto = 'P
                       <div className="flex flex-col gap-1">
                         {it.documentos.map(doc => (
                           <div key={doc.id} className="flex items-center gap-1.5">
-                            <Paperclip className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            <Paperclip className="w-3.5 h-3.5 text-brand-400 shrink-0" />
                             <span className="text-xs text-slate-600 truncate max-w-[140px]">{doc.nombre}</span>
                             <button onClick={() => abrirDocumento(doc)} disabled={abriendoId === doc.id} title="Ver / descargar"
                               className="p-1 rounded text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition disabled:opacity-50">

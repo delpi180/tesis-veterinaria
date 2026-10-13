@@ -46,7 +46,7 @@ export function BotonFirmar({ h, pacienteId, onActualizada, compacto = false }) 
   return (
     <button onClick={firmar} disabled={firmando} title="Firmar y cerrar esta consulta"
       className={compacto
-        ? 'px-3 flex items-center justify-center border-l border-white/20 hover:bg-purple-800 transition shrink-0 disabled:opacity-50'
+        ? 'px-3 flex items-center justify-center border-l border-white/20 hover:bg-brand-800 transition shrink-0 disabled:opacity-50'
         : 'flex items-center gap-1 text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5 transition-colors disabled:opacity-50'}>
       <PenLine className="w-4 h-4" />{!compacto && ' Firmar'}
     </button>
@@ -95,10 +95,10 @@ export function NotasCorreccion({ h, pacienteId, onActualizada }) {
         <div className="space-y-2">
           <textarea value={texto} onChange={e => setTexto(e.target.value)} rows={3}
             placeholder="Qué se corrige o se agrega (por ejemplo: el peso correcto era 12.5 kg)"
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300" />
           <div className="flex gap-2">
             <button onClick={agregar} disabled={guardando || texto.trim().length < 5}
-              className="text-xs font-medium bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded px-3 py-1.5">
+              className="text-xs font-medium bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white rounded px-3 py-1.5">
               Guardar nota
             </button>
             <button onClick={() => { setAbierto(false); setTexto('') }}
@@ -107,7 +107,7 @@ export function NotasCorreccion({ h, pacienteId, onActualizada }) {
         </div>
       ) : (
         <button onClick={() => setAbierto(true)}
-          className="flex items-center gap-1.5 text-xs font-medium text-purple-700 hover:text-purple-900">
+          className="flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-900">
           <MessageSquarePlus className="w-4 h-4" /> Agregar nota de corrección
         </button>
       ))}

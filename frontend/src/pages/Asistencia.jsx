@@ -7,7 +7,7 @@ import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
 import { Cargando } from '../components/Cargando'
 
-const inputCls = 'border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
+const inputCls = 'border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white'
 
 /** Fecha de hoy en hora local (YYYY-MM-DD), sin desfase por UTC. */
 function hoyStr() {
@@ -190,10 +190,10 @@ export default function Asistencia() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Control de Asistencia</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{today}</p>
         </div>
         <button onClick={refrescar} disabled={refrescando}
-          className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+          className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
         </button>
       </header>
@@ -203,7 +203,7 @@ export default function Asistencia() {
         {/* ── Marcación rápida del día ──────────────────────────────── */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-purple-500" />
+            <Clock className="w-4 h-4 text-brand-500" />
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Marcación de hoy</h2>
           </div>
 
@@ -219,7 +219,7 @@ export default function Asistencia() {
                 const abierta = abiertaDe(doc.id)
                 return (
                   <div key={doc.id} className="px-5 py-4 flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center shrink-0">
                       <Stethoscope className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -252,7 +252,7 @@ export default function Asistencia() {
         {resumen.length > 0 && (
           <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-purple-500" />
+              <BarChart3 className="w-4 h-4 text-brand-500" />
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Resumen de horas por doctor</h2>
             </div>
             {/* Celular: una tarjeta por doctor con sus tres cifras en fila.
@@ -271,7 +271,7 @@ export default function Asistencia() {
                     </div>
                     <div>
                       <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Horas</span>
-                      <span className="text-sm font-semibold text-purple-700">{r.total_horas} h</span>
+                      <span className="text-sm font-semibold text-brand-700">{r.total_horas} h</span>
                     </div>
                     <div>
                       <span className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Tardanzas</span>
@@ -298,7 +298,7 @@ export default function Asistencia() {
                   <tr key={r.usuario_id} className={`border-b border-slate-50 ${i % 2 ? 'bg-slate-50/30' : ''}`}>
                     <td className="px-5 py-3 font-medium text-slate-800">{r.usuario_nombre ?? `#${r.usuario_id}`}</td>
                     <td className="px-5 py-3 text-center text-slate-600">{r.dias}</td>
-                    <td className="px-5 py-3 text-right font-semibold text-purple-700">{r.total_horas} h</td>
+                    <td className="px-5 py-3 text-right font-semibold text-brand-700">{r.total_horas} h</td>
                     <td className="px-5 py-3 text-center">
                       {r.tardanzas > 0
                         ? <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full">{r.tardanzas}</span>
@@ -314,7 +314,7 @@ export default function Asistencia() {
         {/* ── Reporte / historial ───────────────────────────────────── */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex flex-wrap items-center gap-3">
-            <Filter className="w-4 h-4 text-purple-500" />
+            <Filter className="w-4 h-4 text-brand-500" />
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Historial de marcaciones</h2>
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <select className={inputCls} value={filtros.usuarioId}
@@ -327,7 +327,7 @@ export default function Asistencia() {
               <input type="date" className={inputCls} value={filtros.hasta}
                 onChange={e => setFiltros(f => ({ ...f, hasta: e.target.value }))} />
               <button onClick={cargarReporte}
-                className="px-3 py-2 text-sm font-semibold text-white bg-purple-700 hover:bg-purple-600 rounded-lg transition">
+                className="px-3 py-2 text-sm font-semibold text-white bg-brand-700 hover:bg-brand-600 rounded-lg transition">
                 Buscar
               </button>
             </div>
@@ -379,7 +379,7 @@ export default function Asistencia() {
                     </span>
                     <div className="flex items-center gap-1">
                       <button onClick={() => abrirCorreccion(r)} aria-label="Corregir horas"
-                        className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition">
+                        className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition">
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button onClick={() => eliminar(r)} aria-label="Eliminar"
@@ -427,7 +427,7 @@ export default function Asistencia() {
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => abrirCorreccion(r)} title="Corregir horas"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition">
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition">
                           <Pencil className="w-4 h-4" />
                         </button>
                         <button onClick={() => eliminar(r)} title="Eliminar"
@@ -495,7 +495,7 @@ export default function Asistencia() {
                   Cancelar
                 </button>
                 <button type="submit" disabled={guardandoEdit}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+                  className="px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
                   {guardandoEdit ? 'Guardando…' : 'Guardar corrección'}
                 </button>
               </div>

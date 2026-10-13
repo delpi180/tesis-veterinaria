@@ -18,28 +18,38 @@ const PawIcon = () => (
 )
 
 // `vet` => solo veterinario · `admin` => solo recepcionista (administradora)
-const SECCION_CLINICA = [
-  { label: 'Inicio',     to: '/',           Icon: LayoutDashboard, admin: true },
-  { label: 'Recepción',  to: '/recepcion',  Icon: ConciergeBell, admin: true },
-  { label: 'Mi panel',   to: '/mi-panel',   Icon: ClipboardList, vet: true },
-  { label: 'Clientes',   to: '/clientes',   Icon: Users },
-  { label: 'Turnos',     to: '/turnos',     Icon: Calendar },
-  // La ve el doctor (qué está medicado) y también recepción (a quién llamar).
-  { label: 'Tratamientos', to: '/tratamientos', Icon: Pill },
-]
-const SECCION_ADMIN = [
-  { label: 'Inventario',        to: '/inventario', Icon: Package,     admin: true },
-  { label: 'Servicios',         to: '/servicios',  Icon: Stethoscope, admin: true },
-  { label: 'Ventas',            to: '/ventas',     Icon: BarChart2,   admin: true },
-  { label: 'Caja',              to: '/caja',       Icon: Wallet,      admin: true },
-  { label: 'Contactar',          to: '/contactos',  Icon: PhoneCall, admin: true },
-  { label: 'Vacunación',        to: '/vacunacion', Icon: Syringe,  admin: true },
-  { label: 'Reportes',          to: '/reportes',   Icon: PieChart, admin: true },
-  { label: 'Planilla',          to: '/planilla',   Icon: Banknote, admin: true },
-  { label: 'Asistencia',        to: '/asistencia', Icon: Clock,    admin: true },
-  { label: 'Actividad',         to: '/actividad',  Icon: History,  admin: true },
-  { label: 'Usuarios',          to: '/usuarios',   Icon: UserCog,  admin: true },
-  { label: 'Errores',           to: '/errores',    Icon: Bug,      admin: true },
+// El menú sigue las tareas del día, no la jerarquía de la organización:
+// "qué hago hoy", "a quién atiendo", "cuánto entró", "quién trabaja".
+const SECCIONES = [
+  { titulo: 'Hoy', items: [
+    { label: 'Inicio',     to: '/',          Icon: LayoutDashboard, admin: true },
+    { label: 'Recepción',  to: '/recepcion', Icon: ConciergeBell,   admin: true },
+    { label: 'Mi panel',   to: '/mi-panel',  Icon: ClipboardList,   vet: true },
+    { label: 'Turnos',     to: '/turnos',    Icon: Calendar },
+  ]},
+  { titulo: 'Pacientes', items: [
+    { label: 'Clientes',     to: '/clientes',     Icon: Users },
+    // La ve el doctor (qué está medicado) y también recepción (a quién llamar).
+    { label: 'Tratamientos', to: '/tratamientos', Icon: Pill },
+    { label: 'Vacunación',   to: '/vacunacion',   Icon: Syringe,   admin: true },
+    { label: 'Contactar',    to: '/contactos',    Icon: PhoneCall, admin: true },
+  ]},
+  { titulo: 'Dinero', items: [
+    { label: 'Ventas',     to: '/ventas',     Icon: BarChart2,   admin: true },
+    { label: 'Caja',       to: '/caja',       Icon: Wallet,      admin: true },
+    { label: 'Inventario', to: '/inventario', Icon: Package,     admin: true },
+    { label: 'Servicios',  to: '/servicios',  Icon: Stethoscope, admin: true },
+    { label: 'Reportes',   to: '/reportes',   Icon: PieChart,    admin: true },
+  ]},
+  { titulo: 'Equipo', items: [
+    { label: 'Asistencia', to: '/asistencia', Icon: Clock,    admin: true },
+    { label: 'Planilla',   to: '/planilla',   Icon: Banknote, admin: true },
+    { label: 'Usuarios',   to: '/usuarios',   Icon: UserCog,  admin: true },
+  ]},
+  { titulo: 'Sistema', items: [
+    { label: 'Actividad', to: '/actividad', Icon: History, admin: true },
+    { label: 'Errores',   to: '/errores',   Icon: Bug,     admin: true },
+  ]},
 ]
 /** Una sección del menú. Vive fuera del componente a propósito: declarada
  *  adentro, React la trataba como un componente nuevo en cada render. */
@@ -47,7 +57,7 @@ function Seccion({ titulo, items, onNavegar, avisos }) {
   if (items.length === 0) return null
   return (
     <>
-      <p className="text-purple-400 text-xs font-semibold uppercase tracking-widest px-3 mt-5 mb-2 first:mt-0">{titulo}</p>
+      <p className="text-brand-400 text-xs font-semibold uppercase tracking-widest px-3 mt-5 mb-2 first:mt-0">{titulo}</p>
       {items.map(item => (
         <NavItem key={item.to} {...item} onClick={onNavegar} aviso={avisos?.[item.to] ?? 0} />
       ))}
@@ -64,8 +74,8 @@ function NavItem({ label, to, Icon, onClick, aviso = 0 }) {
       className={({ isActive }) => [
         'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
         isActive
-          ? 'bg-white text-purple-900 shadow-sm'
-          : 'text-purple-200 hover:bg-purple-800 hover:text-white',
+          ? 'bg-white text-brand-900 shadow-sm'
+          : 'text-brand-200 hover:bg-brand-800 hover:text-white',
       ].join(' ')}
     >
       {({ isActive }) => (
@@ -80,7 +90,7 @@ function NavItem({ label, to, Icon, onClick, aviso = 0 }) {
               {aviso > 99 ? '99+' : aviso}
             </span>
           )}
-          {isActive && aviso === 0 && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />}
+          {isActive && aviso === 0 && <span className="w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0" />}
         </>
       )}
     </NavLink>
@@ -121,8 +131,8 @@ export default function Sidebar() {
   return (
     <>
       {/* Barra superior móvil */}
-      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-purple-950 text-white px-4 py-3 flex items-center gap-3">
-        <button onClick={() => setAbierto(true)} className="p-1.5 rounded-lg hover:bg-purple-800">
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 bg-brand-950 text-white px-4 py-3 flex items-center gap-3">
+        <button onClick={() => setAbierto(true)} className="p-1.5 rounded-lg hover:bg-brand-800">
           <Menu className="w-5 h-5" />
         </button>
         <span className="font-bold text-sm">{clinica.nombre}</span>
@@ -133,19 +143,19 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <aside className={[
-        'w-64 bg-purple-950 flex flex-col shrink-0 z-50',
+        'w-64 bg-brand-950 flex flex-col shrink-0 z-50',
         'fixed inset-y-0 left-0 transform transition-transform md:transform-none md:static md:min-h-screen',
         abierto ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
       ].join(' ')}>
         {/* Logo */}
-        <div className="px-6 py-6 flex items-center gap-3 border-b border-purple-800">
-          <div className="bg-purple-700 rounded-xl p-2 text-white">
+        <div className="px-6 py-6 flex items-center gap-3 border-b border-brand-800">
+          <div className="bg-brand-700 rounded-xl p-2 text-white">
             <PawIcon />
           </div>
           <div className="flex-1">
             <p className="text-white font-bold text-sm leading-tight">{clinica.nombre}</p>
           </div>
-          <button onClick={cerrar} className="md:hidden p-1 text-purple-300 hover:text-white">
+          <button onClick={cerrar} className="md:hidden p-1 text-brand-300 hover:text-white">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -157,23 +167,24 @@ export default function Sidebar() {
                 tapaba media pantalla detrás del modal. */}
             <GlobalSearch onAbrir={cerrar} />
           </div>
-          <Seccion titulo="Clínica" items={visible(SECCION_CLINICA)} onNavegar={cerrar} />
-          <Seccion titulo="Administración" items={visible(SECCION_ADMIN)} onNavegar={cerrar}
-            avisos={{ '/errores': erroresPendientes }} />
+          {SECCIONES.map(sec => (
+            <Seccion key={sec.titulo} titulo={sec.titulo} items={visible(sec.items)} onNavegar={cerrar}
+              avisos={{ '/errores': erroresPendientes }} />
+          ))}
         </nav>
 
         {/* Footer */}
-        <div className="px-4 py-4 border-t border-purple-800">
+        <div className="px-4 py-4 border-t border-brand-800">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-purple-700 flex items-center justify-center text-white text-xs font-bold uppercase">
+            <div className="w-8 h-8 rounded-full bg-brand-700 flex items-center justify-center text-white text-xs font-bold uppercase">
               {nombre.charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-xs font-medium capitalize truncate">{nombre}</p>
-              <p className="text-purple-400 text-xs capitalize">{rol}</p>
+              <p className="text-brand-400 text-xs capitalize">{rol}</p>
             </div>
             <button onClick={handleLogout} title="Cerrar sesión"
-              className="p-2 rounded-lg text-purple-300 hover:text-white hover:bg-purple-800 transition">
+              className="p-2 rounded-lg text-brand-300 hover:text-white hover:bg-brand-800 transition">
               <LogOut className="w-4 h-4" />
             </button>
           </div>

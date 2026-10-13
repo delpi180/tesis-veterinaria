@@ -18,7 +18,7 @@ function TablaTop({ title, Icon, rows, money }) {
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <Icon className="w-4 h-4 text-purple-500" />
+        <Icon className="w-4 h-4 text-brand-500" />
         <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{title}</h2>
       </div>
       {rows.length === 0 ? (
@@ -94,14 +94,14 @@ export default function Reportes() {
       <main className="flex-1 px-4 md:px-6 py-4 md:py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
         {/* Filtros */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 flex flex-wrap items-center gap-2">
-          <Filter className="w-4 h-4 text-purple-500" />
+          <Filter className="w-4 h-4 text-brand-500" />
           <span className="text-xs font-semibold text-slate-500">Periodo:</span>
           <input type="date" value={filtros.desde} onChange={e => setFiltros(f => ({ ...f, desde: e.target.value }))}
             className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700" />
           <input type="date" value={filtros.hasta} onChange={e => setFiltros(f => ({ ...f, hasta: e.target.value }))}
             className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700" />
           <button onClick={() => cargar()}
-            className="px-3 py-1.5 text-sm font-semibold text-white bg-purple-700 hover:bg-purple-600 rounded-lg transition">Buscar</button>
+            className="px-3 py-1.5 text-sm font-semibold text-white bg-brand-700 hover:bg-brand-600 rounded-lg transition">Buscar</button>
         </div>
 
         {loading ? (
@@ -112,19 +112,19 @@ export default function Reportes() {
           <>
             {/* KPIs */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4 flex items-center justify-between">
+              <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-emerald-700 font-semibold uppercase tracking-wide">Ingreso del periodo</p>
-                  <p className="text-2xl font-bold text-emerald-800 mt-1">{fmtMoneda(data.ingreso_total)}</p>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Ingreso del periodo</p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1">{fmtMoneda(data.ingreso_total)}</p>
                 </div>
-                <Coins className="w-8 h-8 text-emerald-400" />
+                <Coins className="w-8 h-8 text-slate-300" />
               </div>
-              <div className="bg-sky-50 border border-sky-200 rounded-xl px-5 py-4 flex items-center justify-between">
+              <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-sky-700 font-semibold uppercase tracking-wide">Ventas del periodo</p>
-                  <p className="text-2xl font-bold text-sky-800 mt-1">{data.total_ventas}</p>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Ventas del periodo</p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1">{data.total_ventas}</p>
                 </div>
-                <ShoppingCart className="w-8 h-8 text-sky-400" />
+                <ShoppingCart className="w-8 h-8 text-slate-300" />
               </div>
             </div>
 

@@ -19,7 +19,7 @@ const ChevronRightIcon = () => (
   </svg>
 )
 const UsersIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-5 h-5 text-purple-600">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-5 h-5 text-brand-600">
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
   </svg>
 )
@@ -65,9 +65,9 @@ function ClienteForm({ onSuccess, onCancel, visible }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className={`bg-purple-50 border border-purple-200 rounded-xl px-5 py-4 flex flex-col gap-3${visible ? '' : ' hidden'}`}
+      className={`bg-brand-50 border border-brand-200 rounded-xl px-5 py-4 flex flex-col gap-3${visible ? '' : ' hidden'}`}
     >
-      <p className="text-sm font-semibold text-purple-800">Nuevo Dueño / Propietario</p>
+      <p className="text-sm font-semibold text-brand-800">Nuevo Dueño / Propietario</p>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         {FIELDS.map(({ key, label, placeholder }) => (
           <div key={key}>
@@ -77,7 +77,7 @@ function ClienteForm({ onSuccess, onCancel, visible }) {
               value={form[key]}
               onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
               placeholder={placeholder}
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-transparent bg-white"
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300 focus:border-transparent bg-white"
             />
           </div>
         ))}
@@ -94,7 +94,7 @@ function ClienteForm({ onSuccess, onCancel, visible }) {
         </button>
         <button
           type="submit" disabled={saving}
-          className="flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition disabled:opacity-60"
+          className="flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-brand-700 hover:bg-brand-600 text-white rounded-lg transition disabled:opacity-60"
         >
           {saving ? <Spinner /> : null}
           {saving ? 'Guardando…' : 'Guardar Cliente'}
@@ -218,7 +218,7 @@ export default function Clientes() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between static md:sticky md:top-0 md:z-10 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Clientes</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{today}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -230,7 +230,7 @@ export default function Clientes() {
           </button>
           <button
             onClick={() => setShowForm(v => !v)}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
+            className="flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow transition"
           >
             <PlusIcon />
             Nuevo Cliente
@@ -289,7 +289,7 @@ export default function Clientes() {
                     </span>
                     <button
                       onClick={e => { e.stopPropagation(); navigate(`/clientes/${m.cliente_id}`) }}
-                      className="w-full text-sm text-purple-700 hover:text-purple-900 font-medium underline-offset-2 hover:underline text-left truncate block"
+                      className="w-full text-sm text-brand-700 hover:text-brand-900 font-medium underline-offset-2 hover:underline text-left truncate block"
                     >
                       {m.propietario || '—'}
                     </button>
@@ -329,7 +329,7 @@ export default function Clientes() {
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
               Propietarios registrados
             </h2>
-            <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">
               {total}{term ? ' encontrados' : ''}
             </span>
 
@@ -345,7 +345,7 @@ export default function Clientes() {
                 placeholder="Buscar por mascota, dueño o DNI…"
                 // text-base en el celular: por debajo de 16px el navegador hace
                 // zoom al enfocar el campo y descuadra la pantalla.
-                className="text-base sm:text-xs pl-8 pr-3 py-2 sm:py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-full sm:w-52"
+                className="text-base sm:text-xs pl-8 pr-3 py-2 sm:py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white w-full sm:w-52"
               />
             </div>
           </div>
@@ -393,7 +393,7 @@ export default function Clientes() {
                     {clientesFiltrados.map((c, i) => (
                       <tr
                         key={c.id}
-                        className={`border-b border-slate-50 hover:bg-purple-50/40 transition cursor-pointer ${i % 2 === 0 ? '' : 'bg-slate-50/30'}`}
+                        className={`border-b border-slate-50 hover:bg-brand-50/40 transition cursor-pointer ${i % 2 === 0 ? '' : 'bg-slate-50/30'}`}
                         onClick={() => navigate(`/clientes/${c.id}`)}
                       >
                         <td className="px-5 py-3.5">
@@ -412,7 +412,7 @@ export default function Clientes() {
                         <td className="px-5 py-3.5 text-right">
                           <button
                             onClick={e => { e.stopPropagation(); navigate(`/clientes/${c.id}`) }}
-                            className="flex items-center gap-1 ml-auto text-purple-600 hover:text-purple-800 font-medium text-xs"
+                            className="flex items-center gap-1 ml-auto text-brand-600 hover:text-brand-800 font-medium text-xs"
                           >
                             Ver detalle <ChevronRightIcon />
                           </button>
@@ -435,7 +435,7 @@ export default function Clientes() {
                       <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
                         DNI: {c.dni || '—'}
                       </span>
-                      <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
+                      <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">
                         {c.pacientes?.length ?? 0} {c.pacientes?.length === 1 ? 'mascota' : 'mascotas'}
                       </span>
                     </div>
@@ -475,7 +475,7 @@ export default function Clientes() {
                 <button
                   onClick={() => irPagina(pagina + 1)}
                   disabled={pagina >= totalPaginas}
-                  className="px-3 py-1.5 text-xs font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Siguiente →
                 </button>

@@ -61,7 +61,7 @@ function DSec({ title, show, children }) {
   if (!show) return null
   return (
     <div className="pt-2 first:pt-0">
-      <p className="text-xs font-semibold uppercase tracking-wide text-purple-700 mb-1">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-brand-700 mb-1">{title}</p>
       <div className="space-y-0.5 pl-1">{children}</div>
     </div>
   )
@@ -82,19 +82,19 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete, onA
 
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
-      <div className="flex items-stretch bg-purple-700 text-white">
+      <div className="flex items-stretch bg-brand-700 text-white">
         <button
           onClick={() => setOpen(o => !o)}
-          className="flex-1 flex items-center justify-between px-4 py-2.5 hover:bg-purple-800 text-left transition min-w-0"
+          className="flex-1 flex items-center justify-between px-4 py-2.5 hover:bg-brand-800 text-left transition min-w-0"
         >
           <div className="min-w-0">
             <span className="text-sm font-semibold">{fmtFechaHora(h.fecha || h.creado_en)}</span>
-            <span className="block text-xs text-purple-200 truncate">
+            <span className="block text-xs text-brand-200 truncate">
               {h.motivo_consulta || '(sin motivo)'}
               {h.diagnostico_presuntivo ? ` · Dx: ${h.diagnostico_presuntivo}` : ''}
             </span>
             {h.veterinario_nombre && (
-              <span className="block text-xs text-purple-200/90 truncate">
+              <span className="block text-xs text-brand-200/90 truncate">
                 Atendido por: {h.veterinario_nombre}
               </span>
             )}
@@ -110,7 +110,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete, onA
         <button
           onClick={() => fichaConsultaPDF(paciente, cliente, h)}
           title="Descargar esta consulta en PDF"
-          className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-purple-800 transition shrink-0"
+          className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-brand-800 transition shrink-0"
         >
           <Download className="w-4 h-4" />
         </button>
@@ -119,7 +119,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete, onA
           <button
             onClick={() => onEdit(h)}
             title="Editar esta consulta"
-            className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-purple-800 transition shrink-0"
+            className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-brand-800 transition shrink-0"
           >
             <Pencil className="w-4 h-4" />
           </button>
@@ -187,7 +187,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete, onA
 
 // ── Gráfico de evolución clínica (peso / T° / FC / FR) ───────────────────────
 const METRICAS = [
-  { key: 'peso_kg',                 label: 'Peso',        unidad: 'kg',  color: '#7c3aed' },
+  { key: 'peso_kg',                 label: 'Peso',        unidad: 'kg',  color: '#335e8a' },
   { key: 'temperatura_c',           label: 'Temperatura', unidad: '°C',  color: '#f59e0b' },
   { key: 'frecuencia_cardiaca',     label: 'Frec. cardiaca', unidad: 'lpm', color: '#ef4444' },
   { key: 'frecuencia_respiratoria', label: 'Frec. respiratoria', unidad: 'rpm', color: '#0ea5e9' },
@@ -213,7 +213,7 @@ function GraficoEvolucion({ historias }) {
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2 flex-wrap">
-        <TrendingUp className="w-4 h-4 text-purple-500" />
+        <TrendingUp className="w-4 h-4 text-brand-500" />
         <h2 className="text-sm font-semibold text-slate-700">Evolución clínica</h2>
         <div className="ml-auto flex items-center gap-1.5 flex-wrap">
           {disponibles.map(x => (
@@ -265,7 +265,7 @@ function GraficoEvolucion({ historias }) {
 }
 
 // ── Helpers PDF compartidos ──────────────────────────────────────────────────
-const _MORADO = [88, 28, 135]
+const _MORADO = [33, 61, 90]
 const _W = 210, _M = 14
 
 function _seccion(doc, title, rows) {
@@ -537,7 +537,7 @@ export default function HistorialPaciente() {
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center gap-3 static md:sticky md:top-0 md:z-10 flex-wrap">
         <button onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-700 transition font-medium shrink-0">
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-brand-700 transition font-medium shrink-0">
           <ChevronLeft className="w-4 h-4" /> Volver
         </button>
         <span className="text-slate-300">/</span>
@@ -557,7 +557,7 @@ export default function HistorialPaciente() {
           <button
             onClick={() => generarPDF(paciente, cliente, ordenadas)}
             disabled={ordenadas.length === 0}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-40"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-40"
           >
             <Download className="w-4 h-4" /> PDF
           </button>
@@ -588,13 +588,13 @@ export default function HistorialPaciente() {
               onClick={() => setTab(id)}
               className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
                 tab === id
-                  ? 'border-purple-600 text-purple-700'
+                  ? 'border-brand-600 text-brand-700'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
               <Icon className="w-4 h-4" /> {label}
               {count != null && count > 0 && (
-                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${tab === id ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${tab === id ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
               )}
             </button>
           ))}
@@ -617,8 +617,8 @@ export default function HistorialPaciente() {
               <div className="flex flex-col gap-5">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
-                    <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center">
-                      <ClipboardList className="w-4 h-4 text-purple-600" />
+                    <div className="w-9 h-9 rounded-lg bg-brand-100 flex items-center justify-center">
+                      <ClipboardList className="w-4 h-4 text-brand-600" />
                     </div>
                     <div>
                       <p className="text-xs text-slate-400 font-medium">Consultas</p>

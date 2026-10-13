@@ -40,12 +40,12 @@ export default function HistorialContactos({ clienteId, pacientes = [] }) {
     finally { setGuardando(false) }
   }
 
-  const campo = 'border border-slate-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-300'
+  const campo = 'border border-slate-200 rounded-lg px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-300'
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm">
       <button onClick={() => setAbierto(a => !a)}
         className="w-full flex items-center gap-2 px-6 py-3 text-left">
-        <PhoneCall className="w-4 h-4 text-purple-500" />
+        <PhoneCall className="w-4 h-4 text-brand-500" />
         <span className="flex-1 text-sm font-semibold text-slate-700">Contactos con el dueño</span>
         {abierto ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
       </button>
@@ -68,7 +68,7 @@ export default function HistorialContactos({ clienteId, pacientes = [] }) {
             <input className={`${campo} flex-1 min-w-[160px]`} placeholder="Nota (opcional)"
               value={form.nota} onChange={e => setForm(f => ({ ...f, nota: e.target.value }))} />
             <button onClick={guardar} disabled={guardando}
-              className="text-xs font-medium bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-lg px-3 py-2">
+              className="text-xs font-medium bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white rounded-lg px-3 py-2">
               Registrar
             </button>
           </div>

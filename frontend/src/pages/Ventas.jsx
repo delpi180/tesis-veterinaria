@@ -45,7 +45,7 @@ const mismoMes = (iso, ref) => {
 function reporteVentasPDF(ventas, rango) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const W = 210
-  const morado = [88, 28, 135]
+  const morado = [33, 61, 90]
 
   doc.setFillColor(...morado)
   doc.rect(0, 0, W, 24, 'F')
@@ -102,7 +102,7 @@ function reporteVentasPDF(ventas, rango) {
 function generarBoleta(venta, cliente) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const W = 210
-  const morado = [88, 28, 135]
+  const morado = [33, 61, 90]
 
   const clinica = clinicaActual()
 
@@ -387,10 +387,10 @@ export default function Ventas() {
   const mesLabel = ahora.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
 
   const STATS = [
-    { label: 'Ingresos del mes', value: fmtMoneda(ingresosMes), Icon: TrendingUp, bg: 'bg-emerald-50', border: 'border-emerald-200', icon: 'text-emerald-600' },
-    { label: 'Ventas del mes', value: String(ventasMes.length), Icon: ShoppingCart, bg: 'bg-purple-50', border: 'border-purple-200', icon: 'text-purple-600' },
-    { label: 'Ítems vendidos', value: String(unidadesMes), Icon: Package, bg: 'bg-amber-50', border: 'border-amber-200', icon: 'text-amber-600' },
-    { label: 'Ticket promedio', value: fmtMoneda(ticketPromedio), Icon: CreditCard, bg: 'bg-sky-50', border: 'border-sky-200', icon: 'text-sky-600' },
+    { label: 'Ingresos del mes', value: fmtMoneda(ingresosMes), Icon: TrendingUp, bg: 'bg-white', border: 'border-slate-200', icon: 'text-slate-500' },
+    { label: 'Ventas del mes', value: String(ventasMes.length), Icon: ShoppingCart, bg: 'bg-white', border: 'border-slate-200', icon: 'text-slate-500' },
+    { label: 'Ítems vendidos', value: String(unidadesMes), Icon: Package, bg: 'bg-white', border: 'border-slate-200', icon: 'text-slate-500' },
+    { label: 'Ticket promedio', value: fmtMoneda(ticketPromedio), Icon: CreditCard, bg: 'bg-white', border: 'border-slate-200', icon: 'text-slate-500' },
   ]
 
   // ── Carrito (POS) ──────────────────────────────────────────────────────────
@@ -502,15 +502,15 @@ export default function Ventas() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between flex-wrap gap-3 static md:sticky md:top-0 md:z-10">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Ventas y Reportes</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{today}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-3 py-1.5 rounded-lg border border-purple-200 capitalize">
+          <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-3 py-1.5 rounded-lg border border-brand-200 first-letter:uppercase">
             {mesLabel}
           </span>
           <button
             onClick={abrirModal}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
+            className="flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow transition"
           >
             <Plus className="w-4 h-4" /> Nueva Venta
           </button>
@@ -540,7 +540,7 @@ export default function Ventas() {
 
         {/* Top ítems del mes */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-slate-700 mb-4">Más vendidos — <span className="capitalize">{mesLabel}</span></h3>
+          <h3 className="text-sm font-semibold text-slate-700 mb-4">Más vendidos — <span className="inline-block first-letter:uppercase">{mesLabel}</span></h3>
           {topItems.length === 0 ? (
             <p className="text-xs text-slate-400 py-4 text-center">Sin ventas registradas este mes</p>
           ) : (
@@ -557,7 +557,7 @@ export default function Ventas() {
                     <p className="text-xs font-bold text-slate-600">{fmtMoneda(monto)}</p>
                   </div>
                   <div className="w-full bg-slate-100 rounded-full h-1.5">
-                    <div className={`h-1.5 rounded-full transition-all ${tipo === 'servicio' ? 'bg-sky-500' : 'bg-purple-500'}`}
+                    <div className={`h-1.5 rounded-full transition-all ${tipo === 'servicio' ? 'bg-sky-500' : 'bg-brand-500'}`}
                       style={{ width: `${Math.round((monto / maxMonto) * 100)}%` }} />
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">{cantidad} {tipo === 'servicio' ? 'atenciones' : 'unidades'}</p>
@@ -570,9 +570,9 @@ export default function Ventas() {
         {/* Historial */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2 flex-wrap">
-            <Receipt className="w-4 h-4 text-purple-500" />
+            <Receipt className="w-4 h-4 text-brand-500" />
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Historial de Ventas</h2>
-            <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">
               {ventas.length}
             </span>
 
@@ -582,24 +582,24 @@ export default function Ventas() {
               <input
                 type="date" value={rango.desde}
                 onChange={e => setRango(r => ({ ...r, desde: e.target.value }))}
-                className="text-xs px-2 py-1 border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="text-xs px-2 py-1 border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-300"
               />
               <label className="text-xs text-slate-400">al</label>
               <input
                 type="date" value={rango.hasta}
                 onChange={e => setRango(r => ({ ...r, hasta: e.target.value }))}
-                className="text-xs px-2 py-1 border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                className="text-xs px-2 py-1 border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-300"
               />
               {(rango.desde || rango.hasta) && (
                 <button onClick={limpiarRango}
-                  className="text-xs text-purple-600 hover:text-purple-800 font-medium">
+                  className="text-xs text-brand-600 hover:text-brand-800 font-medium">
                   Limpiar
                 </button>
               )}
               <button
                 onClick={() => reporteVentasPDF(ventas, rango)}
                 disabled={ventas.length === 0}
-                className="flex items-center gap-1 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg px-2.5 py-1 hover:bg-purple-50 transition disabled:opacity-40"
+                className="flex items-center gap-1 text-xs font-semibold text-brand-700 border border-brand-200 rounded-lg px-2.5 py-1 hover:bg-brand-50 transition disabled:opacity-40"
               >
                 <FileText className="w-3.5 h-3.5" /> Reporte PDF
               </button>
@@ -673,7 +673,7 @@ export default function Ventas() {
                           onClick={() => generarBoleta(v, v.cliente_nombre
                             ? { nombre: v.cliente_nombre, dni: v.cliente_dni } : null)}
                           title="Generar boleta PDF"
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg px-2.5 py-1 hover:bg-purple-50 transition"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 border border-brand-200 rounded-lg px-2.5 py-1 hover:bg-brand-50 transition"
                         >
                           <FileText className="w-3.5 h-3.5" /> PDF
                         </button>
@@ -716,12 +716,12 @@ export default function Ventas() {
               <div className="flex-1 max-w-xs relative">
                 {clienteId ? (
                   <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5 text-xs">
+                    <div className="flex items-center justify-between gap-2 bg-brand-50 border border-brand-200 rounded-lg px-3 py-1.5 text-xs">
                       <span className="text-slate-800 font-semibold truncate flex-1 min-w-0">
                         {cliSelLabel}
                       </span>
                       <button type="button" onClick={limpiarCliente}
-                        className="text-purple-600 hover:text-purple-800 font-semibold shrink-0">Cambiar</button>
+                        className="text-brand-600 hover:text-brand-800 font-semibold shrink-0">Cambiar</button>
                     </div>
                     {/* Para cuál de sus mascotas. Con una sola no se pregunta
                         (ya viene elegida) y con ninguna no se muestra: sirve
@@ -731,7 +731,7 @@ export default function Ventas() {
                       <select
                         value={pacienteId}
                         onChange={e => setPacienteId(e.target.value)}
-                        className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+                        className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-brand-300"
                       >
                         <option value="">¿Para qué mascota? (opcional)</option>
                         {mascotas.map(m => (
@@ -747,7 +747,7 @@ export default function Ventas() {
                       value={cliBusq}
                       onChange={e => setCliBusq(e.target.value)}
                       placeholder="Buscar por DNI o nombre…"
-                      className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+                      className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white"
                       autoComplete="off"
                     />
                     {cliBusq.trim() && (
@@ -759,7 +759,7 @@ export default function Ventas() {
                         ) : (
                           cliResultados.map(c => (
                             <button key={c.id} type="button" onClick={() => elegirCliente(c)}
-                              className="block w-full text-left text-xs px-3 py-2 hover:bg-purple-50 transition border-b border-slate-50 last:border-b-0">
+                              className="block w-full text-left text-xs px-3 py-2 hover:bg-brand-50 transition border-b border-slate-50 last:border-b-0">
                               {c.nombre}{c.dni ? ` (${c.dni})` : ''}
                             </button>
                           ))
@@ -778,17 +778,17 @@ export default function Ventas() {
             <div className="md:hidden flex border-b border-slate-100 shrink-0">
               <button type="button" onClick={() => setPosVista('catalogo')}
                 className={`flex-1 py-2.5 text-xs font-semibold text-center transition ${
-                  posVista === 'catalogo' ? 'text-purple-700 border-b-2 border-purple-700 bg-purple-50/50' : 'text-slate-500'
+                  posVista === 'catalogo' ? 'text-brand-700 border-b-2 border-brand-700 bg-brand-50/50' : 'text-slate-500'
                 }`}>
                 <Package className="w-3.5 h-3.5 inline mr-1" />Catálogo
               </button>
               <button type="button" onClick={() => setPosVista('carrito')}
                 className={`flex-1 py-2.5 text-xs font-semibold text-center transition relative ${
-                  posVista === 'carrito' ? 'text-purple-700 border-b-2 border-purple-700 bg-purple-50/50' : 'text-slate-500'
+                  posVista === 'carrito' ? 'text-brand-700 border-b-2 border-brand-700 bg-brand-50/50' : 'text-slate-500'
                 }`}>
                 <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />Carrito
                 {carrito.length > 0 && (
-                  <span className="absolute -top-1 right-1/4 bg-purple-700 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 right-1/4 bg-brand-700 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                     {carrito.length}
                   </span>
                 )}
@@ -804,7 +804,7 @@ export default function Ventas() {
                 <div className="px-4 pt-3 flex gap-2">
                   <button
                     onClick={() => { setTab('producto'); setCatBusqueda('') }}
-                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${tab === 'producto' ? 'bg-purple-100 text-purple-700' : 'text-slate-500 hover:bg-slate-100'}`}
+                    className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${tab === 'producto' ? 'bg-brand-100 text-brand-700' : 'text-slate-500 hover:bg-slate-100'}`}
                   >
                     <Package className="w-3.5 h-3.5" /> Productos
                   </button>
@@ -823,13 +823,13 @@ export default function Ventas() {
                     <input
                       type="text" value={catBusqueda} onChange={e => setCatBusqueda(e.target.value)}
                       placeholder={tab === 'producto' ? 'Buscar producto o código…' : 'Buscar servicio…'}
-                      className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-full"
+                      className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white w-full"
                     />
                   </div>
                   {tab === 'producto' && (
                     <select
                       value={catCategoria} onChange={e => setCatCategoria(e.target.value)}
-                      className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white text-slate-600"
+                      className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white text-slate-600"
                     >
                       <option value="">Todas</option>
                       {CATEGORIAS.map(c => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
@@ -846,7 +846,7 @@ export default function Ventas() {
                     return (
                       <button
                         key={p.id} type="button" onClick={() => { agregarProducto(p) }} disabled={agotado || tope}
-                        className="text-left border border-slate-200 rounded-lg px-3 py-2 hover:border-purple-300 hover:bg-purple-50/40 transition flex items-center justify-between gap-2 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed"
+                        className="text-left border border-slate-200 rounded-lg px-3 py-2 hover:border-brand-300 hover:bg-brand-50/40 transition flex items-center justify-between gap-2 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed"
                       >
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-slate-800 truncate">{p.nombre}</p>
@@ -857,7 +857,7 @@ export default function Ventas() {
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-sm font-semibold text-slate-700">{fmtMoneda(p.precio)}</span>
-                          <Plus className="w-4 h-4 text-purple-500" />
+                          <Plus className="w-4 h-4 text-brand-500" />
                         </div>
                       </button>
                     )
@@ -894,7 +894,7 @@ export default function Ventas() {
                 {posVista === 'catalogo' && carrito.length > 0 && (
                   <div className="md:hidden px-4 py-3 border-t border-slate-100 shrink-0">
                     <button type="button" onClick={() => setPosVista('carrito')}
-                      className="w-full py-2.5 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition shadow">
+                      className="w-full py-2.5 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg flex items-center justify-center gap-2 transition shadow">
                       <ShoppingCart className="w-4 h-4" />
                       Ver carrito ({carrito.length}) — {fmtMoneda(totalFinal)}
                     </button>
@@ -906,14 +906,14 @@ export default function Ventas() {
               <div className={`flex flex-col min-h-0 ${posVista !== 'carrito' ? 'hidden md:flex' : 'flex'}`}>
                 {/* Botón volver al catálogo (solo móvil) */}
                 <button type="button" onClick={() => setPosVista('catalogo')}
-                  className="md:hidden px-4 py-2 text-xs text-purple-700 font-semibold flex items-center gap-1 border-b border-slate-100 shrink-0 hover:bg-purple-50/50 transition">
+                  className="md:hidden px-4 py-2 text-xs text-brand-700 font-semibold flex items-center gap-1 border-b border-slate-100 shrink-0 hover:bg-brand-50/50 transition">
                   ← Seguir agregando
                 </button>
 
                 <div className="px-4 py-3 border-b border-slate-100 items-center gap-2 hidden md:flex">
-                  <ShoppingCart className="w-4 h-4 text-purple-500" />
+                  <ShoppingCart className="w-4 h-4 text-brand-500" />
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Carrito</span>
-                  <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{carrito.length}</span>
+                  <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{carrito.length}</span>
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
@@ -987,7 +987,7 @@ export default function Ventas() {
                           key={v} type="button" onClick={() => setMetodoPago(v)}
                           className={`text-xs font-semibold py-1.5 rounded-lg border transition ${
                             metodoPago === v
-                              ? 'bg-purple-700 text-white border-purple-700'
+                              ? 'bg-brand-700 text-white border-brand-700'
                               : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                           }`}
                         >
@@ -1004,7 +1004,7 @@ export default function Ventas() {
                       value={descuentoPct}
                       onChange={e => setDescuentoPct(e.target.value)}
                       placeholder="0"
-                      className="w-20 text-sm text-right border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                      className="w-20 text-sm text-right border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-300"
                     />
                   </div>
                   {/* Resumen */}
@@ -1028,7 +1028,7 @@ export default function Ventas() {
                       Cancelar
                     </button>
                     <button type="button" onClick={handleGuardar} disabled={guardando}
-                      className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                      className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50 flex items-center justify-center gap-2">
                       <FileText className="w-4 h-4" />
                       {guardando ? 'Registrando…' : 'Registrar Boleta'}
                     </button>

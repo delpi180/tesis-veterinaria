@@ -4,7 +4,7 @@ import { api } from '../services/api'
 import { useToast } from './Toast'
 import { useConfirmar } from './Confirmar'
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
+const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white'
 const TIPOS = { medicamento: 'Medicamento', raza: 'Raza', abreviatura: 'Abreviatura', persona: 'Persona', otro: 'Otro' }
 const VACIO = { termino: '', suena_como: '', tipo: 'medicamento' }
 
@@ -44,7 +44,7 @@ export default function GlosarioDictado() {
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <BookA className="w-4 h-4 text-purple-500" />
+        <BookA className="w-4 h-4 text-brand-500" />
         <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Glosario del dictado</h2>
       </div>
       <div className="p-5 space-y-4">
@@ -62,7 +62,7 @@ export default function GlosarioDictado() {
             {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <button type="submit" disabled={guardando}
-            className="sm:col-span-2 flex items-center justify-center gap-1.5 bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg px-3 py-2">
+            className="sm:col-span-2 flex items-center justify-center gap-1.5 bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg px-3 py-2">
             <Plus className="w-4 h-4" /> Agregar
           </button>
         </form>

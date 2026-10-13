@@ -124,7 +124,7 @@ export default function Contactos() {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center gap-3 flex-wrap">
-        <PhoneCall className="w-5 h-5 text-purple-600" />
+        <PhoneCall className="w-5 h-5 text-brand-600" />
         <div className="flex-1 min-w-0">
           <h1 className="text-lg font-bold text-slate-800">Contactar clientes</h1>
           <p className="text-xs text-slate-500">A quién escribir o llamar hoy, con el mensaje ya armado.</p>
@@ -144,9 +144,9 @@ export default function Contactos() {
           {tabs.map(t => (
             <button key={t.k} onClick={() => setMotivo(t.k)}
               className={`text-xs font-medium rounded-full px-3 py-1.5 border transition ${
-                motivo === t.k ? 'bg-purple-700 text-white border-purple-700'
+                motivo === t.k ? 'bg-brand-700 text-white border-brand-700'
                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}>
-              {t.l} <span className={motivo === t.k ? 'text-purple-200' : 'text-slate-500'}>· {t.n}</span>
+              {t.l} <span className={motivo === t.k ? 'text-brand-200' : 'text-slate-500'}>· {t.n}</span>
             </button>
           ))}
         </div>
@@ -156,7 +156,7 @@ export default function Contactos() {
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input value={buscar} onChange={e => setBuscar(e.target.value)}
               placeholder="Buscar dueño, mascota o vacuna"
-              className="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              className="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
           </div>
           <label className="flex items-center gap-2 text-xs text-slate-700">
             <input type="checkbox" checked={ocultarHechos} onChange={e => setOcultarHechos(e.target.checked)} />
@@ -187,7 +187,7 @@ export default function Contactos() {
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <button onClick={() => navigate(`/clientes/${p.cliente_id}`)}
-                        className="text-sm font-semibold text-slate-800 hover:text-purple-700 hover:underline">
+                        className="text-sm font-semibold text-slate-800 hover:text-brand-700 hover:underline">
                         {p.propietario}
                       </button>
                       <span className="text-sm text-slate-600">· {p.paciente}</span>
@@ -270,16 +270,16 @@ export default function Contactos() {
         </div>
       )}
       {cola && (
-        <div className="fixed bottom-0 inset-x-0 md:left-64 bg-purple-950 text-white px-4 py-3 flex items-center gap-3 z-30">
+        <div className="fixed bottom-0 inset-x-0 md:left-64 bg-brand-950 text-white px-4 py-3 flex items-center gap-3 z-30">
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-purple-200">Envío en lote · {cola.i + 1} de {cola.items.length}</p>
+            <p className="text-xs text-brand-200">Envío en lote · {cola.i + 1} de {cola.items.length}</p>
             <p className="text-sm font-medium truncate">
               {cola.items[cola.i].propietario} · {cola.items[cola.i].paciente}
             </p>
           </div>
-          <button onClick={avanzarCola} className="text-xs text-purple-200 hover:text-white px-3 py-2">Omitir</button>
+          <button onClick={avanzarCola} className="text-xs text-brand-200 hover:text-white px-3 py-2">Omitir</button>
           <button onClick={() => { setCola(null); setSeleccion(new Set()) }}
-            className="text-xs text-purple-200 hover:text-white px-3 py-2">Terminar</button>
+            className="text-xs text-brand-200 hover:text-white px-3 py-2">Terminar</button>
           <button onClick={enviarDeCola}
             className="flex items-center gap-1.5 text-sm font-medium bg-emerald-500 hover:bg-emerald-400 text-white rounded-lg px-4 py-2">
             <MessageCircle className="w-4 h-4" /> Abrir WhatsApp
@@ -337,10 +337,10 @@ function EditorMensajes({ onCerrar }) {
                 </label>
                 <textarea rows={3} value={textos[p.motivo] ?? ''}
                   onChange={e => setTextos(t => ({ ...t, [p.motivo]: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-300" />
                 <div className="flex gap-2">
                   <button onClick={() => guardar(p.motivo)} disabled={textos[p.motivo] === p.texto}
-                    className="text-xs font-medium bg-purple-700 hover:bg-purple-800 disabled:opacity-40 text-white rounded px-3 py-1.5">
+                    className="text-xs font-medium bg-brand-700 hover:bg-brand-800 disabled:opacity-40 text-white rounded px-3 py-1.5">
                     Guardar
                   </button>
                   {p.personalizada && (

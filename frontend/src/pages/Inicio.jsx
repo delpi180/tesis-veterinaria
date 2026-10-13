@@ -6,9 +6,9 @@ import {
 } from 'recharts'
 import {
   Stethoscope, Users, Coins, AlertTriangle,
-  Clock, PawPrint, ChevronRight, TrendingUp, Syringe, MessageCircle, Package, Check,
+  PawPrint, ChevronRight, Syringe, MessageCircle, Package, Check,
 } from 'lucide-react'
-import { api, getUsuario } from '../services/api'
+import { api } from '../services/api'
 import { Skeleton, SkeletonFilas } from '../components/Skeleton'
 import { estadoStyle, estadoLabel, waRecordatorio } from '../utils/citas'
 
@@ -23,7 +23,7 @@ function CustomTooltip({ active, payload, label }) {
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-lg px-4 py-3 text-sm">
       <p className="font-semibold text-slate-700 mb-1">{label}</p>
-      <p className="text-purple-600 font-bold">{payload[0].value} consultas</p>
+      <p className="text-brand-600 font-bold">{payload[0].value} consultas</p>
     </div>
   )
 }
@@ -69,7 +69,6 @@ export default function Inicio() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
 
-  const usuario = getUsuario() || 'Veterinario'
   const citasHoy       = data?.citas_hoy ?? []
   const citasPendientes = citasHoy.filter(c => c.estado !== 'cancelada' && c.estado !== 'atendida')
   const semana         = data?.consultas_semana ?? []
@@ -86,29 +85,29 @@ export default function Inicio() {
     {
       label: 'Consultas Hoy', value: data?.consultas_hoy ?? '—',
       sub: `${totalSemana} esta semana`,
-      Icon: Stethoscope, bg: 'bg-purple-50', border: 'border-purple-200',
-      icon: 'text-purple-600', ring: 'bg-purple-100',
+      Icon: Stethoscope, bg: 'bg-white', border: 'border-slate-200',
+      icon: 'text-slate-500', ring: 'bg-slate-100',
     },
     {
       label: 'Ingresos del Día', value: fmtMoneda(data?.ingresos_dia),
       sub: `${fmtMoneda(data?.ingresos_mes)} en el mes`,
-      Icon: Coins, bg: 'bg-emerald-50', border: 'border-emerald-200',
-      icon: 'text-emerald-600', ring: 'bg-emerald-100',
+      Icon: Coins, bg: 'bg-white', border: 'border-slate-200',
+      icon: 'text-slate-500', ring: 'bg-slate-100',
     },
     {
       label: 'Clientes / Mascotas', value: `${data?.total_clientes ?? '—'} / ${data?.total_pacientes ?? '—'}`,
       sub: 'Registrados en el sistema',
-      Icon: Users, bg: 'bg-sky-50', border: 'border-sky-200',
-      icon: 'text-sky-600', ring: 'bg-sky-100',
+      Icon: Users, bg: 'bg-white', border: 'border-slate-200',
+      icon: 'text-slate-500', ring: 'bg-slate-100',
     },
     {
       label: 'Alertas de Inventario', value: alertasInv,
       sub: !alertasInv ? 'Todo en orden'
         : porVencer.length && stockBajo.length ? 'Por reponer y por vencer'
         : porVencer.length ? 'Productos por vencer' : 'Productos con stock bajo',
-      Icon: AlertTriangle, bg: alertasInv ? 'bg-red-50' : 'bg-slate-50',
+      Icon: AlertTriangle, bg: alertasInv ? 'bg-red-50' : 'bg-white',
       border: alertasInv ? 'border-red-200' : 'border-slate-200',
-      icon: alertasInv ? 'text-red-500' : 'text-slate-400',
+      icon: alertasInv ? 'text-red-600' : 'text-slate-500',
       ring: alertasInv ? 'bg-red-100' : 'bg-slate-100',
     },
   ]
@@ -119,12 +118,8 @@ export default function Inicio() {
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">Panel de Control</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-emerald-500" />
-          <span className="text-xs font-semibold text-emerald-600">Sistema operativo</span>
+          <h1 className="text-xl font-bold text-slate-800">Inicio</h1>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{today}</p>
         </div>
       </header>
 
@@ -136,40 +131,20 @@ export default function Inicio() {
           </div>
         )}
 
-        {/* Banner */}
-        <div className="bg-gradient-to-r from-purple-700 to-violet-600 rounded-2xl px-7 py-5 text-white shadow-md flex items-center justify-between">
-          <div>
-            <p className="text-purple-200 text-sm font-medium mb-1">Bienvenido de nuevo</p>
-            <h2 className="text-2xl font-bold capitalize">{usuario}</h2>
-            <p className="text-purple-200 text-sm mt-1">
-              {loading ? 'Cargando resumen del día…' : (
-                <>
-                  Tienes <strong className="text-white">{citasPendientes.length} turno{citasPendientes.length !== 1 ? 's' : ''}</strong> pendiente{citasPendientes.length !== 1 ? 's' : ''} hoy
-                  {alertasInv > 0 && (
-                    <> y <strong className="text-white">{alertasInv} alerta{alertasInv !== 1 ? 's' : ''}</strong> de inventario</>
-                  )}
-                  {vacunas.length > 0 && (
-                    <>, con <strong className="text-white">{vacunas.length} vacuna{vacunas.length !== 1 ? 's' : ''}</strong> por recordar</>
-                  )}.
-                </>
+        {/* Resumen del día: una frase, sin banner. Lo accionable está abajo. */}
+        <p className="text-sm text-slate-700">
+          {loading ? 'Cargando el resumen del día…' : (
+            <>
+              Hoy hay <strong>{citasPendientes.length} turno{citasPendientes.length !== 1 ? 's' : ''}</strong> pendiente{citasPendientes.length !== 1 ? 's' : ''}
+              {alertasInv > 0 && (
+                <>, <strong>{alertasInv} alerta{alertasInv !== 1 ? 's' : ''}</strong> de inventario</>
               )}
-            </p>
-          </div>
-          <div className="hidden md:flex flex-col items-end gap-2">
-            <button
-              onClick={() => navigate('/turnos')}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-sm font-semibold rounded-lg transition backdrop-blur-sm"
-            >
-              <Clock className="w-4 h-4" /> Ver turnos
-            </button>
-            <button
-              onClick={() => navigate('/clientes')}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-sm font-semibold rounded-lg transition backdrop-blur-sm"
-            >
-              <PawPrint className="w-4 h-4" /> Ver clientes
-            </button>
-          </div>
-        </div>
+              {vacunas.length > 0 && (
+                <> y <strong>{vacunas.length} vacuna{vacunas.length !== 1 ? 's' : ''}</strong> por recordar</>
+              )}.
+            </>
+          )}
+        </p>
 
         {/* En turno ahora */}
         {presentes.length > 0 && (
@@ -214,7 +189,7 @@ export default function Inicio() {
                 <h2 className="text-sm font-semibold text-slate-700">Consultas por Día</h2>
                 <p className="text-xs text-slate-400 mt-0.5">Semana actual — {totalSemana} total</p>
               </div>
-              <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2.5 py-0.5 rounded-full">
+              <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2.5 py-0.5 rounded-full">
                 Esta semana
               </span>
             </div>
@@ -233,10 +208,10 @@ export default function Inicio() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                     <XAxis dataKey="dia" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f5f3ff', radius: 6 }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f2f6fa', radius: 6 }} />
                     <Bar dataKey="consultas" radius={[6, 6, 0, 0]}>
                       {semana.map((entry, index) => (
-                        <Cell key={index} fill={index === HOY_IDX ? '#7c3aed' : '#ddd6fe'} />
+                        <Cell key={index} fill={index === HOY_IDX ? '#335e8a' : '#c3d4e6'} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -244,10 +219,10 @@ export default function Inicio() {
               )}
               <div className="flex items-center gap-4 mt-2 justify-center text-xs text-slate-400">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-violet-700 inline-block" /> Hoy
+                  <span className="w-3 h-3 rounded bg-brand-700 inline-block" /> Hoy
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-violet-200 inline-block" /> Otros días
+                  <span className="w-3 h-3 rounded bg-brand-200 inline-block" /> Otros días
                 </span>
               </div>
             </div>
@@ -259,7 +234,7 @@ export default function Inicio() {
               <h2 className="text-sm font-semibold text-slate-700">Turnos de Hoy</h2>
               <button
                 onClick={() => navigate('/turnos')}
-                className="flex items-center gap-0.5 text-xs text-purple-600 hover:text-purple-800 font-semibold transition"
+                className="flex items-center gap-0.5 text-xs text-brand-600 hover:text-brand-800 font-semibold transition"
               >
                 Ver todos <ChevronRight className="w-3.5 h-3.5" />
               </button>
@@ -278,7 +253,7 @@ export default function Inicio() {
                     className="px-5 py-3 flex items-start gap-3 hover:bg-slate-50/60 transition text-left"
                   >
                     <div className="text-center shrink-0 w-12">
-                      <span className="text-sm font-bold text-purple-700 block">{fmtHora(c.fecha_hora)}</span>
+                      <span className="text-sm font-bold text-brand-700 block">{fmtHora(c.fecha_hora)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-800 truncate">{c.motivo || '(sin motivo)'}</p>
@@ -288,7 +263,7 @@ export default function Inicio() {
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5 truncate">{c.propietario}</p>
                       {c.veterinario && (
-                        <p className="text-xs text-purple-600 font-medium mt-0.5 truncate flex items-center gap-1">
+                        <p className="text-xs text-brand-600 font-medium mt-0.5 truncate flex items-center gap-1">
                           <Stethoscope className="w-3 h-3 shrink-0" />{c.veterinario}
                         </p>
                       )}
@@ -304,7 +279,7 @@ export default function Inicio() {
             <div className="px-5 py-3 border-t border-slate-100">
               <button
                 onClick={() => navigate('/turnos')}
-                className="w-full py-2 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition"
+                className="w-full py-2 text-xs font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition"
               >
                 + Agendar nuevo turno
               </button>
@@ -342,7 +317,7 @@ export default function Inicio() {
                       </p>
                       <button
                         onClick={() => v.cliente_id && navigate(`/clientes/${v.cliente_id}`)}
-                        className="flex items-center gap-1 text-xs text-slate-500 hover:text-purple-700 transition"
+                        className="flex items-center gap-1 text-xs text-slate-500 hover:text-brand-700 transition"
                       >
                         <PawPrint className="w-3 h-3" /> {v.paciente} · {v.propietario}
                       </button>
@@ -380,7 +355,7 @@ export default function Inicio() {
               <h2 className="text-sm font-semibold text-slate-700">Stock Bajo</h2>
               <button
                 onClick={() => navigate('/inventario')}
-                className="ml-auto flex items-center gap-0.5 text-xs text-purple-600 hover:text-purple-800 font-semibold transition"
+                className="ml-auto flex items-center gap-0.5 text-xs text-brand-600 hover:text-brand-800 font-semibold transition"
               >
                 Ir a inventario <ChevronRight className="w-3.5 h-3.5" />
               </button>
@@ -422,28 +397,6 @@ export default function Inicio() {
           </section>
 
         </div>
-
-        {/* Acceso rápido */}
-        <section className="bg-white rounded-xl border border-slate-200 shadow-sm px-5 py-4">
-          <h3 className="text-sm font-semibold text-slate-700 mb-3">Acceso Rápido</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { label: 'Clientes',          to: '/clientes',   color: 'bg-purple-700 hover:bg-purple-600' },
-              { label: 'Turnos',            to: '/turnos',     color: 'bg-sky-600    hover:bg-sky-500'    },
-              { label: 'Inventario',        to: '/inventario', color: 'bg-emerald-600 hover:bg-emerald-500'},
-              { label: 'Ventas y Reportes', to: '/ventas',     color: 'bg-amber-600  hover:bg-amber-500'  },
-            ].map(({ label, to, color }) => (
-              <button
-                key={label}
-                onClick={() => navigate(to)}
-                className={`${color} text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition shadow-sm flex items-center justify-center gap-2`}
-              >
-                {label}
-                <ChevronRight className="w-4 h-4 opacity-70" />
-              </button>
-            ))}
-          </div>
-        </section>
 
       </main>
     </div>

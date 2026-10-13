@@ -27,7 +27,7 @@ export default function Paginacion({ pagina, total, porPagina, onCambiar, etique
         <button
           onClick={() => onCambiar(pagina + 1)}
           disabled={pagina >= totalPaginas}
-          className="px-3 py-1.5 text-xs font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          className="px-3 py-1.5 text-xs font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Siguiente →
         </button>

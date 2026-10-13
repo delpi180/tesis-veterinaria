@@ -28,7 +28,7 @@ const FORM_INICIAL = { fecha: hoyStr(), diagnostico: '', indicaciones: '', items
 // ── PDF de la receta (clínica + paciente + dueño + medicamentos + firma) ────
 // Construye el documento sin guardarlo: cada botón decide qué hacer con él
 // (descargarlo directo, o compartirlo por WhatsApp).
-const _MORADO = [88, 28, 135]
+const _MORADO = [33, 61, 90]
 function nombreArchivoReceta(paciente, receta) {
   return `Receta_${paciente?.nombre ?? 'paciente'}_${receta.fecha}.pdf`
 }
@@ -189,16 +189,16 @@ function ItemsEditor({ items, onChange }) {
             ? 'bg-amber-50 border-amber-300'
             : 'bg-slate-50 border-slate-200'}`}>
           <input value={it.medicamento} onChange={e => update(i, 'medicamento', e.target.value)}
-            placeholder="Medicamento" className="sm:col-span-2 text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            placeholder="Medicamento" className="sm:col-span-2 text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
           <input value={it.dosis} onChange={e => update(i, 'dosis', e.target.value)}
-            placeholder="Dosis (15 mg/kg)" className="text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            placeholder="Dosis (15 mg/kg)" className="text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
           <input value={it.via} onChange={e => update(i, 'via', e.target.value)}
-            placeholder="Vía (Oral)" className="text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            placeholder="Vía (Oral)" className="text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
           <input value={it.frecuencia} onChange={e => update(i, 'frecuencia', e.target.value)}
-            placeholder="Frecuencia (c/12h)" className="text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            placeholder="Frecuencia (c/12h)" className="text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
           <div className="flex items-center gap-1.5">
             <input value={it.duracion} onChange={e => update(i, 'duracion', e.target.value)}
-              placeholder="Duración (5 días)" className="flex-1 text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              placeholder="Duración (5 días)" className="flex-1 text-sm px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
             <button type="button" onClick={() => remove(i)}
               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition shrink-0">
               <Trash2 className="w-4 h-4" />
@@ -225,7 +225,7 @@ function ItemsEditor({ items, onChange }) {
         </div>
       ))}
       <button type="button" onClick={add}
-        className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 border border-dashed border-purple-300 rounded-lg px-3 py-1.5 hover:bg-purple-50 transition w-fit">
+        className="flex items-center gap-1.5 text-xs font-semibold text-brand-700 border border-dashed border-brand-300 rounded-lg px-3 py-1.5 hover:bg-brand-50 transition w-fit">
         <Plus className="w-3.5 h-3.5" /> Agregar medicamento
       </button>
     </div>
@@ -389,12 +389,12 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <Pill className="w-4 h-4 text-purple-500" />
+        <Pill className="w-4 h-4 text-brand-500" />
         <h2 className="text-sm font-semibold text-slate-700">Recetas</h2>
-        <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{recetas.length}</span>
+        <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{recetas.length}</span>
         {puedeEscribir && (
           <button onClick={abrirNueva}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-purple-700 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg transition">
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-brand-700 hover:bg-brand-600 text-white text-xs font-semibold rounded-lg transition">
             <Plus className="w-3.5 h-3.5" /> Nueva receta
           </button>
         )}
@@ -406,7 +406,7 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
 
       {/* Formulario (crear/editar) — solo veterinario */}
       {formAbierto && puedeEscribir && (
-        <form onSubmit={guardar} className="px-4 py-3 border-b border-slate-100 flex flex-col gap-3 bg-purple-50/30">
+        <form onSubmit={guardar} className="px-4 py-3 border-b border-slate-100 flex flex-col gap-3 bg-brand-50/30">
           <div className="flex items-center justify-between">
             <p className="text-sm font-bold text-slate-800">{editId ? 'Editar receta' : 'Nueva receta'}</p>
             <button type="button" onClick={cerrarForm} className="p-1 rounded-lg hover:bg-slate-200 transition text-slate-400">
@@ -428,13 +428,13 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
             <div className="flex flex-col gap-1">
               <label className="text-xs font-semibold text-slate-600">Fecha</label>
               <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
-                className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
             </div>
             <div className="flex flex-col gap-1 sm:col-span-2">
               <label className="text-xs font-semibold text-slate-600">Diagnóstico / motivo</label>
               <input value={form.diagnostico} onChange={e => setForm(f => ({ ...f, diagnostico: e.target.value }))}
                 placeholder="Ej. Gastroenteritis leve"
-                className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300" />
             </div>
           </div>
           <div className="flex flex-col gap-1">
@@ -445,14 +445,14 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
             <label className="text-xs font-semibold text-slate-600">Indicaciones para el propietario</label>
             <textarea rows={2} value={form.indicaciones} onChange={e => setForm(f => ({ ...f, indicaciones: e.target.value }))}
               placeholder="Ej. Dieta blanda por 3 días, control si no mejora…"
-              className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white resize-none focus:outline-none focus:ring-2 focus:ring-brand-300" />
           </div>
           {error && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">{error}</p>}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={cerrarForm}
               className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">Cancelar</button>
             <button type="submit" disabled={guardando}
-              className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+              className="px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
               {guardando ? 'Guardando…' : editId ? 'Guardar cambios' : 'Guardar receta'}
             </button>
           </div>
@@ -476,12 +476,12 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
                   <p className="text-sm font-bold text-slate-800">{fmtFecha(r.fecha)}</p>
                   {r.diagnostico && <p className="text-xs text-slate-500">{r.diagnostico}</p>}
                   {r.veterinario_nombre && (
-                    <p className="text-xs text-purple-700 font-medium mt-0.5">Dr(a). {r.veterinario_nombre}</p>
+                    <p className="text-xs text-brand-700 font-medium mt-0.5">Dr(a). {r.veterinario_nombre}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={() => descargarPDF(paciente, cliente, r)} title="Descargar PDF"
-                    className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition">
+                    className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-brand-700 hover:border-brand-300 transition">
                     <Download className="w-4 h-4" />
                   </button>
                   <button onClick={() => handleEnviar(r)}
@@ -492,7 +492,7 @@ export default function RecetasPaciente({ pacienteId, paciente, cliente }) {
                   {puedeEscribir && (
                     <>
                       <button onClick={() => abrirEditar(r)} title="Editar receta"
-                        className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-purple-700 hover:border-purple-300 transition">
+                        className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 hover:text-brand-700 hover:border-brand-300 transition">
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button onClick={() => eliminar(r)} title="Eliminar receta"

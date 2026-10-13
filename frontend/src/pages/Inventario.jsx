@@ -22,7 +22,7 @@ const CAT_LABEL = {
 const CAT_COLORS = {
   comida:      'bg-amber-100 text-amber-700',
   accesorio:   'bg-slate-100 text-slate-600',
-  medicamento: 'bg-purple-100 text-purple-700',
+  medicamento: 'bg-brand-100 text-brand-700',
 }
 
 const FORM_INICIAL = {
@@ -39,7 +39,7 @@ const FORM_INICIAL = {
   lote:              '',
 }
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
+const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
 
 const fmtMoneda = (n) => `S/ ${Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -128,7 +128,7 @@ function KardexModal({ producto, onClose, onStockCambiado }) {
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <History className="w-4 h-4 text-purple-500" /> Kardex — {producto.nombre}
+              <History className="w-4 h-4 text-brand-500" /> Kardex — {producto.nombre}
             </p>
             <p className="text-xs text-slate-400 font-mono">{producto.codigo} · stock actual: {producto.stock}</p>
           </div>
@@ -146,11 +146,11 @@ function KardexModal({ producto, onClose, onStockCambiado }) {
               className={`px-3 py-2 text-xs font-semibold ${signo === -1 ? 'bg-rose-600 text-white' : 'bg-white text-slate-500'}`}>Salida</button>
           </div>
           <input type="number" min="1" value={cant} onChange={e => setCant(e.target.value)} placeholder="Cant."
-            className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300" />
           <input type="text" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Motivo (ej. compra, merma)"
-            className="flex-1 min-w-[140px] text-sm border border-slate-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            className="flex-1 min-w-[140px] text-sm border border-slate-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300" />
           <button type="submit" disabled={guardando}
-            className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+            className="px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
             {guardando ? '…' : 'Aplicar'}
           </button>
         </form>
@@ -265,7 +265,7 @@ function EntradaIAModal({ onClose, onAplicado }) {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] flex flex-col">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-500" /> Entrada de mercadería por voz/texto
+            <Sparkles className="w-4 h-4 text-brand-500" /> Entrada de mercadería por voz/texto
           </p>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 transition text-slate-400">
             <X className="w-4 h-4" />
@@ -279,7 +279,7 @@ function EntradaIAModal({ onClose, onAplicado }) {
           <textarea
             rows={3} value={texto} onChange={e => setTexto(e.target.value)}
             placeholder={`Ej: ${EJEMPLO_INV}`}
-            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white resize-none"
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white resize-none"
           />
           <div className="flex items-center gap-2">
             <button onClick={grabar} disabled={cargando}
@@ -287,7 +287,7 @@ function EntradaIAModal({ onClose, onAplicado }) {
               {isRecording ? <><StopCircle className="w-4 h-4" /> Detener ({seconds}s)</> : <><Mic className="w-4 h-4" /> Dictar</>}
             </button>
             <button onClick={interpretarTexto} disabled={cargando || isRecording}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
+              className="flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg transition disabled:opacity-50">
               <Sparkles className="w-4 h-4" /> {cargando ? 'Interpretando…' : 'Interpretar'}
             </button>
             {micError && <span className="text-xs text-rose-600">{micError}</span>}
@@ -317,7 +317,7 @@ function EntradaIAModal({ onClose, onAplicado }) {
                       <tr key={i} className="border-b border-slate-50">
                         <td className="px-3 py-2">
                           <input value={it.nombre} onChange={e => setItem(i, 'nombre', e.target.value)}
-                            className="w-full text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300" />
+                            className="w-full text-sm border border-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-brand-300" />
                           {it.codigo && <span className="text-xs font-mono text-slate-400">{it.codigo} · stock {it.stock_actual}</span>}
                         </td>
                         <td className="px-3 py-2">
@@ -329,12 +329,12 @@ function EntradaIAModal({ onClose, onAplicado }) {
                         </td>
                         <td className="px-3 py-2 text-center">
                           <input type="number" min="1" value={it.cantidad} onChange={e => setItem(i, 'cantidad', e.target.value)}
-                            className="w-16 text-sm text-center border border-slate-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300" />
+                            className="w-16 text-sm text-center border border-slate-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-brand-300" />
                         </td>
                         <td className="px-3 py-2 text-right">
                           <input type="number" min="0" step="0.01" value={it.precio ?? ''} onChange={e => setItem(i, 'precio', e.target.value)}
                             placeholder={it.accion === 'nuevo' ? 'req.' : '—'}
-                            className={`w-20 text-sm text-right border rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300 ${it.accion === 'nuevo' && !(Number(it.precio) > 0) ? 'border-rose-300 bg-rose-50' : 'border-slate-200'}`} />
+                            className={`w-20 text-sm text-right border rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-brand-300 ${it.accion === 'nuevo' && !(Number(it.precio) > 0) ? 'border-rose-300 bg-rose-50' : 'border-slate-200'}`} />
                         </td>
                         <td className="px-3 py-2 text-center">
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${it.accion === 'nuevo' ? 'bg-sky-100 text-sky-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -549,7 +549,7 @@ export default function Inventario() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between flex-wrap gap-3 static md:sticky md:top-0 md:z-10">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Inventario y Productos</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{today}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -560,13 +560,13 @@ export default function Inventario() {
           </button>
           <button
             onClick={() => setEntradaIA(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 hover:bg-purple-50 text-sm font-semibold rounded-lg transition"
+            className="flex items-center gap-2 px-4 py-2 border border-brand-200 text-brand-700 hover:bg-brand-50 text-sm font-semibold rounded-lg transition"
           >
             <Sparkles className="w-4 h-4" /> Entrada por voz/texto
           </button>
           <button
             onClick={abrirNuevo}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition"
+            className="flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow transition"
           >
             <Plus className="w-4 h-4" /> Nuevo Producto
           </button>
@@ -607,8 +607,8 @@ export default function Inventario() {
         {/* Tarjetas resumen */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-4 shadow-sm">
-            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-              <Package className="w-5 h-5 text-purple-600" />
+            <div className="w-10 h-10 rounded-xl bg-brand-100 flex items-center justify-center">
+              <Package className="w-5 h-5 text-brand-600" />
             </div>
             <div>
               <p className="text-xs text-slate-400 font-medium">Total productos</p>
@@ -650,14 +650,14 @@ export default function Inventario() {
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
               placeholder="Buscar nombre, código o proveedor…"
-              className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-64"
+              className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white w-64"
             />
           </div>
 
           <select
             value={fCategoria}
             onChange={e => setFCategoria(e.target.value)}
-            className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white text-slate-600"
+            className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white text-slate-600"
           >
             <option value="">Todas las categorías</option>
             {CATEGORIAS.map(c => <option key={c} value={c}>{CAT_LABEL[c]}</option>)}
@@ -666,7 +666,7 @@ export default function Inventario() {
           <select
             value={fEstado}
             onChange={e => setFEstado(e.target.value)}
-            className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white text-slate-600"
+            className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white text-slate-600"
           >
             <option value="">Cualquier estado</option>
             <option value="en_stock">En stock</option>
@@ -677,7 +677,7 @@ export default function Inventario() {
           {hayFiltros && (
             <button
               onClick={limpiarFiltros}
-              className="text-xs text-purple-600 hover:text-purple-800 font-medium ml-auto"
+              className="text-xs text-brand-600 hover:text-brand-800 font-medium ml-auto"
             >
               Limpiar filtros
             </button>
@@ -687,11 +687,11 @@ export default function Inventario() {
         {/* Tabla de productos */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <Package className="w-4 h-4 text-purple-500" />
+            <Package className="w-4 h-4 text-brand-500" />
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
               Catálogo
             </h2>
-            <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
+            <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">
               {filtrados.length}{hayFiltros ? ` de ${productos.length}` : ''}
             </span>
           </div>
@@ -709,13 +709,13 @@ export default function Inventario() {
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   onClick={abrirNuevo}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow-sm transition"
+                  className="flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow-sm transition"
                 >
                   <Plus className="w-4 h-4" /> Nuevo Producto
                 </button>
                 <button
                   onClick={() => setEntradaIA(true)}
-                  className="flex items-center gap-2 px-4 py-2 border border-purple-200 text-purple-700 hover:bg-purple-50 text-sm font-semibold rounded-lg transition"
+                  className="flex items-center gap-2 px-4 py-2 border border-brand-200 text-brand-700 hover:bg-brand-50 text-sm font-semibold rounded-lg transition"
                 >
                   <Sparkles className="w-4 h-4" /> Entrada por voz/texto
                 </button>
@@ -795,7 +795,7 @@ export default function Inventario() {
                           <button
                             onClick={() => abrirEditar(p)}
                             title="Editar"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition"
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
@@ -819,7 +819,7 @@ export default function Inventario() {
             <div className="flex flex-col items-center justify-center py-12 text-slate-400">
               <Search className="w-8 h-8 mb-2 opacity-40" />
               <p className="text-sm">Ningún producto coincide con los filtros</p>
-              <button onClick={limpiarFiltros} className="text-xs text-purple-600 hover:text-purple-800 font-medium mt-2">
+              <button onClick={limpiarFiltros} className="text-xs text-brand-600 hover:text-brand-800 font-medium mt-2">
                 Limpiar filtros
               </button>
             </div>
@@ -951,7 +951,7 @@ export default function Inventario() {
                   <label className="flex items-center gap-2 text-sm text-slate-700 py-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-300"
+                      className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300"
                       checked={form.activo}
                       onChange={e => setForm(f => ({ ...f, activo: e.target.checked }))}
                     />
@@ -999,7 +999,7 @@ export default function Inventario() {
                 </button>
                 <button
                   type="submit" disabled={guardando}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50"
                 >
                   {guardando ? 'Guardando…' : editId ? 'Guardar Cambios' : 'Crear Producto'}
                 </button>

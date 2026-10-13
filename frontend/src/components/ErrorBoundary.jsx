@@ -44,7 +44,7 @@ export class ErrorBoundary extends Component {
                 this.setState({ error: null })
                 window.location.reload()
               }}
-              className="px-5 py-2.5 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg transition"
+              className="px-5 py-2.5 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg transition"
             >
               Recargar aplicación
             </button>

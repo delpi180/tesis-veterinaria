@@ -22,7 +22,7 @@ const ESPECIE_COLORS = {
 }
 const especieColor = (e = '') => ESPECIE_COLORS[e.toLowerCase()] ?? ESPECIE_COLORS.default
 
-const inputCls ='w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
+const inputCls ='w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
 
 const fmtFechaLarga = (iso) =>
@@ -96,7 +96,7 @@ function CamposMascota({ form, setForm }) {
           <input type="text" className={inputCls} value={form.color} onChange={set('color')} placeholder="Ej: Marrón" />
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700 py-2 cursor-pointer">
-          <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-300"
+          <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300"
             checked={form.esterilizado} onChange={e => setForm(p => ({ ...p, esterilizado: e.target.checked }))} />
           Esterilizado
         </label>
@@ -142,8 +142,8 @@ function PacienteForm({ clienteId, onSuccess, onCancel, visible }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className={`bg-purple-50 border border-purple-200 rounded-xl px-5 py-4 flex flex-col gap-3${visible ? '' : ' hidden'}`}>
-      <p className="text-sm font-semibold text-purple-800">Nueva Mascota</p>
+    <form onSubmit={handleSubmit} className={`bg-brand-50 border border-brand-200 rounded-xl px-5 py-4 flex flex-col gap-3${visible ? '' : ' hidden'}`}>
+      <p className="text-sm font-semibold text-brand-800">Nueva Mascota</p>
       <CamposMascota form={form} setForm={setForm} />
       {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
       <div className="flex gap-2 justify-end">
@@ -152,7 +152,7 @@ function PacienteForm({ clienteId, onSuccess, onCancel, visible }) {
           Cancelar
         </button>
         <button type="submit" disabled={saving}
-          className="flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition disabled:opacity-60">
+          className="flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-brand-700 hover:bg-brand-600 text-white rounded-lg transition disabled:opacity-60">
           {saving ? <Spinner color="text-white" /> : null}
           {saving ? 'Guardando…' : 'Registrar Mascota'}
         </button>
@@ -297,7 +297,7 @@ function AgendarCitaModal({ paciente, onClose, onCreated }) {
               Cancelar
             </button>
             <button type="submit" disabled={saving}
-              className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+              className="px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
               {saving ? 'Guardando…' : 'Agendar Cita'}
             </button>
           </div>
@@ -359,7 +359,7 @@ function EditarMascotaModal({ paciente, onClose, onGuardado }) {
               Cancelar
             </button>
             <button type="submit" disabled={saving}
-              className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+              className="px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
               {saving ? 'Guardando…' : 'Guardar Cambios'}
             </button>
           </div>
@@ -409,14 +409,14 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
       {/* Cabecera de la mascota */}
-      <div className="px-5 py-5 bg-gradient-to-br from-purple-700 to-purple-900 text-white">
+      <div className="px-5 py-5 bg-brand-800 text-white">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
             <PawPrint className="w-6 h-6" />
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-lg font-bold leading-tight truncate">{paciente.nombre}</p>
-            <p className="text-xs text-purple-200">
+            <p className="text-xs text-brand-200">
               {paciente.especie}{paciente.raza ? ` · ${paciente.raza}` : ''}
               {paciente.edad != null ? ` · ${paciente.edad} año${paciente.edad !== 1 ? 's' : ''}` : ''}
               {paciente.sexo ? ` · ${paciente.sexo}` : ''}
@@ -425,11 +425,11 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <button onClick={() => onEditar(paciente)} title="Editar mascota"
-              className="p-2 rounded-lg text-purple-200 hover:text-white hover:bg-white/15 transition">
+              className="p-2 rounded-lg text-brand-200 hover:text-white hover:bg-white/15 transition">
               <Pencil className="w-4 h-4" />
             </button>
             <button onClick={() => onEliminar(paciente)} title="Eliminar mascota"
-              className="p-2 rounded-lg text-purple-200 hover:text-white hover:bg-white/15 transition">
+              className="p-2 rounded-lg text-brand-200 hover:text-white hover:bg-white/15 transition">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -476,7 +476,7 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 flex items-center gap-3">
             <Calendar className="w-5 h-5 text-emerald-600 shrink-0" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-emerald-800 capitalize">{fmtFechaLarga(proximaCita.fecha_hora)}</p>
+              <p className="text-xs font-semibold text-emerald-800 first-letter:uppercase">{fmtFechaLarga(proximaCita.fecha_hora)}</p>
               <p className="text-xs text-emerald-600 flex items-center gap-1">
                 <Clock className="w-3 h-3" /> {fmtHora(proximaCita.fecha_hora)}
                 {proximaCita.motivo ? ` · ${proximaCita.motivo}` : ''}
@@ -497,26 +497,26 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button onClick={() => navigate(`/pacientes/${paciente.id}/historial`, { state: { paciente, cliente } })}
             className="flex items-center justify-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition">
-            <FileText className="w-4 h-4 text-purple-600" /> Historia clínica
+            <FileText className="w-4 h-4 text-brand-600" /> Historia clínica
           </button>
           <button onClick={() => setVerAntecedentes(v => !v)}
             className="flex items-center justify-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition">
-            <ClipboardList className="w-4 h-4 text-purple-600" /> Antecedentes
+            <ClipboardList className="w-4 h-4 text-brand-600" /> Antecedentes
           </button>
         </div>
 
         {/* Documentos complementarios (radiografías, análisis, etc.) */}
         <button onClick={() => setVerDocumentos(v => !v)}
           className={`w-full flex items-center justify-center gap-2 px-3 py-2 border text-sm font-medium rounded-lg transition ${
-            verDocumentos ? 'border-purple-300 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+            verDocumentos ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'
           }`}>
-          <Paperclip className="w-4 h-4 text-purple-600" /> Documentos (radiografías, análisis…)
+          <Paperclip className="w-4 h-4 text-brand-600" /> Documentos (radiografías, análisis…)
         </button>
         {verDocumentos && <DocumentosPaciente pacienteId={paciente.id} />}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <button onClick={() => onAgendar(paciente)}
-            className="flex items-center justify-center gap-2 px-3 py-2 border border-purple-200 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-50 transition">
+            className="flex items-center justify-center gap-2 px-3 py-2 border border-brand-200 text-brand-700 text-sm font-medium rounded-lg hover:bg-brand-50 transition">
             <Calendar className="w-4 h-4" /> Agendar cita
           </button>
           {sinTelefono ? (
@@ -681,7 +681,7 @@ export default function DetalleCliente() {
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center gap-4 static md:sticky md:top-0 md:z-10 flex-wrap">
         <button onClick={() => navigate('/clientes')}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-700 transition font-medium">
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-brand-700 transition font-medium">
           <ChevronLeft className="w-4 h-4" /> Clientes
         </button>
         <span className="text-slate-300">/</span>
@@ -727,9 +727,9 @@ export default function DetalleCliente() {
           {/* Lista de mascotas */}
           <section className={`lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden ${selectedId ? 'hidden lg:block' : 'block'}`}>
             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2 flex-wrap">
-              <PawPrint className="w-4 h-4 text-purple-500" />
+              <PawPrint className="w-4 h-4 text-brand-500" />
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Mascotas</h2>
-              <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2.5 py-0.5 rounded-full">
+              <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2.5 py-0.5 rounded-full">
                 {pacientesFiltrados.length}{term ? ` de ${pacientes.length}` : ''}
               </span>
 
@@ -737,11 +737,11 @@ export default function DetalleCliente() {
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
                   placeholder="Buscar mascota…"
-                  className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white w-40" />
+                  className="text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white w-40" />
               </div>
 
               <button onClick={() => setShowForm(v => !v)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-purple-700 hover:bg-purple-600 text-white rounded-lg transition ml-auto">
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-brand-700 hover:bg-brand-600 text-white rounded-lg transition ml-auto">
                 <Plus className="w-3.5 h-3.5" /> Agregar
               </button>
             </div>
@@ -785,7 +785,7 @@ export default function DetalleCliente() {
                       <button
                         onClick={() => setSelectedId(activo ? null : p.id)}
                         title="Opciones rápidas (agendar, WhatsApp, cobrar)"
-                        className={`px-3 flex items-center border-l border-slate-100 transition ${activo ? 'text-purple-600 bg-purple-50' : 'text-slate-300 hover:text-purple-600 hover:bg-slate-50'}`}
+                        className={`px-3 flex items-center border-l border-slate-100 transition ${activo ? 'text-brand-600 bg-brand-50' : 'text-slate-300 hover:text-brand-600 hover:bg-slate-50'}`}
                       >
                         <ClipboardList className="w-4 h-4" />
                       </button>
@@ -801,7 +801,7 @@ export default function DetalleCliente() {
             {selectedId && (
               <button
                 onClick={() => setSelectedId(null)}
-                className="lg:hidden mb-4 flex items-center gap-1 text-sm font-semibold text-purple-700 hover:text-purple-900"
+                className="lg:hidden mb-4 flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-brand-900"
               >
                 <ChevronLeft className="w-4 h-4" /> Volver a la lista de mascotas
               </button>

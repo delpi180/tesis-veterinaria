@@ -61,7 +61,7 @@ function AppProtegida() {
     // `min-w-0`: sin esto el contenedor no baja de su ancho de contenido y una
     // tabla o barra de pestañas ancha estira TODA la aplicación de lado en
     // móvil, en vez de desplazarse dentro de su propia caja.
-    <div className="flex min-w-0 min-h-screen">
+    <div className="flex w-full min-w-0 min-h-screen">
       <Sidebar />
       {/* min-w-0 evita que gráficos/tablas anchos rompan el centrado del contenido */}
       <div className="flex-1 min-w-0 flex flex-col pt-12 md:pt-0">

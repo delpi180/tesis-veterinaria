@@ -10,7 +10,7 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 const CATEGORIAS = [
   { v: 'radiografia', l: 'Radiografía', cls: 'bg-sky-100 text-sky-700' },
-  { v: 'analisis',    l: 'Análisis',    cls: 'bg-purple-100 text-purple-700' },
+  { v: 'analisis',    l: 'Análisis',    cls: 'bg-brand-100 text-brand-700' },
   { v: 'receta',      l: 'Receta',      cls: 'bg-emerald-100 text-emerald-700' },
   { v: 'otro',        l: 'Otro',        cls: 'bg-slate-100 text-slate-600' },
 ]
@@ -131,9 +131,9 @@ export default function DocumentosPaciente({ pacienteId, historiaId = null, titu
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <Paperclip className="w-4 h-4 text-purple-500" />
+        <Paperclip className="w-4 h-4 text-brand-500" />
         <h2 className="text-sm font-semibold text-slate-700">{titulo}</h2>
-        <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">
+        <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">
           {docs.length}
         </span>
       </div>
@@ -151,12 +151,12 @@ export default function DocumentosPaciente({ pacienteId, historiaId = null, titu
           <input
             type="file"
             onChange={e => setArchivo(e.target.files?.[0] ?? null)}
-            className="text-xs file:mr-2 file:rounded-md file:border-0 file:bg-purple-100 file:text-purple-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:cursor-pointer w-full sm:w-auto sm:flex-1 min-w-0"
+            className="text-xs file:mr-2 file:rounded-md file:border-0 file:bg-brand-100 file:text-brand-700 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:cursor-pointer w-full sm:w-auto sm:flex-1 min-w-0"
           />
           <select
             value={categoria}
             onChange={e => setCategoria(e.target.value)}
-            className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-300"
           >
             {CATEGORIAS.map(c => <option key={c.v} value={c.v}>{c.l}</option>)}
           </select>
@@ -167,12 +167,12 @@ export default function DocumentosPaciente({ pacienteId, historiaId = null, titu
             value={descripcion}
             onChange={e => setDescripcion(e.target.value)}
             placeholder="Descripción (opcional)"
-            className="flex-1 min-w-0 sm:min-w-[180px] text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+            className="flex-1 min-w-0 sm:min-w-[180px] text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white"
           />
           <button
             type="submit"
             disabled={subiendo || !archivo}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-purple-700 hover:bg-purple-600 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-brand-700 hover:bg-brand-600 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50"
           >
             {subiendo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
             {subiendo ? 'Subiendo…' : 'Subir'}

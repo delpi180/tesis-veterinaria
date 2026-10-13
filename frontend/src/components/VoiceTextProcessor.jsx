@@ -31,22 +31,22 @@ function EstadoProceso({ aiState, esperaSeg, audioInfo }) {
       : "Extrayendo los datos…";
 
   return (
-    <div className="rounded-md border border-purple-200 bg-purple-50 px-3 py-2.5 space-y-2">
+    <div className="rounded-md border border-brand-200 bg-brand-50 px-3 py-2.5 space-y-2">
       <div className="flex items-center gap-2">
-        <Loader2 size={14} className="animate-spin text-purple-700 shrink-0" />
-        <span className="text-xs font-semibold text-purple-800">{etiqueta}</span>
-        <span className="ml-auto text-xs font-mono text-purple-700 tabular-nums">{fmtSec(esperaSeg)}</span>
+        <Loader2 size={14} className="animate-spin text-brand-700 shrink-0" />
+        <span className="text-xs font-semibold text-brand-800">{etiqueta}</span>
+        <span className="ml-auto text-xs font-mono text-brand-700 tabular-nums">{fmtSec(esperaSeg)}</span>
       </div>
 
-      <div className="h-1.5 rounded-full bg-purple-200 overflow-hidden">
+      <div className="h-1.5 rounded-full bg-brand-200 overflow-hidden">
         <div
-          className={`h-full bg-purple-600 rounded-full transition-all duration-700 ease-out ${
+          className={`h-full bg-brand-600 rounded-full transition-all duration-700 ease-out ${
             transcribiendo ? "w-1/2" : "w-[92%]"
           }`}
         />
       </div>
 
-      <p className="text-[11px] text-purple-700 leading-snug">
+      <p className="text-[11px] text-brand-700 leading-snug">
         {audioInfo?.segundos != null && `Audio de ${fmtSec(audioInfo.segundos)} · ${fmtMB(audioInfo.bytes)}. `}
         Las consultas largas pueden tardar un par de minutos. No cierres esta ventana.
       </p>
@@ -220,7 +220,7 @@ export default function VoiceTextProcessor({
   };
 
   const lCls = "block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1";
-  const hlInput = "w-full rounded-md px-2.5 py-1.5 text-sm text-slate-800 border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-purple-300 focus:border-purple-300";
+  const hlInput = "w-full rounded-md px-2.5 py-1.5 text-sm text-slate-800 border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-brand-300 focus:border-brand-300";
 
   return (
     <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4 shadow-sm">
@@ -238,7 +238,7 @@ export default function VoiceTextProcessor({
             disabled={aiState === "recording" || aiState === "transcribing" || aiState === "processing"}
             className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-colors ${
               !modoTexto
-                ? "bg-purple-100 text-purple-700"
+                ? "bg-brand-100 text-brand-700"
                 : "text-slate-500 hover:bg-slate-200 disabled:opacity-50"
             }`}
           >
@@ -254,7 +254,7 @@ export default function VoiceTextProcessor({
             disabled={aiState === "recording" || aiState === "transcribing" || aiState === "processing"}
             className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold transition-colors ${
               modoTexto
-                ? "bg-purple-100 text-purple-700"
+                ? "bg-brand-100 text-brand-700"
                 : "text-slate-500 hover:bg-slate-200 disabled:opacity-50"
             }`}
           >
@@ -275,7 +275,7 @@ export default function VoiceTextProcessor({
               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors disabled:opacity-50 ${
                 isRecording
                   ? "bg-red-600 hover:bg-red-700 text-white"
-                  : "bg-purple-700 hover:bg-purple-800 text-white"
+                  : "bg-brand-700 hover:bg-brand-800 text-white"
               }`}
             >
               {isRecording ? (
@@ -343,7 +343,7 @@ export default function VoiceTextProcessor({
               type="button"
               onClick={handleProcesarTexto}
               disabled={!textoManual.trim() || aiState === "processing"}
-              className="flex items-center gap-2 px-4 py-1.5 bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-md text-sm font-semibold transition-colors"
+              className="flex items-center gap-2 px-4 py-1.5 bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white rounded-md text-sm font-semibold transition-colors"
             >
               {aiState === "processing" ? (
                 <>
@@ -389,7 +389,7 @@ export default function VoiceTextProcessor({
               <button
                 type="button"
                 onClick={reintentar}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-purple-700 hover:bg-purple-800 text-white font-semibold transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded bg-brand-700 hover:bg-brand-800 text-white font-semibold transition-colors"
               >
                 <Loader2 size={12} /> Reintentar transcripción
               </button>

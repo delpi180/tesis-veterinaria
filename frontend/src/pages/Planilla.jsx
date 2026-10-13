@@ -27,7 +27,7 @@ function Celda({ valor, onGuardar, disabled, decimales = false, ancho = 'w-20', 
     <input type="number" min="0" step={decimales ? '0.01' : '1'} value={v} aria-label={etiqueta}
       onChange={e => setV(e.target.value)} onBlur={confirmar}
       onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
-      className={`${ancho} border border-slate-200 rounded px-2 py-1 text-sm text-right bg-white focus:outline-none focus:ring-2 focus:ring-purple-300`} />
+      className={`${ancho} border border-slate-200 rounded px-2 py-1 text-sm text-right bg-white focus:outline-none focus:ring-2 focus:ring-brand-300`} />
   )
 }
 
@@ -53,7 +53,7 @@ function SueldosPersonal({ onCambio }) {
   return (
     <section className="bg-white rounded-xl border border-slate-200">
       <button onClick={() => setAbierto(a => !a)} className="w-full flex items-center gap-2 px-5 py-3 text-left">
-        <Banknote className="w-4 h-4 text-purple-500" />
+        <Banknote className="w-4 h-4 text-brand-500" />
         <span className="flex-1 text-sm font-semibold text-slate-700">
           Sueldos del personal
           {sinSueldo > 0 && <span className="ml-2 text-xs font-medium text-amber-800 bg-amber-100 rounded-full px-2 py-0.5">{sinSueldo} sin sueldo</span>}
@@ -173,7 +173,7 @@ export default function Planilla() {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center gap-3">
-        <Banknote className="w-5 h-5 text-purple-600" />
+        <Banknote className="w-5 h-5 text-brand-600" />
         <div className="flex-1">
           <h1 className="text-lg font-bold text-slate-800">Planilla del personal</h1>
           <p className="text-xs text-slate-500">Sueldos, descuentos por asistencia y boletas de pago.</p>
@@ -202,7 +202,7 @@ export default function Planilla() {
             {lista.slice(0, 6).map(p => (
               <button key={p.periodo} onClick={() => setPeriodo(p.periodo)}
                 className={`text-xs rounded-full px-3 py-1.5 border ${p.periodo === periodo
-                  ? 'bg-purple-700 text-white border-purple-700' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}>
+                  ? 'bg-brand-700 text-white border-brand-700' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}>
                 {p.periodo}{p.estado === 'cerrada' ? ' 🔒' : ''}
               </button>
             ))}
@@ -218,7 +218,7 @@ export default function Planilla() {
                 className="w-16 border border-slate-200 rounded px-2 py-1 text-sm text-right" />
             </label>
             <button onClick={generar} disabled={ocupado}
-              className="flex items-center gap-1.5 text-sm font-medium bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-lg px-4 py-2">
+              className="flex items-center gap-1.5 text-sm font-medium bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white rounded-lg px-4 py-2">
               <Plus className="w-4 h-4" /> Generar planilla con la asistencia del mes
             </button>
           </div>
@@ -250,7 +250,7 @@ export default function Planilla() {
               </button>
               {!cerrada && (
                 <button onClick={cerrar} disabled={ocupado}
-                  className="flex items-center gap-1.5 text-xs font-medium bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-lg px-3 py-2">
+                  className="flex items-center gap-1.5 text-xs font-medium bg-brand-700 hover:bg-brand-800 disabled:opacity-50 text-white rounded-lg px-3 py-2">
                   <Lock className="w-3.5 h-3.5" /> Cerrar planilla
                 </button>
               )}
@@ -327,7 +327,7 @@ export default function Planilla() {
                       <td className={`px-3 py-2 text-right font-bold ${l.neto < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{soles(l.neto)}</td>
                       <td className="px-3 py-2 text-right">
                         <button onClick={() => boletaPagoPDF(planilla, l)} title="Descargar boleta de pago"
-                          className="p-1.5 text-purple-700 hover:bg-purple-50 rounded" aria-label={`Boleta de ${l.nombre}`}>
+                          className="p-1.5 text-brand-700 hover:bg-brand-50 rounded" aria-label={`Boleta de ${l.nombre}`}>
                           <FileText className="w-4 h-4" />
                         </button>
                       </td>

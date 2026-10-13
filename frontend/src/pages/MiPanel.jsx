@@ -24,10 +24,10 @@ function Card({ title, Icon, count, children }) {
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
       <div className="px-4 md:px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <Icon className="w-4 h-4 text-purple-500" />
+        <Icon className="w-4 h-4 text-brand-500" />
         <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{title}</h2>
         {count != null && (
-          <span className="ml-auto text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{count}</span>
+          <span className="ml-auto text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{count}</span>
         )}
       </div>
       <div className="flex-1">{children}</div>
@@ -87,17 +87,17 @@ export default function MiPanel() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 static md:sticky md:top-0 md:z-10 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Mi panel — {nombre}</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{hoy}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{hoy}</p>
         </div>
         <div className="flex items-center gap-2">
           {data?.doctor?.id && (
             <button onClick={() => navigate(`/usuarios/${data.doctor.id}/perfil`)}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition">
+              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition">
               <IdCard className="w-4 h-4" /> Ver mi perfil
             </button>
           )}
           <button onClick={refrescar} disabled={refrescando}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
           </button>
         </div>
@@ -164,7 +164,7 @@ export default function MiPanel() {
               <div className="w-full md:w-[380px] p-5 bg-slate-50/50 flex flex-col justify-center gap-3">
                 <div className="flex items-center justify-between text-xs border-b border-slate-100 pb-2">
                   <span className="font-semibold text-slate-400 uppercase tracking-wider">Horario Pactado</span>
-                  <span className="font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                  <span className="font-semibold text-brand-700 bg-brand-50 px-2 py-0.5 rounded border border-brand-100">
                     {data.asistencia_hoy.hora_entrada_perfil ? `${data.asistencia_hoy.hora_entrada_perfil} hrs` : 'No asignado'}
                   </span>
                 </div>
@@ -182,7 +182,7 @@ export default function MiPanel() {
                         <span key={code} title={activo ? `${lbl}: trabaja` : `${lbl}: no trabaja`}
                           className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
                             activo
-                              ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                              ? 'bg-brand-100 text-brand-800 border border-brand-200'
                               : 'bg-white text-slate-500 border border-slate-200 line-through'
                           }`}>{lbl}</span>
                       )
@@ -217,7 +217,7 @@ export default function MiPanel() {
                     {data.mis_turnos.map(t => (
                       <div key={t.id} className="px-4 md:px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
                         <div className="text-center shrink-0 w-16">
-                          <p className="text-sm font-bold text-purple-700">{fmtHora(t.fecha_hora)}</p>
+                          <p className="text-sm font-bold text-brand-700">{fmtHora(t.fecha_hora)}</p>
                           <p className="text-[10px] text-slate-400">{fmtFecha(t.fecha_hora)}</p>
                         </div>
                         <button onClick={() => irACliente(t.cliente_id)} className="min-w-0 flex-1 text-left">
@@ -227,7 +227,7 @@ export default function MiPanel() {
                         {t.paciente_id && (
                           <button
                             onClick={() => navigate(`/consultas/${t.paciente_id}`, { state: { citaId: t.id } })}
-                            className="shrink-0 px-3 py-1.5 text-xs font-semibold text-white bg-purple-700 hover:bg-purple-600 rounded-lg transition">
+                            className="shrink-0 px-3 py-1.5 text-xs font-semibold text-white bg-brand-700 hover:bg-brand-600 rounded-lg transition">
                             Atender
                           </button>
                         )}
@@ -288,7 +288,7 @@ export default function MiPanel() {
                 pasando en la clínica, no solo lo propio. */}
             <div className="pt-1">
               <div className="flex items-center gap-2 mb-3 px-1">
-                <Users className="w-4 h-4 text-purple-500" />
+                <Users className="w-4 h-4 text-brand-500" />
                 <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">La clínica hoy</h2>
                 <span className="text-[11px] text-slate-400">· visible para todo el equipo</span>
               </div>
@@ -302,13 +302,13 @@ export default function MiPanel() {
                       {clinica.agenda.map(t => (
                         <button key={t.id} onClick={() => irACliente(t.cliente_id)}
                           className="w-full text-left px-4 md:px-5 py-2.5 hover:bg-slate-50/70 transition flex items-center gap-3">
-                          <span className={`text-xs font-mono font-semibold shrink-0 tabular-nums ${t.es_mio ? 'text-purple-700' : 'text-slate-400'}`}>
+                          <span className={`text-xs font-mono font-semibold shrink-0 tabular-nums ${t.es_mio ? 'text-brand-700' : 'text-slate-400'}`}>
                             {fmtHora(t.fecha_hora)}
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-slate-800 truncate">
                               {t.paciente}
-                              {t.es_mio && <span className="ml-2 text-[10px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">Tuyo</span>}
+                              {t.es_mio && <span className="ml-2 text-[10px] font-bold text-brand-700 bg-brand-100 px-1.5 py-0.5 rounded">Tuyo</span>}
                             </p>
                             <p className="text-xs text-slate-500 truncate">
                               {t.veterinario ?? 'Sin asignar'}{t.motivo ? ` · ${t.motivo}` : ''}
@@ -352,7 +352,7 @@ export default function MiPanel() {
                       {clinica.consultas_equipo.map(h => (
                         <button key={h.id} onClick={() => h.paciente_id && navigate(`/pacientes/${h.paciente_id}/historial`)}
                           className="w-full text-left px-4 md:px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
-                          <Stethoscope className={`w-4 h-4 shrink-0 ${h.es_mio ? 'text-purple-400' : 'text-slate-300'}`} />
+                          <Stethoscope className={`w-4 h-4 shrink-0 ${h.es_mio ? 'text-brand-400' : 'text-slate-300'}`} />
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-slate-800 truncate">
                               {h.paciente} · {h.especie}
@@ -362,7 +362,7 @@ export default function MiPanel() {
                             </p>
                           </div>
                           <div className="text-right shrink-0">
-                            <p className={`text-xs font-medium ${h.es_mio ? 'text-purple-700' : 'text-slate-500'}`}>
+                            <p className={`text-xs font-medium ${h.es_mio ? 'text-brand-700' : 'text-slate-500'}`}>
                               {h.es_mio ? 'Tú' : h.veterinario ?? '—'}
                             </p>
                             <p className="text-[10px] text-slate-400">{fmtFecha(h.fecha)}</p>

@@ -29,7 +29,7 @@
         slate-300 original  #cbd5e1 → 1.48:1   prácticamente invisible
 
      El slate-500 cumplía sobre blanco (4.76:1) pero no sobre las tarjetas con
-     fondo teñido que usa la app (4.43:1 sobre purple-50, 4.34:1 sobre
+     fondo teñido que usa la app (4.43:1 sobre brand-50, 4.34:1 sobre
      slate-100), y ahí es donde viven las etiquetas de los formularios.
 
      Se corrigen aquí, en el token, para arreglar los ~296 usos a la vez sin
@@ -39,6 +39,26 @@
   --color-slate-500: #5f6f85;  /* peor caso 4.68:1 — apto para texto */
   --color-slate-400: #64748b;  /* 4.76:1 sobre blanco — apto para texto */
   --color-slate-300: #8493a9;  /* 3.12:1 — apto para iconos y separadores */
+
+  /* ── Color de marca ───────────────────────────────────────────────────────
+     Azul marino sobrio. Es el único bloque que hay que tocar para cambiar la
+     identidad de toda la aplicación: todas las pantallas usan `brand-*`.
+     Se eligió azul y no verde a propósito: el verde ya significa "correcto",
+     "pagado" y "enviado" en el sistema, y el rojo y el ámbar significan error
+     y aviso. Un color de marca que no compite con ninguno de ellos mantiene
+     legible el estado de cada cosa.
+     Blanco sobre brand-600 y más oscuros: ≥ 6.5:1.                          */
+  --color-brand-50:  #f2f6fa;
+  --color-brand-100: #e1eaf3;
+  --color-brand-200: #c3d4e6;
+  --color-brand-300: #97b5d3;
+  --color-brand-400: #6791bd;
+  --color-brand-500: #4575a6;
+  --color-brand-600: #335e8a;
+  --color-brand-700: #284b6f;
+  --color-brand-800: #213d5a;
+  --color-brand-900: #1b3249;
+  --color-brand-950: #111f2f;
 }
 
 :root {
@@ -71,7 +91,7 @@ body {
 /* El foco del teclado tiene que verse: se navega con Tab entre campos de la
    historia clínica y sin esto no se sabe dónde se está parado. */
 :focus-visible {
-  outline: 2px solid #a855f7;
+  outline: 2px solid #4575a6;
   outline-offset: 2px;
 }
 

@@ -24,7 +24,7 @@
  * única forma de que un botón morado pueda pedir la ruedita en blanco y que
  * salga blanca siempre.
  */
-export function Spinner({ size = 20, color = 'text-purple-500', className = '' }) {
+export function Spinner({ size = 20, color = 'text-brand-500', className = '' }) {
   return (
     <svg
       viewBox="0 0 24 24"

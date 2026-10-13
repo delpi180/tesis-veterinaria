@@ -11,11 +11,11 @@ import DatosClinica from '../components/DatosClinica'
 import GlosarioDictado from '../components/GlosarioDictado'
 import { Cargando } from '../components/Cargando'
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
+const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
 
 const ROL_PILL = {
-  veterinario:  'bg-purple-100 text-purple-700',
+  veterinario:  'bg-brand-100 text-brand-700',
   recepcionista: 'bg-sky-100 text-sky-700',
 }
 
@@ -199,10 +199,10 @@ export default function Usuarios() {
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center justify-between flex-wrap gap-3 static md:sticky md:top-0 md:z-10">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Usuarios y Roles</h1>
-          <p className="text-xs text-slate-400 mt-0.5 capitalize">{today}</p>
+          <p className="text-xs text-slate-400 mt-0.5 first-letter:uppercase">{today}</p>
         </div>
         <button onClick={abrirNuevo}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition">
+          className="flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow transition">
           <Plus className="w-4 h-4" /> Nuevo Usuario
         </button>
       </header>
@@ -221,9 +221,9 @@ export default function Usuarios() {
 
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <UserCog className="w-4 h-4 text-purple-500" />
+            <UserCog className="w-4 h-4 text-brand-500" />
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Usuarios</h2>
-            <span className="ml-auto text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{usuarios.length}</span>
+            <span className="ml-auto text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{usuarios.length}</span>
           </div>
 
           {loading ? (
@@ -241,7 +241,7 @@ export default function Usuarios() {
                       <p className="font-semibold text-slate-800 text-sm truncate flex items-center gap-1.5">
                         <User className="w-4 h-4 text-slate-300 shrink-0" />
                         {u.usuario}
-                        {u.usuario === yo && <span className="text-xs text-purple-500">(tú)</span>}
+                        {u.usuario === yo && <span className="text-xs text-brand-500">(tú)</span>}
                       </p>
                       <p className="text-xs text-slate-500 truncate">{u.nombre}</p>
                     </div>
@@ -260,7 +260,7 @@ export default function Usuarios() {
                         <IdCard className="w-4 h-4" />
                       </button>
                       <button onClick={() => abrirEditar(u)} aria-label="Editar"
-                        className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition">
+                        className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition">
                         <Pencil className="w-4 h-4" />
                       </button>
                       {u.usuario !== yo && (
@@ -292,7 +292,7 @@ export default function Usuarios() {
                     <td className="px-5 py-3.5">
                       <span className="flex items-center gap-2 font-medium text-slate-800">
                         <User className="w-4 h-4 text-slate-300" /> {u.usuario}
-                        {u.usuario === yo && <span className="text-xs text-purple-500">(tú)</span>}
+                        {u.usuario === yo && <span className="text-xs text-brand-500">(tú)</span>}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-slate-600">{u.nombre}</td>
@@ -314,7 +314,7 @@ export default function Usuarios() {
                           <IdCard className="w-4 h-4" />
                         </button>
                         <button onClick={() => abrirEditar(u)} title="Editar"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition">
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition">
                           <Pencil className="w-4 h-4" />
                         </button>
                         {u.usuario !== yo && (
@@ -410,8 +410,8 @@ export default function Usuarios() {
                           return (
                             <button key={code} type="button" onClick={() => toggleDia(code)}
                               className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition ${activo
-                                ? 'bg-purple-600 text-white border-purple-600'
-                                : 'bg-white text-slate-500 border-slate-200 hover:border-purple-300'}`}>
+                                ? 'bg-brand-600 text-white border-brand-600'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-brand-300'}`}>
                               {lbl}
                             </button>
                           )
@@ -421,7 +421,7 @@ export default function Usuarios() {
                   </div>
                 )}
                 <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                  <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-300"
+                  <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300"
                     checked={form.activo} onChange={e => setForm(f => ({ ...f, activo: e.target.checked }))} />
                   Usuario activo
                 </label>
@@ -431,7 +431,7 @@ export default function Usuarios() {
                 <button type="button" onClick={cerrar}
                   className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition">Cancelar</button>
                 <button type="submit" disabled={guardando}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+                  className="px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
                   {guardando ? 'Guardando…' : editId ? 'Guardar' : 'Crear Usuario'}
                 </button>
               </div>
