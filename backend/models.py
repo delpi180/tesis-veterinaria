@@ -20,8 +20,17 @@ class Clinica(Base):
     # 'activa' | 'suspendida'. Una clínica suspendida no puede iniciar ni
     # mantener sesión (falta de pago, abuso, baja a pedido).
     estado    = Column(String(12), nullable=False, default="activa", server_default="activa")
+    # 'prueba' | 'basico' | 'profesional' | 'fundadora'; 'plataforma' está reservado
+    # a la clínica interna donde viven los operadores del SaaS (no es un cliente).
     plan      = Column(String(20), nullable=False, default="prueba", server_default="prueba")
     creado_en = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    # Último día de uso. Pasado ese día la clínica queda bloqueada como si
+    # estuviera suspendida. None = sin vencimiento.
+    vence_en  = Column(Date)
+    suspendida_motivo = Column(String(200))
+    suspendida_en     = Column(DateTime(timezone=True))
+    # Notas del operador sobre esta clínica (acuerdos, contacto). La clínica NO las ve.
+    nota_interna = Column(Text)
 
 
 class TenantMixin:
@@ -970,3 +979,23 @@ class PlanillaLinea(TenantMixin, Base):
     nota             = Column(String(200))
 
     planilla = relationship("Planilla", back_populates="lineas")
+
+
+class AccionPlataforma(Base):
+    """Bitácora de lo que hacen los operadores del SaaS sobre las clínicas.
+
+    Es distinta de la bitácora de cada clínica (`Actividad`): aquella es de la
+    clínica y la ve su administradora; esta es de la plataforma y las clínicas no
+    la ven. Guarda el nombre de la clínica porque debe sobrevivir a que la
+    clínica cambie de nombre o desaparezca.
+    """
+    __tablename__ = "acciones_plataforma"
+
+    id             = Column(Integer, primary_key=True)
+    operador       = Column(String(50), nullable=False)
+    clinica_id     = Column(Integer, ForeignKey("clinicas.id", ondelete="SET NULL"), index=True)
+    clinica_nombre = Column(String(120))
+    # 'suspender' | 'reactivar' | 'plan' | 'vencimiento' | 'nota' | 'restablecer_clave'
+    accion         = Column(String(30), nullable=False)
+    detalle        = Column(String(300))
+    fecha          = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)

@@ -50,11 +50,44 @@ token, busca la cuenta y su clínica, y la deja en `request.state.clinica_id`;
 - Cada clínica elige su **color de marca** (`configuracion_clinica.color_marca`);
   el frontend deriva la paleta completa de ese color (`utils/paleta.js`).
 
+## Operación de la plataforma (operador)
+
+Quien opera el SaaS entra por la pantalla de acceso normal con una cuenta de rol
+`plataforma` y llega a su propio panel (**Clínicas**). Desde ahí:
+
+- ve todas las clínicas con **solo conteos** (usuarios, clientes, mascotas,
+  consultas de 30 días, última actividad): **nunca** nombres de clientes,
+  mascotas, historias ni ventas;
+- **suspende** (con motivo obligatorio) y **reactiva**: rige en el acto, también
+  para las sesiones abiertas;
+- cambia el **plan** y el **vencimiento**: pasado el último día de uso la clínica
+  queda bloqueada hasta que el operador lo extienda;
+- anota una **nota interna** (la clínica no la ve);
+- **restablece la contraseña** de la administradora: devuelve una temporal una
+  sola vez y cierra sus sesiones abiertas;
+- consulta la **bitácora del operador** (quién hizo qué, sobre qué clínica).
+
+Reglas de seguridad:
+
+- El rol `plataforma` **no se puede otorgar desde la aplicación** (ni al crear ni
+  al editar usuarios, ni al registrarse). Solo se crea en el servidor:
+  `python -m scripts.crear_operador <usuario>` (contraseña de 12+ caracteres).
+- Los operadores viven en una clínica interna reservada (plan `plataforma`) que no
+  aparece en ninguna lista ni se puede abrir.
+- La sesión del operador **no está acotada a una clínica** (necesita ver todas),
+  así que tiene una segunda barrera: solo puede llamar a `/api/plataforma/*`; todo
+  lo demás responde 403, y el panel no tiene acceso a datos clínicos.
+- Sus acciones **no** se escriben en la bitácora de ninguna clínica: tienen la
+  suya (`acciones_plataforma`).
+- `DIAS_DE_PRUEBA` (por defecto 0 = sin vencimiento) fija el plazo de las clínicas
+  que se registran solas.
+
 ## Pendiente (no cubierto aún)
 
-- **Plataforma:** no hay un rol de operador para listar/suspender clínicas desde
-  la app; hoy se hace por SQL o script.
-- **Planes y cobro:** `clinicas.plan` existe, pero nada lo hace cumplir.
+- **Cobro:** `plan` y `vence_en` los fija el operador a mano; no hay pasarela de
+  pago ni facturación, ni límites por plan (usuarios, almacenamiento, IA).
+- **Segundo factor** para las cuentas de operador (hoy: contraseña de 12+).
+- **Baja y borrado de datos** de una clínica que se va: hoy solo se suspende.
 - **Archivos:** los documentos de los pacientes viven en la base (por clínica);
   a escala convendrá un almacenamiento de objetos con prefijo por clínica.
 - **Límite de uso de IA** por clínica (hoy es por IP).

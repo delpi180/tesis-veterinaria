@@ -12,6 +12,8 @@ export const getRol     = () => localStorage.getItem(ROL_KEY)
 export const esVeterinario = () => getRol() === 'veterinario'
 /** La administradora del sistema es la recepcionista. */
 export const esAdmin = () => getRol() === 'recepcionista'
+// Operador del SaaS: ve la lista de clínicas, nunca sus datos
+export const esPlataforma = () => getRol() === 'plataforma'
 
 export function setSesion({ token, usuario, nombre, rol }) {
   localStorage.setItem(TOKEN_KEY, token)

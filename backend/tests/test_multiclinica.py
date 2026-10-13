@@ -317,6 +317,7 @@ def test_no_se_puede_guardar_ni_enlazar_a_otra_clinica(clinica_b):
 GLOBALES = {
     "clinicas", "rate_limit_hits",
     "evaluadores", "respuestas_sus", "respuestas_tam",   # módulos de tesis, apagados
+    "acciones_plataforma",    # bitácora del operador del SaaS: es de la plataforma, no de una clínica
 }
 # Con clinica_id opcional: se filtran a mano en su router.
 OPCIONALES = {"errores", "sse_events"}

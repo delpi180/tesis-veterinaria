@@ -31,9 +31,11 @@ import re
 
 ADMIN = "recepcionista"
 VET = "veterinario"
+PLATAFORMA = "plataforma"        # operador del SaaS: ve clínicas, nunca sus datos
 AMBOS = frozenset({ADMIN, VET})
 SOLO_ADMIN = frozenset({ADMIN})
 SOLO_VET = frozenset({VET})
+SOLO_PLATAFORMA = frozenset({PLATAFORMA})
 
 GET, POST, PUT, DELETE = "GET", "POST", "PUT", "DELETE"
 TODOS = ("GET", "POST", "PUT", "DELETE", "PATCH")
@@ -98,6 +100,11 @@ REGLAS: list[tuple[tuple[str, ...], str, frozenset]] = [
     (TODOS,     "/api/respaldo/*",                        SOLO_ADMIN),
     # Reportar un error es público (se resuelve antes); verlos es de la administradora.
     (TODOS,     "/api/errores/*",                         SOLO_ADMIN),
+
+    # ── Operación del SaaS ───────────────────────────────────────────────────
+    # El operador gestiona clínicas (estado, plan, vencimiento) y NADA más: no
+    # figura en ninguna otra regla, así que no puede abrir datos de una clínica.
+    (TODOS,     "/api/plataforma/*",                      SOLO_PLATAFORMA),
 
     # ── Módulos de tesis (apagados por defecto; ver core.config) ─────────────
     (TODOS,     "/api/sus/*",                             AMBOS),

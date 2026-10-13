@@ -11,6 +11,8 @@ administradora degradada o una contraseña cambiada cortan las sesiones abiertas
 """
 import logging
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from core.security import sello_de_sesion
 from database import SessionLocal
@@ -21,12 +23,34 @@ _TTL_SEG = 30
 _CACHE: dict[str, tuple[float, "Cuenta"]] = {}
 
 
-class Cuenta:
-    __slots__ = ("habilitada", "clinica_id", "suspendida", "rol", "sello")
+ROL_PLATAFORMA = "plataforma"
+MENSAJE_SUSPENDIDA = "La cuenta de tu clínica está suspendida. Contacta al soporte."
+MENSAJE_VENCIDA = "El periodo de uso de tu clínica terminó. Contacta al soporte para renovarlo."
 
-    def __init__(self, habilitada=False, clinica_id=None, suspendida=False, rol=None, sello=None):
-        self.habilitada, self.clinica_id, self.suspendida = habilitada, clinica_id, suspendida
+
+class Cuenta:
+    __slots__ = ("habilitada", "clinica_id", "bloqueo", "rol", "sello")
+
+    def __init__(self, habilitada=False, clinica_id=None, bloqueo=None, rol=None, sello=None):
+        self.habilitada, self.clinica_id, self.bloqueo = habilitada, clinica_id, bloqueo
         self.rol, self.sello = rol, sello
+
+    @property
+    def suspendida(self) -> bool:
+        return self.bloqueo is not None
+
+    @property
+    def es_plataforma(self) -> bool:
+        return self.rol == ROL_PLATAFORMA
+
+
+def bloqueo_de(estado: str, vence_en) -> str | None:
+    """Por qué una clínica no puede usar el sistema hoy (None = puede)."""
+    if estado != "activa":
+        return MENSAJE_SUSPENDIDA
+    if vence_en is not None and vence_en < datetime.now(ZoneInfo("America/Lima")).date():
+        return MENSAJE_VENCIDA
+    return None
 
 
 def cuenta(usuario: str) -> Cuenta:
@@ -43,13 +67,13 @@ def cuenta(usuario: str) -> Cuenta:
         db = SessionLocal()   # sesión de sistema: todavía no se sabe la clínica
         fila = (
             db.query(models.Usuario.activo, models.Usuario.clinica_id, models.Clinica.estado,
-                     models.Usuario.rol, models.Usuario.password_hash)
+                     models.Usuario.rol, models.Usuario.password_hash, models.Clinica.vence_en)
             .join(models.Clinica, models.Clinica.id == models.Usuario.clinica_id)
             .filter(models.Usuario.usuario == usuario)
             .first()
         )
         resultado = (
-            Cuenta(bool(fila[0]), fila[1], fila[2] != "activa", fila[3], sello_de_sesion(fila[4]))
+            Cuenta(bool(fila[0]), fila[1], bloqueo_de(fila[2], fila[5]), fila[3], sello_de_sesion(fila[4]))
             if fila else Cuenta()
         )
     except Exception as e:

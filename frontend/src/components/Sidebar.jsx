@@ -4,9 +4,9 @@ import {
   LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, LogOut, Wallet, UserCog,
   Clock, ClipboardList, History, PieChart, ConciergeBell, Syringe, Menu, X, Bug,
-  Pill, PhoneCall, Banknote,
+  Pill, PhoneCall, Banknote, Building2,
 } from 'lucide-react'
-import { api, getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
+import { api, getNombre, getRol, cerrarSesion, esVeterinario, esAdmin, esPlataforma } from '../services/api'
 import GlobalSearch from './GlobalSearch'
 import { useClinica } from '../services/clinica'
 import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
@@ -21,6 +21,9 @@ const PawIcon = () => (
 // El menú sigue las tareas del día, no la jerarquía de la organización:
 // "qué hago hoy", "a quién atiendo", "cuánto entró", "quién trabaja".
 const SECCIONES = [
+  { titulo: 'Plataforma', items: [
+    { label: 'Clínicas', to: '/plataforma', Icon: Building2, plataforma: true },
+  ]},
   { titulo: 'Hoy', items: [
     { label: 'Inicio',     to: '/',          Icon: LayoutDashboard, admin: true },
     { label: 'Recepción',  to: '/recepcion', Icon: ConciergeBell,   admin: true },
@@ -103,9 +106,11 @@ export default function Sidebar() {
   const [abierto, setAbierto] = useState(false)
   const nombre = getNombre() || 'Veterinario'
   const rol = getRol() || 'veterinario'
+  // El operador del SaaS solo ve su panel; las clínicas nunca ven el de plataforma.
   const visible = (items) => items.filter(i =>
-    (!i.vet   || esVeterinario()) &&
-    (!i.admin || esAdmin())
+    esPlataforma()
+      ? i.plataforma
+      : (!i.plataforma && (!i.vet || esVeterinario()) && (!i.admin || esAdmin()))
   )
 
   // Errores sin revisar. El sistema ya los registraba, pero había que
@@ -165,7 +170,7 @@ export default function Sidebar() {
           <div className="mb-2">
             {/* Al abrir el buscador se cierra el menú: en el celular el cajón
                 tapaba media pantalla detrás del modal. */}
-            <GlobalSearch onAbrir={cerrar} />
+            {!esPlataforma() && <GlobalSearch onAbrir={cerrar} />}
           </div>
           {SECCIONES.map(sec => (
             <Seccion key={sec.titulo} titulo={sec.titulo} items={visible(sec.items)} onNavegar={cerrar}

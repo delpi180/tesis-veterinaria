@@ -6,6 +6,7 @@ from database import get_db
 from models import Clinica, Usuario
 from core.security import crear_token, sello_de_sesion, verify_password
 from core.config import settings
+from core.cuentas import MENSAJE_SUSPENDIDA, ROL_PLATAFORMA, bloqueo_de
 from core import ratelimit
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
@@ -50,9 +51,9 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
     # Una clínica suspendida no inicia sesión (y las que ya la tenían abierta
     # quedan bloqueadas por el middleware).
     clinica = db.get(Clinica, u.clinica_id)
-    if not clinica or clinica.estado != "activa":
-        raise HTTPException(status_code=403,
-                            detail="La cuenta de tu clínica está suspendida. Contacta al soporte.")
+    bloqueo = bloqueo_de(clinica.estado, clinica.vence_en) if clinica else MENSAJE_SUSPENDIDA
+    if bloqueo and u.rol != ROL_PLATAFORMA:
+        raise HTTPException(status_code=403, detail=bloqueo)
 
     ratelimit.limpiar(clave)
     return LoginResponse(

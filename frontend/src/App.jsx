@@ -6,7 +6,7 @@ import { ConfirmarProvider } from './components/Confirmar'
 import { CargandoPantalla } from './components/Cargando'
 import { ClinicaProvider } from './services/clinica'
 import Login from './pages/Login'
-import { getToken, esVeterinario, esAdmin } from './services/api'
+import { getToken, esVeterinario, esAdmin, esPlataforma } from './services/api'
 import './App.css'
 
 // Cada pantalla se descarga recién cuando se entra a ella.
@@ -34,6 +34,7 @@ const Asistencia        = lazy(() => import('./pages/Asistencia'))
 const Actividad         = lazy(() => import('./pages/Actividad'))
 const Reportes          = lazy(() => import('./pages/Reportes'))
 const PanelRecepcion    = lazy(() => import('./pages/PanelRecepcion'))
+const Plataforma        = lazy(() => import('./pages/Plataforma'))
 const Registro          = lazy(() => import('./pages/Registro'))
 const Contactos         = lazy(() => import('./pages/Contactos'))
 const Planilla          = lazy(() => import('./pages/Planilla'))
@@ -58,6 +59,23 @@ function Home() {
 
 function AppProtegida() {
   if (!getToken()) return <Navigate to="/login" replace />
+  // El operador del SaaS tiene su propio panel y ninguna otra pantalla: no
+  // existen para él las rutas de una clínica.
+  if (esPlataforma()) {
+    return (
+      <div className="flex w-full min-w-0 min-h-screen">
+        <Sidebar />
+        <div className="flex-1 min-w-0 flex flex-col pt-12 md:pt-0">
+          <Suspense fallback={<CargandoPantalla />}>
+            <Routes>
+              <Route path="/plataforma" element={<Plataforma />} />
+              <Route path="*"           element={<Navigate to="/plataforma" replace />} />
+            </Routes>
+          </Suspense>
+        </div>
+      </div>
+    )
+  }
   return (
     // `min-w-0`: sin esto el contenedor no baja de su ancho de contenido y una
     // tabla o barra de pestañas ancha estira TODA la aplicación de lado en
@@ -69,6 +87,8 @@ function AppProtegida() {
         <Suspense fallback={<CargandoPantalla />}>
         <Routes>
           <Route path="/"                       element={<Home />} />
+          {/* El panel de plataforma no es de ninguna clínica */}
+          <Route path="/plataforma"             element={<Navigate to="/" replace />} />
           <Route path="/mi-panel"               element={<SoloVet><MiPanel /></SoloVet>} />
           <Route path="/clientes"               element={<Clientes />} />
           <Route path="/clientes/:id"           element={<DetalleCliente />} />

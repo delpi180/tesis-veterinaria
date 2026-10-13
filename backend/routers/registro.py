@@ -6,6 +6,7 @@ sistema (el usuario es lo único que se pide al iniciar sesión, así que dos
 clínicas no pueden repetirlo).
 """
 import re
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, field_validator
@@ -72,7 +73,10 @@ def registrar_clinica(body: RegistroIn, request: Request, db: Session = Depends(
     if db.query(Usuario.id).filter(Usuario.usuario == body.usuario).first():
         raise HTTPException(status.HTTP_409_CONFLICT, "Ese usuario ya está en uso. Elige otro.")
 
-    clinica = Clinica(nombre=body.clinica)
+    clinica = Clinica(
+        nombre=body.clinica,
+        vence_en=(date.today() + timedelta(days=settings.dias_de_prueba)) if settings.dias_de_prueba > 0 else None,
+    )
     db.add(clinica)
     db.flush()
     admin = Usuario(

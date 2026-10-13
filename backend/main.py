@@ -16,7 +16,7 @@ import models  # registra todos los modelos en Base.metadata
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
-    busqueda, inventario, asistencia, mi_panel, actividad, configuracion, glosario, contactos, planilla, registro, errores,
+    busqueda, inventario, asistencia, mi_panel, actividad, configuracion, glosario, contactos, planilla, registro, plataforma, errores,
     respaldo, catalogos, tratamientos,
 )
 from core import ratelimit
@@ -109,6 +109,7 @@ _ACCIONES = {
     ("POST", "/api/pacientes/{id}/historias/{id}/addendum"): "Agregó una nota de corrección a una consulta",
     ("PUT", "/api/planilla/personal/{id}"): "Registró el sueldo de un trabajador",
     ("POST", "/api/planilla"): "Generó una planilla",
+    ("PUT", "/api/plataforma/clinicas/{id}"): "Operador: cambió una clínica",
     ("POST", "/api/contactos"): "Registró un contacto con el dueño",
     ("POST", "/api/glosario"): "Agregó una palabra al glosario del dictado",
     ("PUT", "/api/glosario/{id}"): "Editó una palabra del glosario",
@@ -190,14 +191,19 @@ async def auth_middleware(request: Request, call_next):
                 status_code=401,
                 content={"detail": "Tu sesión ya no es válida. Inicia sesión de nuevo."},
             )
-        if cuenta.suspendida:
-            return JSONResponse(
-                status_code=403,
-                content={"detail": "La cuenta de tu clínica está suspendida. Contacta al soporte."},
-            )
+        if cuenta.bloqueo and not cuenta.es_plataforma:
+            return JSONResponse(status_code=403, content={"detail": cuenta.bloqueo})
         # El rol que manda es el de HOY en la base de datos, no el que traía el
         # token: así degradar a alguien o cambiarle el rol rige de inmediato.
         rol = cuenta.rol
+        # El operador del SaaS solo entra a su propio panel. La tabla de permisos
+        # ya lo impide; esta es la segunda barrera, porque una sesión de operador
+        # no está acotada a ninguna clínica y un descuido ahí vería a todas.
+        if cuenta.es_plataforma and not (
+            path.startswith("/api/plataforma/") or path == "/api/plataforma"
+        ):
+            return JSONResponse(status_code=403,
+                                content={"detail": "No tienes permiso para esta acción."})
         # Control de rol, para TODAS las rutas y desde un solo lugar: la tabla de
         # core/permisos.py. Lo que no está declarado ahí no lo puede llamar
         # nadie (se niega por defecto).
@@ -210,9 +216,14 @@ async def auth_middleware(request: Request, call_next):
             )
         request.state.usuario = sesion["usuario"]
         request.state.rol = rol
-        # De aquí en adelante TODA consulta de esta petición queda acotada a
-        # esta clínica (ver database.get_db).
-        request.state.clinica_id = cuenta.clinica_id
+        if cuenta.es_plataforma:
+            # Sin clínica: sus consultas NO se filtran (necesita ver todas).
+            request.state.clinica_id = None
+            request.state.plataforma = True
+        else:
+            # De aquí en adelante TODA consulta de esta petición queda acotada a
+            # esta clínica (ver database.get_db).
+            request.state.clinica_id = cuenta.clinica_id
     elif es_lectura_publica:
         # Rutas públicas que, si hay sesión, responden con los datos de SU
         # clínica (nombre y color en la pantalla). Sin sesión, valores genéricos.
@@ -233,6 +244,7 @@ async def auth_middleware(request: Request, call_next):
         and path not in RUTAS_PUBLICAS
         and not path.startswith("/api/actividad")
         and getattr(request.state, "usuario", None)
+        and not getattr(request.state, "plataforma", False)   # tiene su propia bitácora
         and response.status_code < 400
     ):
         _registrar_actividad(
@@ -319,6 +331,7 @@ app.include_router(glosario.router)
 app.include_router(contactos.router)
 app.include_router(planilla.router)
 app.include_router(registro.router)
+app.include_router(plataforma.router)
 app.include_router(errores.router)
 app.include_router(respaldo.router)
 app.include_router(catalogos.router)

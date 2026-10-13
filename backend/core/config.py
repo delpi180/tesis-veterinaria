@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     nombre_producto: str = "Gestión Veterinaria"
     # Si cualquiera puede crear una clínica desde la pantalla de registro.
     registro_abierto: bool = True
+    # Días de uso gratuito de una clínica nueva. 0 = sin vencimiento (el operador
+    # lo fija a mano). Pasado el plazo la clínica queda bloqueada hasta que el
+    # operador lo extienda.
+    dias_de_prueba: int = 0
 
     # CORS: "*" en dev; en prod poner el dominio de Vercel (CSV) vía variable.
     cors_origins: str = "*"

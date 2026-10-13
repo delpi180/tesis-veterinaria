@@ -19,6 +19,7 @@ const PawIcon = () => (
 const DESTINO_POR_ROL = {
   recepcionista: '/recepcion',
   veterinario:   '/mi-panel',
+  plataforma:    '/plataforma',
 }
 
 export default function Login() {
