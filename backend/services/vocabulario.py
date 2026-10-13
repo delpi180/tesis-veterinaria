@@ -20,7 +20,7 @@ import unicodedata
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import Paciente, Producto
+from models import Paciente, Producto, TerminoGlosario
 
 # Vocabulario veterinario general: sirve en cualquier clínica.
 KEYTERMS_BASE = [
@@ -88,8 +88,14 @@ def _limpiar(nombre: str) -> str:
     return " ".join(palabras[:3]).strip()
 
 
+def _del_glosario(db: Session) -> list[str]:
+    return [t for (t,) in db.query(TerminoGlosario.termino)
+                            .filter(TerminoGlosario.activo.is_(True)).all()]
+
+
 def _de_la_base(db: Session) -> list[str]:
-    terminos: list[str] = []
+    # Lo que la administradora escribió a mano manda: va primero.
+    terminos: list[str] = _del_glosario(db)
 
     # Medicamentos primero: son los que más se dictan y los que peor se oyen.
     for (nombre,) in (db.query(Producto.nombre)
@@ -152,8 +158,9 @@ def keyterms(db: Session | None = None) -> list[str]:
 
 def invalidar_cache() -> None:
     """Para las pruebas y para cuando se recarga el inventario de golpe."""
-    global _cache
+    global _cache, _cache_catalogo
     _cache = None
+    _cache_catalogo = None
 
 
 # ── Catálogo de medicamentos para la extracción ──────────────────────────────
@@ -248,3 +255,51 @@ def bloque_catalogo(catalogo: list[str]) -> str:
         "ninguno, escribe lo que se dictó sin inventar: puede ser un "
         "medicamento que la clínica no tiene en stock, y eso es válido."
     )
+
+
+# ── Variantes mal oídas del glosario ─────────────────────────────────────────
+
+def variantes_glosario(db: Session | None) -> list[tuple[str, str]]:
+    """[(como_suena, como_se_escribe)] de los términos activos con variantes."""
+    if db is None:
+        return []
+    try:
+        filas = (db.query(TerminoGlosario.termino, TerminoGlosario.suena_como)
+                   .filter(TerminoGlosario.activo.is_(True),
+                           TerminoGlosario.suena_como.isnot(None)).all())
+    except Exception:
+        return []
+    pares = []
+    for termino, suena in filas:
+        for v in (suena or "").split(","):
+            v = " ".join(v.split())
+            if v:
+                pares.append((v, termino))
+    return pares
+
+
+def aplicar_variantes(texto: str, pares: list[tuple[str, str]]) -> str:
+    """Cambia en la transcripción lo que se oyó mal por como se escribe bien.
+
+    Palabra completa y sin distinguir mayúsculas ("melo si vet" no toca
+    "melo si vetusto"). Las variantes más largas se aplican primero para que
+    una frase no quede partida por otra más corta.
+    """
+    for suena, correcto in sorted(pares, key=lambda p: -len(p[0])):
+        texto = re.sub(rf"(?<!\w){re.escape(suena)}(?!\w)", correcto, texto,
+                       flags=re.IGNORECASE)
+    return texto
+
+
+def bloque_glosario(db: Session | None) -> str:
+    """Términos propios para el prompt: el modelo debe respetar su escritura."""
+    if db is None:
+        return ""
+    try:
+        terminos = _del_glosario(db)
+    except Exception:
+        return ""
+    if not terminos:
+        return ""
+    return ("\n\nTÉRMINOS PROPIOS DE ESTA CLÍNICA (escríbelos exactamente así si "
+            "aparecen): " + "; ".join(terminos[:80]))

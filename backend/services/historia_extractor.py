@@ -20,7 +20,8 @@ from zoneinfo import ZoneInfo
 from openai import OpenAI
 from core.config import settings
 from services.vocabulario import (
-    bloque_catalogo, catalogo_medicamentos, coincide_con_catalogo,
+    aplicar_variantes, bloque_catalogo, bloque_glosario, catalogo_medicamentos,
+    coincide_con_catalogo, variantes_glosario,
 )
 from services.revision_historia import (
     ajustar_a_catalogo, rescatar_constantes, resumen_campos,
@@ -385,6 +386,11 @@ def extraer_historia(texto: str, db=None) -> dict:
 
     client = OpenAI(api_key=settings.openai_api_key)
 
+    # Lo que el reconocedor suele oír mal, corregido con el glosario de la
+    # clínica antes de que lo lea el modelo. `texto` original se devuelve tal cual.
+    original = texto
+    texto = aplicar_variantes(texto, variantes_glosario(db))
+
     today       = datetime.now(_LIMA_TZ).date()
     dia_semana  = _DIAS_ES[today.strftime("%A")]
     fecha_hoy   = f"{today.isoformat()} ({dia_semana})"
@@ -392,7 +398,7 @@ def extraer_historia(texto: str, db=None) -> dict:
     system_prompt = _SYSTEM_PROMPT_TPL.format(
         fecha_hoy=fecha_hoy,
         dia_semana=dia_semana,
-    ) + bloque_catalogo(catalogo)
+    ) + bloque_catalogo(catalogo) + bloque_glosario(db)
 
     print(
         f"[GPT] Extrayendo historia — modelo={settings.llm_model} "
@@ -473,5 +479,5 @@ def extraer_historia(texto: str, db=None) -> dict:
         "alertas_rango": alertas_rango,
         "resumen":       resumen_campos(parsed, inferencias, alertas_rango, rescatados),
         "ajustes_nombre": ajustes,
-        "transcripcion": texto,
+        "transcripcion": original,
     }

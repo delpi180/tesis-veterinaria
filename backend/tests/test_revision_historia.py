@@ -43,3 +43,22 @@ def test_resumen_marca_faltantes_y_dudosos():
     motivos = {d["motivo"] for d in r["dudosos"]}
     assert {"fuera_de_rango", "inferido", "fuera_de_inventario", "sin_dosis"} <= motivos
     assert 0 < r["completitud"] < 100
+
+
+def test_dosis_total_y_tope_de_plausibilidad():
+    from services.revision_historia import calcular_dosis_total
+    r = calcular_dosis_total("4 mg/kg", 12.5)
+    assert r["total"] == 50.0 and r["unidad"] == "mg"
+    assert calcular_dosis_total("una tableta", 10) is None
+    assert calcular_dosis_total("4 mg/kg", None) is None
+    res = resumen_campos({"tratamiento_items": [
+        {"medicamento": "X", "dosis": "400 mg/kg", "en_catalogo": True}]}, {}, {})
+    assert any(d["motivo"] == "dosis_alta" for d in res["dudosos"])
+
+
+def test_variantes_del_glosario_se_aplican_por_palabra_completa():
+    from services.vocabulario import aplicar_variantes
+    pares = [("melo si vet", "MELOXIVET"), ("pe cu", "PQ")]
+    t = aplicar_variantes("Le receto Melo Si Vet y nada de pe cu", pares)
+    assert t == "Le receto MELOXIVET y nada de PQ"
+    assert aplicar_variantes("pe cualquiera", pares) == "pe cualquiera"

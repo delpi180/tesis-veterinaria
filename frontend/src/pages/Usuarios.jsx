@@ -8,6 +8,7 @@ import { useToast } from '../components/Toast'
 import { useConfirmar } from '../components/Confirmar'
 import { useCerrarConEscape } from '../hooks/useCerrarConEscape'
 import DatosClinica from '../components/DatosClinica'
+import GlosarioDictado from '../components/GlosarioDictado'
 import { Cargando } from '../components/Cargando'
 
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
@@ -213,6 +214,8 @@ export default function Usuarios() {
         </div>
 
         <DatosClinica />
+
+        <GlosarioDictado />
 
         <RespaldoDatos />
 

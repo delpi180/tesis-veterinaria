@@ -165,6 +165,39 @@ def ajustar_a_catalogo(items: list, catalogo: list[str], umbral: float = 0.84) -
     return cambios
 
 
+# ── Dosis por peso ───────────────────────────────────────────────────────────
+
+_DOSIS_KG = re.compile(r"(\d+(?:[.,]\d+)?)\s*(mg|mcg|ml|ui)\s*/\s*kg", re.IGNORECASE)
+
+# No es un rango terapéutico —eso depende de cada fármaco y no se inventa aquí—
+# sino un tope de plausibilidad: ningún fármaco de uso corriente se da por
+# encima de esto por kilo. Superarlo casi siempre es un dictado mal oído
+# ("cuatro" convertido en "cuatrocientos") y es el error que más duele.
+DOSIS_MG_KG_MAXIMA = 100
+
+
+def dosis_por_kg(dosis: str | None):
+    """'4 mg/kg' → (4.0, 'mg'); None si no es una dosis por peso."""
+    m = _DOSIS_KG.search(dosis or "")
+    if not m:
+        return None
+    return float(m.group(1).replace(",", ".")), m.group(2).lower()
+
+
+def calcular_dosis_total(dosis: str | None, peso_kg) -> dict | None:
+    """Dosis total para el peso del paciente, o None si no se puede calcular."""
+    d = dosis_por_kg(dosis)
+    try:
+        peso = float(peso_kg)
+    except (TypeError, ValueError):
+        return None
+    if not d or peso <= 0:
+        return None
+    por_kg, unidad = d
+    return {"por_kg": por_kg, "unidad": unidad, "peso_kg": peso,
+            "total": round(por_kg * peso, 2)}
+
+
 # ── Resumen de completitud ───────────────────────────────────────────────────
 
 # Lo que una historia clínica no debería quedar sin. Etiquetas en español para
@@ -226,6 +259,15 @@ def resumen_campos(datos: dict, inferencias: dict, alertas_rango: dict,
         if t.get("medicamento") and not t.get("dosis"):
             dudosos.append({"campo": f"tratamiento_items.{i}", "motivo": "sin_dosis",
                             "detalle": f"«{nombre}» no tiene dosis."})
+
+    for i, t in enumerate(datos.get("tratamiento_items") or []):
+        if not isinstance(t, dict):
+            continue
+        d = dosis_por_kg(t.get("dosis"))
+        if d and d[1] == "mg" and d[0] > DOSIS_MG_KG_MAXIMA:
+            dudosos.append({"campo": f"tratamiento_items.{i}", "motivo": "dosis_alta",
+                            "detalle": f"{t.get('dosis')} es una dosis excepcionalmente alta; "
+                                       "verificar contra el audio."})
 
     total = len(_ESENCIALES)
     completos = total - len(faltantes)

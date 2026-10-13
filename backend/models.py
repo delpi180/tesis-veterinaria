@@ -758,3 +758,25 @@ class VacunaAvisada(Base):
         UniqueConstraint("paciente_id", "vacuna", "proxima_dosis", "tipo", name="uq_vacuna_avisada"),
     )
 
+
+
+class TerminoGlosario(Base):
+    """Palabra que la clínica quiere que el dictado escriba bien.
+
+    La lista de refuerzo sale del inventario y de las razas, pero hay cosas que
+    ahí no están: abreviaturas de la casa ("PQ" por perro quirúrgico), el nombre
+    de un colega que deriva casos, una marca que aún no se compró, o la forma
+    en que el reconocedor destroza una palabra concreta. Cada fila dice cómo
+    debe escribirse (`termino`) y, opcionalmente, cómo suele oírse mal
+    (`suena_como`, separadas por comas) para corregirlo antes de estructurar.
+    """
+    __tablename__ = "glosario_terminos"
+
+    id         = Column(Integer, primary_key=True)
+    termino    = Column(String(120), nullable=False, unique=True)
+    suena_como = Column(String(300))
+    # 'medicamento' | 'raza' | 'abreviatura' | 'persona' | 'otro'
+    tipo       = Column(String(20), nullable=False, default="otro", server_default="otro")
+    activo     = Column(Boolean, nullable=False, default=True, server_default="true")
+    creado_en  = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    creado_por = Column(String(50))

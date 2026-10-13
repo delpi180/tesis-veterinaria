@@ -1008,3 +1008,47 @@ class AsistenciaOut(BaseModel):
         return calcular_tardanza_min(self.hora_ingreso, self.hora_entrada_perfil)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Glosario del dictado
+# ---------------------------------------------------------------------------
+
+class GlosarioIn(BaseModel):
+    termino:    str
+    suena_como: Optional[str] = None
+    tipo:       str = "otro"
+    activo:     bool = True
+
+    @field_validator("termino")
+    @classmethod
+    def _termino(cls, v):
+        v = " ".join((v or "").split())
+        if len(v) < 2:
+            raise ValueError("El término debe tener al menos 2 letras")
+        return v[:120]
+
+    @field_validator("tipo")
+    @classmethod
+    def _tipo(cls, v):
+        if v not in ("medicamento", "raza", "abreviatura", "persona", "otro"):
+            raise ValueError("Tipo no válido")
+        return v
+
+    @field_validator("suena_como")
+    @classmethod
+    def _suena(cls, v):
+        if not v:
+            return None
+        partes = [" ".join(p.split()) for p in v.split(",")]
+        return ", ".join(p for p in partes if p)[:300] or None
+
+
+class GlosarioOut(BaseModel):
+    id:         int
+    termino:    str
+    suena_como: Optional[str] = None
+    tipo:       str
+    activo:     bool
+
+    model_config = ConfigDict(from_attributes=True)

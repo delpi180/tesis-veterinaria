@@ -10,6 +10,7 @@ import { useConfirmar } from "../components/Confirmar";
 import VoiceTextProcessor from "../components/VoiceTextProcessor";
 import DocumentosPaciente from "../components/DocumentosPaciente";
 import ResumenIA from "../components/ResumenIA";
+import { calcularDosis } from "../utils/dosis";
 import { CargandoPantalla } from "../components/Cargando";
 import { nombresSimilares } from "../utils/similitud";
 
@@ -407,7 +408,7 @@ function LoQueSeOyo({ texto }) {
   );
 }
 
-function TratamientoList({ items, onChange, desde, medicamentos = [] }) {
+function TratamientoList({ items, onChange, desde, medicamentos = [], pesoKg }) {
   const add    = () => onChange([...items, { ...TX_EMPTY }]);
   const remove = i  => onChange(items.filter((_, idx) => idx !== i));
   const update = (i, f, v) => { const n = [...items]; n[i] = { ...n[i], [f]: v }; onChange(n); };
@@ -500,6 +501,18 @@ function TratamientoList({ items, onChange, desde, medicamentos = [] }) {
                   {vencido
                     ? `Ojo: el lote de ${p.nombre} venció el ${p.fecha_vencimiento.split('-').reverse().join('/')}. No se podrá entregar.`
                     : `Ojo: no queda stock de ${p.nombre} en la clínica.`}
+                </p>
+              );
+            })()}
+            {(() => {
+              // Dosis total para el peso de esta consulta. Solo la cuenta:
+              // qué dosis dar lo decide el doctor.
+              const c = calcularDosis(item.dosis, pesoKg);
+              if (!c) return null;
+              return (
+                <p className="col-span-1 sm:col-span-6 text-[11px] text-slate-600">
+                  Para {c.peso} kg: <strong className="text-slate-800">{c.total} {c.unidad}</strong> en total
+                  <span className="text-slate-400"> ({c.porKg} {c.unidad}/kg)</span>
                 </p>
               );
             })()}
@@ -1525,7 +1538,7 @@ export default function HistoriasClinicas() {
             </Field>
             <div>
               <p className={lCls}>Medicamentos</p>
-              <TratamientoList items={form.tratamiento_items} desde={form.fecha || undefined}
+              <TratamientoList items={form.tratamiento_items} desde={form.fecha || undefined} pesoKg={form.peso_kg}
                 medicamentos={medicamentos}
                 onChange={v => { setForm(p => ({ ...p, tratamiento_items: v })); }} />
             </div>

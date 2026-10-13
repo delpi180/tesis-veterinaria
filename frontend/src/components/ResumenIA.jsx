@@ -6,6 +6,7 @@ const MOTIVOS = {
   rescatado: "Tomado del dictado",
   fuera_de_inventario: "No está en el inventario",
   sin_dosis: "Sin dosis",
+  dosis_alta: "Dosis muy alta",
 };
 
 const NOMBRES = {
