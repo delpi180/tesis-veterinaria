@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal, Optional
 from pydantic import (
@@ -962,6 +963,7 @@ class ConfiguracionOut(BaseModel):
     telefono:        Optional[str] = None
     email:           Optional[str] = None
     pie_comprobante: Optional[str] = None
+    color_marca:     Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -973,6 +975,18 @@ class ConfiguracionUpdate(BaseModel):
     telefono:        Optional[str] = None
     email:           Optional[str] = None
     pie_comprobante: Optional[str] = None
+    # Color de marca de la clínica, "#rrggbb". Vacío = el color por defecto.
+    color_marca:     Optional[str] = None
+
+    @field_validator("color_marca")
+    @classmethod
+    def _color(cls, v):
+        v = (v or "").strip()
+        if not v:
+            return None
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}", v):
+            raise ValueError("El color debe tener la forma #rrggbb")
+        return v.lower()
 
     @model_validator(mode='after')
     def _validar(self):

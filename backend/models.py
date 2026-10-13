@@ -2,10 +2,42 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import Column, Boolean, Date, Float, Integer, LargeBinary, Numeric, String, Text, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declared_attr
 from database import Base
 
 
-class Usuario(Base):
+class Clinica(Base):
+    """Una clínica cliente del SaaS. Todo lo demás cuelga de ella.
+
+    El aislamiento entre clínicas lo garantiza la sesión de base de datos (ver
+    database.py): cada fila de las tablas con `TenantMixin` lleva el id de su
+    clínica, y la sesión de una petición solo ve y solo escribe en la suya.
+    """
+    __tablename__ = "clinicas"
+
+    id        = Column(Integer, primary_key=True)
+    nombre    = Column(String(120), nullable=False)
+    # 'activa' | 'suspendida'. Una clínica suspendida no puede iniciar ni
+    # mantener sesión (falta de pago, abuso, baja a pedido).
+    estado    = Column(String(12), nullable=False, default="activa", server_default="activa")
+    plan      = Column(String(20), nullable=False, default="prueba", server_default="prueba")
+    creado_en = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class TenantMixin:
+    """Marca una tabla como propiedad de una clínica.
+
+    `server_default=1` existe para los scripts y pruebas que insertan sin
+    sesión de clínica; las peticiones de la API siempre asignan la suya
+    explícitamente (database.py) y lo verifican con pruebas.
+    """
+    @declared_attr
+    def clinica_id(cls):
+        return Column(Integer, ForeignKey("clinicas.id"), nullable=False,
+                      index=True, server_default="1")
+
+
+class Usuario(TenantMixin, Base):
     __tablename__ = "usuarios"
 
     id            = Column(Integer, primary_key=True)
@@ -29,11 +61,11 @@ class Usuario(Base):
     sueldo_base    = Column(Numeric(10, 2))
 
 
-class Cliente(Base):
+class Cliente(TenantMixin, Base):
     __tablename__ = "clientes"
 
     id        = Column(Integer, primary_key=True)
-    dni       = Column(String(20), unique=True, index=True, nullable=True)
+    dni       = Column(String(20), index=True, nullable=True)   # único por clínica (ver __table_args__)
     nombre    = Column(String(100), nullable=False)
     telefono  = Column(String(20))
     direccion = Column(String(200))
@@ -44,8 +76,10 @@ class Cliente(Base):
         cascade="all, delete-orphan",
     )
 
+    __table_args__ = (UniqueConstraint("clinica_id", "dni", name="uq_clientes_clinica_dni"),)
 
-class Paciente(Base):
+
+class Paciente(TenantMixin, Base):
     __tablename__ = "pacientes"
 
     id         = Column(Integer, primary_key=True)
@@ -97,7 +131,7 @@ class Paciente(Base):
     )
 
 
-class Tratamiento(Base):
+class Tratamiento(TenantMixin, Base):
     """Un medicamento indicado en una consulta, con su ventana de tiempo.
 
     Por qué existe
@@ -175,7 +209,7 @@ class Tratamiento(Base):
         return "terminado" if self.fin < datetime.now(timezone.utc).date() else "en_curso"
 
 
-class DocumentoPaciente(Base):
+class DocumentoPaciente(TenantMixin, Base):
     """Archivos complementarios de la mascota: radiografías, análisis, recetas, etc.
 
     El contenido se guarda como binario dentro de PostgreSQL (durable en Railway,
@@ -202,7 +236,7 @@ class DocumentoPaciente(Base):
     historia = relationship("HistoriaClinica", back_populates="documentos")
 
 
-class RegistroClinico(Base):
+class RegistroClinico(TenantMixin, Base):
     """Registros complementarios simples por mascota: antiparasitarios, estética
     y métodos complementarios (radiografías, análisis, ecografías, etc.).
 
@@ -231,7 +265,7 @@ class RegistroClinico(Base):
     paciente = relationship("Paciente", back_populates="registros")
 
 
-class Receta(Base):
+class Receta(TenantMixin, Base):
     """Receta médica veterinaria: el tratamiento formal que el doctor indica
     para un paciente (medicamentos, dosis, vía, frecuencia y duración),
     separada de la historia clínica para poder imprimirse/entregarse sola.
@@ -262,7 +296,7 @@ class Receta(Base):
         return self.veterinario.nombre if self.veterinario else self.firmado_por
 
 
-class HistoriaClinica(Base):
+class HistoriaClinica(TenantMixin, Base):
     __tablename__ = "historias_clinicas"
 
     id          = Column(Integer, primary_key=True)
@@ -352,7 +386,7 @@ class HistoriaClinica(Base):
         return self.veterinario.nombre if self.veterinario else self.firmado_por
 
 
-class Cita(Base):
+class Cita(TenantMixin, Base):
     __tablename__ = "citas"
 
     id          = Column(Integer, primary_key=True)
@@ -416,6 +450,9 @@ class ErrorRegistrado(Base):
     __tablename__ = "errores"
 
     id       = Column(Integer, primary_key=True)
+    # Opcional: un error en la pantalla de acceso no pertenece a ninguna clínica.
+    # No usa TenantMixin porque la lista debe poder incluir esos sin clínica.
+    clinica_id = Column(Integer, ForeignKey("clinicas.id"), nullable=True, index=True)
     origen   = Column(String(10), nullable=False)   # 'frontend' | 'backend'
     mensaje  = Column(String(500), nullable=False)
     detalle  = Column(Text)                          # traceback o componentStack
@@ -432,7 +469,7 @@ class ErrorRegistrado(Base):
     visto    = Column(Boolean, default=False)        # marcado como revisado
 
 
-class Actividad(Base):
+class Actividad(TenantMixin, Base):
     """Bitácora de auditoría: registra cada acción que modifica datos."""
     __tablename__ = "actividades"
 
@@ -470,7 +507,7 @@ def calcular_tardanza_min(hora_ingreso, hora_entrada_perfil):
     return diff if diff > 0 else 0
 
 
-class Asistencia(Base):
+class Asistencia(TenantMixin, Base):
     """Marcaciones de ingreso/salida del personal (control de la recepcionista)."""
     __tablename__ = "asistencias"
 
@@ -562,11 +599,11 @@ class RespuestaTAM(Base):
 # Módulo de ventas e inventario
 # ---------------------------------------------------------------------------
 
-class Producto(Base):
+class Producto(TenantMixin, Base):
     __tablename__ = "productos"
 
     id           = Column(Integer, primary_key=True)
-    codigo       = Column(String(20), unique=True, index=True)  # SKU autogenerado: MED-0001
+    codigo       = Column(String(20), index=True)  # SKU autogenerado: MED-0001 (único por clínica)
     nombre       = Column(String(150), nullable=False)
     descripcion  = Column(Text)
     categoria    = Column(String(50))          # comida / accesorio / medicamento
@@ -592,8 +629,10 @@ class Producto(Base):
     fecha_vencimiento = Column(Date)          # null = no aplica (accesorios, comida sin fecha)
     lote              = Column(String(50))
 
+    __table_args__ = (UniqueConstraint("clinica_id", "codigo", name="uq_productos_clinica_codigo"),)
 
-class Servicio(Base):
+
+class Servicio(TenantMixin, Base):
     __tablename__ = "servicios"
 
     id              = Column(Integer, primary_key=True)
@@ -605,7 +644,7 @@ class Servicio(Base):
     creado_en       = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
-class Venta(Base):
+class Venta(TenantMixin, Base):
     __tablename__ = "ventas"
 
     id            = Column(Integer, primary_key=True)
@@ -650,7 +689,7 @@ class Venta(Base):
     items   = relationship("VentaItem", back_populates="venta", cascade="all, delete-orphan")
 
 
-class CierreCaja(Base):
+class CierreCaja(TenantMixin, Base):
     """Arqueo del día: lo que dice el sistema contra lo que hay en el cajón.
 
     Antes el "cierre de caja" era solo un listado de ventas que se podía
@@ -668,7 +707,7 @@ class CierreCaja(Base):
     __tablename__ = "cierres_caja"
 
     id                = Column(Integer, primary_key=True)
-    fecha             = Column(Date, nullable=False, unique=True)   # un cierre por día
+    fecha             = Column(Date, nullable=False)                # un cierre por día y clínica
     efectivo_esperado = Column(Numeric(10, 2), nullable=False)      # según el sistema
     efectivo_contado  = Column(Numeric(10, 2), nullable=False)      # lo que había en el cajón
     diferencia        = Column(Numeric(10, 2), nullable=False)      # contado - esperado (negativo = falta)
@@ -678,8 +717,10 @@ class CierreCaja(Base):
     cerrado_por       = Column(String(50))
     cerrado_en        = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    __table_args__ = (UniqueConstraint("clinica_id", "fecha", name="uq_cierre_caja_clinica_fecha"),)
 
-class MovimientoInventario(Base):
+
+class MovimientoInventario(TenantMixin, Base):
     __tablename__ = "movimientos_inventario"
 
     id               = Column(Integer, primary_key=True)
@@ -694,7 +735,7 @@ class MovimientoInventario(Base):
     producto = relationship("Producto")
 
 
-class VentaItem(Base):
+class VentaItem(TenantMixin, Base):
     __tablename__ = "venta_items"
 
     id              = Column(Integer, primary_key=True)
@@ -722,11 +763,12 @@ class SseEvent(Base):
     __tablename__ = "sse_events"
 
     id        = Column(Integer, primary_key=True)
+    clinica_id = Column(Integer, nullable=True)   # a quién va dirigido el aviso
     message   = Column(String(100), nullable=False)
     timestamp = Column(Float, nullable=False, index=True)
 
 
-class ConfiguracionClinica(Base):
+class ConfiguracionClinica(TenantMixin, Base):
     """Datos de la clínica que usa el sistema (una sola fila, id=1).
 
     Antes el nombre "Veterinaria Los Pinos" estaba escrito a mano en el login,
@@ -747,11 +789,17 @@ class ConfiguracionClinica(Base):
     # Texto libre al pie de los comprobantes (ej. "Gracias por su preferencia")
     pie_comprobante = Column(String(200))
 
+    # Color de marca elegido por la clínica ("#0f766e"); la app deriva de él toda
+    # su paleta. Sin valor se usa el color por defecto del producto.
+    color_marca     = Column(String(7))
+
     actualizado_en  = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     actualizado_por = Column(String(50))
 
+    __table_args__ = (UniqueConstraint("clinica_id", name="uq_config_clinica"),)
 
-class VacunaAvisada(Base):
+
+class VacunaAvisada(TenantMixin, Base):
     """Marca que ya se avisó al dueño sobre una vacuna pendiente.
 
     Los recordatorios de vacuna NO son una tabla propia: se calculan al vuelo
@@ -783,7 +831,7 @@ class VacunaAvisada(Base):
 
 
 
-class TerminoGlosario(Base):
+class TerminoGlosario(TenantMixin, Base):
     """Palabra que la clínica quiere que el dictado escriba bien.
 
     La lista de refuerzo sale del inventario y de las razas, pero hay cosas que
@@ -796,7 +844,7 @@ class TerminoGlosario(Base):
     __tablename__ = "glosario_terminos"
 
     id         = Column(Integer, primary_key=True)
-    termino    = Column(String(120), nullable=False, unique=True)
+    termino    = Column(String(120), nullable=False)
     suena_como = Column(String(300))
     # 'medicamento' | 'raza' | 'abreviatura' | 'persona' | 'otro'
     tipo       = Column(String(20), nullable=False, default="otro", server_default="otro")
@@ -804,8 +852,10 @@ class TerminoGlosario(Base):
     creado_en  = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     creado_por = Column(String(50))
 
+    __table_args__ = (UniqueConstraint("clinica_id", "termino", name="uq_glosario_clinica_termino"),)
 
-class AddendumHistoria(Base):
+
+class AddendumHistoria(TenantMixin, Base):
     """Nota de corrección o ampliación de una consulta ya firmada.
 
     No reemplaza nada: se suma al final. El texto original queda intacto y la
@@ -825,7 +875,7 @@ class AddendumHistoria(Base):
     historia = relationship("HistoriaClinica", back_populates="addendums")
 
 
-class ContactoCliente(Base):
+class ContactoCliente(TenantMixin, Base):
     """Cada vez que la clínica intentó comunicarse con un dueño.
 
     Las pantallas de vacunas y tratamientos ya generaban enlaces de WhatsApp,
@@ -856,25 +906,28 @@ class ContactoCliente(Base):
     creado_por  = Column(String(50))
 
 
-class PlantillaContacto(Base):
+class PlantillaContacto(TenantMixin, Base):
     """Texto del mensaje de cada motivo, cuando la clínica lo cambió.
 
     Sin fila para un motivo se usa el texto por defecto (services/contactos.py).
     """
     __tablename__ = "plantillas_contacto"
 
-    motivo          = Column(String(20), primary_key=True)
+    id              = Column(Integer, primary_key=True)
+    motivo          = Column(String(20), nullable=False)
     texto           = Column(Text, nullable=False)
     actualizado_en  = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     actualizado_por = Column(String(50))
 
+    __table_args__ = (UniqueConstraint("clinica_id", "motivo", name="uq_plantilla_clinica_motivo"),)
 
-class Planilla(Base):
+
+class Planilla(TenantMixin, Base):
     """Planilla de un mes. 'borrador' se corrige; 'cerrada' ya no cambia."""
     __tablename__ = "planillas"
 
     id             = Column(Integer, primary_key=True)
-    periodo        = Column(String(7), nullable=False, unique=True)   # "2026-10"
+    periodo        = Column(String(7), nullable=False)   # "2026-10"; único por clínica
     estado         = Column(String(10), nullable=False, default="borrador", server_default="borrador")
     tolerancia_min = Column(Integer, nullable=False, default=0, server_default="0")
     dias_mes       = Column(Integer, nullable=False, default=30, server_default="30")
@@ -887,8 +940,10 @@ class Planilla(Base):
     lineas = relationship("PlanillaLinea", back_populates="planilla",
                           cascade="all, delete-orphan", order_by="PlanillaLinea.nombre")
 
+    __table_args__ = (UniqueConstraint("clinica_id", "periodo", name="uq_planilla_clinica_periodo"),)
 
-class PlanillaLinea(Base):
+
+class PlanillaLinea(TenantMixin, Base):
     """Un trabajador en una planilla. Guarda una foto de su sueldo y nombre de
     ese mes: si después cambian, la planilla cerrada no se altera."""
     __tablename__ = "planilla_lineas"

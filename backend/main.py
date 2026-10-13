@@ -11,12 +11,12 @@ from pydantic import BaseModel
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("vetlospinos")
 
-from database import SessionLocal, engine
+from database import SessionLocal, engine, nueva_sesion
 import models  # registra todos los modelos en Base.metadata
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
-    busqueda, inventario, asistencia, mi_panel, actividad, configuracion, glosario, contactos, planilla, errores,
+    busqueda, inventario, asistencia, mi_panel, actividad, configuracion, glosario, contactos, planilla, registro, errores,
     respaldo, catalogos, tratamientos,
 )
 from core import ratelimit
@@ -30,7 +30,7 @@ from services.soap_processor import process_soap  # léxico, para comparativa de
 app = FastAPI(title="Veterinaria Los Pinos API")
 
 # Rutas accesibles sin token
-RUTAS_PUBLICAS = {"/api/auth/login", "/api/health"}
+RUTAS_PUBLICAS = {"/api/auth/login", "/api/health", "/api/registro/"}
 
 # Rutas donde solo el ENVÍO (POST) es público, pero leerlas exige sesión.
 # Reportar un error del navegador no puede depender de tener sesión: si la app
@@ -137,11 +137,20 @@ def _describir_accion(metodo: str, path: str) -> str:
 # consulta extra por request. Se cachea el resultado unos segundos: así
 # desactivar a alguien le corta el acceso en ~30 s (antes: hasta 12 h, lo que
 # durara su token) sin castigar el rendimiento. Sin Redis ni servicios pagos.
-_CACHE_CUENTAS: dict[str, tuple[float, bool]] = {}
+_CACHE_CUENTAS: dict[str, tuple[float, "_Cuenta"]] = {}
 _CACHE_TTL_SEG = 30
 
 
-def _cuenta_habilitada(usuario: str) -> bool:
+class _Cuenta:
+    """Lo que el middleware necesita saber de quien hace la petición."""
+    __slots__ = ("habilitada", "clinica_id", "suspendida")
+
+    def __init__(self, habilitada: bool, clinica_id: int | None, suspendida: bool):
+        self.habilitada, self.clinica_id, self.suspendida = habilitada, clinica_id, suspendida
+
+
+def _cuenta(usuario: str) -> "_Cuenta":
+    """Estado de la cuenta y a qué clínica pertenece. Se recuerda 30 s."""
     ahora = time.time()
     entrada = _CACHE_CUENTAS.get(usuario)
     if entrada and (ahora - entrada[0]) < _CACHE_TTL_SEG:
@@ -149,31 +158,33 @@ def _cuenta_habilitada(usuario: str) -> bool:
 
     db = None
     try:
-        db = SessionLocal()
-        activo = (
-            db.query(models.Usuario.activo)
+        db = SessionLocal()   # sesión de sistema: aún no se sabe la clínica
+        fila = (
+            db.query(models.Usuario.activo, models.Usuario.clinica_id, models.Clinica.estado)
+            .join(models.Clinica, models.Clinica.id == models.Usuario.clinica_id)
             .filter(models.Usuario.usuario == usuario)
-            .scalar()
+            .first()
         )
-        habilitada = bool(activo)
+        cuenta = (_Cuenta(bool(fila[0]), fila[1], fila[2] != "activa")
+                  if fila else _Cuenta(False, None, False))
     except Exception as e:
-        # Si la BD falla, no dejamos a todo el mundo fuera por un blip: se
-        # confía en la firma del token (que ya se validó) y se registra.
+        # Sin poder verificar la cuenta NO se deja pasar: ahora una petición sin
+        # clínica conocida sería una petición que podría ver datos de otra.
         logger.warning("No se pudo verificar la cuenta '%s': %s", usuario, e)
-        return True
+        return _Cuenta(False, None, False)
     finally:
         if db is not None:
             db.close()
 
-    _CACHE_CUENTAS[usuario] = (ahora, habilitada)
-    return habilitada
+    _CACHE_CUENTAS[usuario] = (ahora, cuenta)
+    return cuenta
 
 
-def _registrar_actividad(usuario, rol, metodo, ruta, estado, detalle=None):
+def _registrar_actividad(usuario, rol, metodo, ruta, estado, detalle=None, clinica_id=None):
     """Guarda una entrada en la bitácora (no rompe la petición si falla)."""
     db = None
     try:
-        db = SessionLocal()
+        db = nueva_sesion(clinica_id)
         db.add(models.Actividad(
             usuario=usuario, rol=rol,
             accion=_describir_accion(metodo, ruta),
@@ -216,10 +227,16 @@ async def auth_middleware(request: Request, call_next):
         # existiendo y activa: al desactivar a alguien (p. ej. personal que ya
         # no trabaja aquí) su sesión debe cortarse de inmediato, no seguir
         # abierta hasta que el token expire por su cuenta.
-        if not _cuenta_habilitada(sesion["usuario"]):
+        cuenta = _cuenta(sesion["usuario"])
+        if not cuenta.habilitada or cuenta.clinica_id is None:
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Tu cuenta fue desactivada. Contacta a la administradora."},
+            )
+        if cuenta.suspendida:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "La cuenta de tu clínica está suspendida. Contacta al soporte."},
             )
         # Control de rol: la recepcionista puede leer la ficha completa del
         # paciente y llenar historias clínicas; emitir recetas no (ver
@@ -237,6 +254,19 @@ async def auth_middleware(request: Request, call_next):
             )
         request.state.usuario = sesion["usuario"]
         request.state.rol = sesion["rol"]
+        # De aquí en adelante TODA consulta de esta petición queda acotada a
+        # esta clínica (ver database.get_db).
+        request.state.clinica_id = cuenta.clinica_id
+    elif es_lectura_publica:
+        # Rutas públicas que, si hay sesión, responden con los datos de SU
+        # clínica (nombre y color en la pantalla). Sin sesión, valores genéricos.
+        header = request.headers.get("Authorization", "")
+        token = header.removeprefix("Bearer ").strip()
+        sesion = verificar_token(token) if token else None
+        if sesion:
+            cuenta = _cuenta(sesion["usuario"])
+            if cuenta.habilitada and not cuenta.suspendida:
+                request.state.clinica_id = cuenta.clinica_id
 
     response = await call_next(request)
 
@@ -253,6 +283,7 @@ async def auth_middleware(request: Request, call_next):
             request.state.usuario, getattr(request.state, "rol", None),
             request.method, path, response.status_code,
             detalle=getattr(request.state, "actividad_detalle", None),
+            clinica_id=getattr(request.state, "clinica_id", None),
         )
 
     return response
@@ -282,11 +313,12 @@ async def _error_no_controlado(request: Request, exc: Exception):
     try:
         import traceback
         from routers.errores import registrar_error
-        db = SessionLocal()
+        db = nueva_sesion(getattr(request.state, "clinica_id", None))
         try:
             registrar_error(
                 db,
                 origen="backend",
+                clinica_id=getattr(request.state, "clinica_id", None),
                 mensaje=f"{type(exc).__name__}: {exc}",
                 detalle=traceback.format_exc(),
                 ruta=f"{request.method} {request.url.path}",
@@ -330,6 +362,7 @@ app.include_router(configuracion.router)
 app.include_router(glosario.router)
 app.include_router(contactos.router)
 app.include_router(planilla.router)
+app.include_router(registro.router)
 app.include_router(errores.router)
 app.include_router(respaldo.router)
 app.include_router(catalogos.router)
@@ -517,7 +550,7 @@ async def transcribe_endpoint(request: Request, audio: UploadFile = File(...)):
     # clínica, así que hace falta una sesión. Se abre y cierra acá porque la
     # transcripción corre en otro hilo y puede tardar minutos: sostener una
     # conexión del pool todo ese rato sería desperdiciarla.
-    db_vocab = SessionLocal()
+    db_vocab = nueva_sesion(getattr(request.state, "clinica_id", None))
     try:
         import asyncio
         texto = await asyncio.to_thread(
@@ -554,7 +587,7 @@ def procesar_historia_endpoint(body: ProcessHistoriaRequest, request: Request):
 
     # El catálogo de medicamentos de la clínica va al prompt: permite
     # reconocer una marca mal transcrita en vez de copiarla rota.
-    db_cat = SessionLocal()
+    db_cat = nueva_sesion(getattr(request.state, "clinica_id", None))
     try:
         resultado = extraer_historia(body.texto, db=db_cat)
     except Exception as e:
@@ -584,7 +617,7 @@ def procesar_receta_endpoint(body: ProcesarRecetaRequest, request: Request):
     if not body.texto.strip():
         raise HTTPException(status_code=400, detail="El campo 'texto' no puede estar vacío.")
 
-    db_cat = SessionLocal()
+    db_cat = nueva_sesion(getattr(request.state, "clinica_id", None))
     try:
         resultado = extraer_receta(body.texto, db=db_cat)
     except Exception as e:

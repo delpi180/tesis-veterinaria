@@ -162,7 +162,7 @@ def guardar_plantilla(motivo: str, payload: PlantillaIn, request: Request,
     solo_admin(request)
     if motivo not in svc.MOTIVOS:
         raise HTTPException(404, "Motivo no encontrado")
-    p = db.get(PlantillaContacto, motivo)
+    p = db.query(PlantillaContacto).filter(PlantillaContacto.motivo == motivo).first()
     quien = getattr(request.state, "usuario", None)
     if p:
         p.texto, p.actualizado_por = payload.texto, quien
@@ -177,7 +177,7 @@ def guardar_plantilla(motivo: str, payload: PlantillaIn, request: Request,
 @router.delete("/plantillas/{motivo}", status_code=204)
 def restaurar_plantilla(motivo: str, request: Request, db: Session = Depends(get_db)):
     solo_admin(request)
-    p = db.get(PlantillaContacto, motivo)
+    p = db.query(PlantillaContacto).filter(PlantillaContacto.motivo == motivo).first()
     if p:
         db.delete(p)
         db.commit()

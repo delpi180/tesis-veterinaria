@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { rgbMarca } from '../utils/paleta'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingCart, Package, CreditCard,
@@ -45,7 +46,7 @@ const mismoMes = (iso, ref) => {
 function reporteVentasPDF(ventas, rango) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const W = 210
-  const morado = [33, 61, 90]
+  const morado = rgbMarca(800)
 
   doc.setFillColor(...morado)
   doc.rect(0, 0, W, 24, 'F')
@@ -102,7 +103,7 @@ function reporteVentasPDF(ventas, rango) {
 function generarBoleta(venta, cliente) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const W = 210
-  const morado = [33, 61, 90]
+  const morado = rgbMarca(800)
 
   const clinica = clinicaActual()
 

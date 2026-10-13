@@ -47,7 +47,10 @@ MAX_KEYTERMS = 120
 # más por consulta médica. Se recuerda un rato: cargar un producto nuevo tarda
 # a lo sumo esto en reflejarse en el dictado.
 _TTL_SEGUNDOS = 600
-_cache: tuple[float, list[str]] | None = None
+# Un caché POR CLÍNICA: el vocabulario sale del inventario y de las razas de cada
+# una, y compartirlo mezclaría los medicamentos de una veterinaria en el dictado
+# de otra.
+_cache: dict[int | None, tuple[float, list[str]]] = {}
 
 
 # Una dosis o presentación: "4MG", "10", "0.5ml", "500". Se descarta.
@@ -129,10 +132,11 @@ def keyterms(db: Session | None = None) -> list[str]:
     Si la base no responde se devuelve la lista base: un dictado no puede
     fallar porque el vocabulario no se pudo armar.
     """
-    global _cache
     ahora = time.time()
-    if _cache and (ahora - _cache[0]) < _TTL_SEGUNDOS:
-        return _cache[1]
+    clave = db.info.get("clinica_id") if db is not None else None
+    hit = _cache.get(clave)
+    if hit and (ahora - hit[0]) < _TTL_SEGUNDOS:
+        return hit[1]
 
     propios: list[str] = []
     if db is not None:
@@ -152,15 +156,14 @@ def keyterms(db: Session | None = None) -> list[str]:
         if len(final) >= MAX_KEYTERMS:
             break
 
-    _cache = (ahora, final)
+    _cache[clave] = (ahora, final)
     return final
 
 
 def invalidar_cache() -> None:
     """Para las pruebas y para cuando se recarga el inventario de golpe."""
-    global _cache, _cache_catalogo
-    _cache = None
-    _cache_catalogo = None
+    _cache.clear()
+    _cache_catalogo.clear()
 
 
 # ── Catálogo de medicamentos para la extracción ──────────────────────────────
@@ -169,7 +172,7 @@ def invalidar_cache() -> None:
 # el paso siguiente: si igual salió mal escrita, GPT puede reconocerla si sabe
 # qué medicamentos existen en esta clínica. Sin catálogo, "melo si vet" se
 # copia tal cual al tratamiento y a la receta.
-_cache_catalogo: tuple[float, list[str]] | None = None
+_cache_catalogo: dict[int | None, tuple[float, list[str]]] = {}
 
 
 def catalogo_medicamentos(db: Session | None) -> list[str]:
@@ -179,10 +182,11 @@ def catalogo_medicamentos(db: Session | None) -> list[str]:
     que se busca es que el tratamiento quede escrito igual que el producto,
     para poder cobrarlo después sin volver a tipearlo.
     """
-    global _cache_catalogo
     ahora = time.time()
-    if _cache_catalogo and (ahora - _cache_catalogo[0]) < _TTL_SEGUNDOS:
-        return _cache_catalogo[1]
+    clave = db.info.get("clinica_id") if db is not None else None
+    hit = _cache_catalogo.get(clave)
+    if hit and (ahora - hit[0]) < _TTL_SEGUNDOS:
+        return hit[1]
 
     nombres: list[str] = []
     if db is not None:
@@ -199,7 +203,7 @@ def catalogo_medicamentos(db: Session | None) -> list[str]:
         except Exception:
             nombres = []
 
-    _cache_catalogo = (ahora, nombres)
+    _cache_catalogo[clave] = (ahora, nombres)
     return nombres
 
 

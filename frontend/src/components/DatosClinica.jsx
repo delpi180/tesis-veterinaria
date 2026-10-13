@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Building2, Save } from 'lucide-react'
 import { api } from '../services/api'
 import { useClinica } from '../services/clinica'
 import { useToast } from './Toast'
+import { aplicarMarca, esHexValido, generarPaleta, COLOR_POR_DEFECTO } from '../utils/paleta'
 
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
@@ -23,6 +24,18 @@ export default function DatosClinica() {
 
   const set = (campo) => (e) => setForm(f => ({ ...f, [campo]: e.target.value }))
 
+  // El color se prueba en vivo: toda la app cambia al elegirlo, y solo queda si
+  // se guarda. Si se sale sin guardar, vuelve al color guardado.
+  const guardadoRef = useRef(clinica.color_marca)
+  useEffect(() => { guardadoRef.current = clinica.color_marca }, [clinica.color_marca])
+  useEffect(() => () => aplicarMarca(guardadoRef.current), [])
+  const elegirColor = (valor) => {
+    setForm(f => ({ ...f, color_marca: valor }))
+    if (esHexValido(valor) || !valor) aplicarMarca(valor)
+  }
+  const colorMostrado = esHexValido(form.color_marca) ? form.color_marca : COLOR_POR_DEFECTO
+  const ajustado = esHexValido(form.color_marca) && generarPaleta(form.color_marca)[600] !== form.color_marca.toLowerCase()
+
   const guardar = async (e) => {
     e.preventDefault()
     if (!form.nombre?.trim()) { setError('El nombre de la clínica es obligatorio.'); return }
@@ -35,6 +48,7 @@ export default function DatosClinica() {
         telefono:        form.telefono?.trim() || null,
         email:           form.email?.trim() || null,
         pie_comprobante: form.pie_comprobante?.trim() || null,
+        color_marca:     esHexValido(form.color_marca) ? form.color_marca : null,
       })
       await recargar()
       toast.success('Datos de la clínica actualizados')
@@ -94,6 +108,27 @@ export default function DatosClinica() {
             <input type="text" className={inputCls} value={form.pie_comprobante ?? ''} onChange={set('pie_comprobante')}
               placeholder="Gracias por su preferencia" />
           </div>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className={labelCls}>Color de tu marca</label>
+          <div className="flex flex-wrap items-center gap-3">
+            <input type="color" value={colorMostrado} onChange={e => elegirColor(e.target.value)}
+              aria-label="Elegir el color de la marca"
+              className="h-10 w-14 rounded border border-slate-200 bg-white p-1 cursor-pointer" />
+            <input type="text" className={`${inputCls} w-32 font-mono`} value={form.color_marca ?? ''}
+              onChange={e => elegirColor(e.target.value)} placeholder={COLOR_POR_DEFECTO} maxLength={7} />
+            {form.color_marca && (
+              <button type="button" onClick={() => elegirColor('')}
+                className="text-xs text-slate-600 hover:text-slate-900 underline">
+                Usar el color original
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-slate-500">
+            Se aplica a todo el sistema, a las boletas y a los PDF.
+            {ajustado && ' Lo oscurecimos un poco para que el texto blanco se lea bien.'}
+          </p>
         </div>
 
         {error && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">{error}</p>}

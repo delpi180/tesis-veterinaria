@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     auth_secret: str = "vet-los-pinos-secreto-dev"
     auth_token_horas: int = 12
 
+    # Nombre del producto: lo que se ve antes de iniciar sesión, cuando todavía
+    # no se sabe de qué clínica es quien entra.
+    nombre_producto: str = "Gestión Veterinaria"
+    # Si cualquiera puede crear una clínica desde la pantalla de registro.
+    registro_abierto: bool = True
+
     # CORS: "*" en dev; en prod poner el dominio de Vercel (CSV) vía variable.
     cors_origins: str = "*"
 

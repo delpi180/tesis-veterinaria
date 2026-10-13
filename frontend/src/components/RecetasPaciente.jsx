@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { rgbMarca } from '../utils/paleta'
 import { Plus, Trash2, Loader2, Pencil, Download, Pill, X, Send, Mic, AlertTriangle } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -28,7 +29,6 @@ const FORM_INICIAL = { fecha: hoyStr(), diagnostico: '', indicaciones: '', items
 // ── PDF de la receta (clínica + paciente + dueño + medicamentos + firma) ────
 // Construye el documento sin guardarlo: cada botón decide qué hacer con él
 // (descargarlo directo, o compartirlo por WhatsApp).
-const _MORADO = [33, 61, 90]
 function nombreArchivoReceta(paciente, receta) {
   return `Receta_${paciente?.nombre ?? 'paciente'}_${receta.fecha}.pdf`
 }
@@ -36,7 +36,7 @@ function construirPDF(paciente, cliente, receta) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const W = 210, M = 14
 
-  doc.setFillColor(..._MORADO)
+  doc.setFillColor(...rgbMarca(800))
   doc.rect(0, 0, W, 24, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(15); doc.setFont(undefined, 'bold')
@@ -56,7 +56,7 @@ function construirPDF(paciente, cliente, receta) {
       ['Sexo / Edad', [paciente?.sexo, edad].filter(Boolean).join(' · ')],
     ],
     theme: 'grid',
-    headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+    headStyles: { fillColor: rgbMarca(800), fontSize: 9, halign: 'left', textColor: 255 },
     columnStyles: { 0: { cellWidth: 42, fontStyle: 'bold', textColor: [90, 90, 90] }, 1: { cellWidth: W - 2 * M - 42 } },
     styles: { fontSize: 9, cellPadding: 2 },
     margin: { left: M, right: M },
@@ -69,7 +69,7 @@ function construirPDF(paciente, cliente, receta) {
       ['Teléfono', cliente?.telefono ?? ''],
     ],
     theme: 'grid',
-    headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+    headStyles: { fillColor: rgbMarca(800), fontSize: 9, halign: 'left', textColor: 255 },
     columnStyles: { 0: { cellWidth: 42, fontStyle: 'bold', textColor: [90, 90, 90] }, 1: { cellWidth: W - 2 * M - 42 } },
     styles: { fontSize: 9, cellPadding: 2 },
     margin: { left: M, right: M },
@@ -81,7 +81,7 @@ function construirPDF(paciente, cliente, receta) {
       head: [['Diagnóstico']],
       body: [[receta.diagnostico]],
       theme: 'grid',
-      headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+      headStyles: { fillColor: rgbMarca(800), fontSize: 9, halign: 'left', textColor: 255 },
       styles: { fontSize: 9, cellPadding: 2 },
       margin: { left: M, right: M },
     })
@@ -92,7 +92,7 @@ function construirPDF(paciente, cliente, receta) {
     head: [['Medicamento', 'Dosis', 'Vía', 'Frecuencia', 'Duración']],
     body: (receta.items || []).map(i => [i.medicamento ?? '', i.dosis ?? '', i.via ?? '', i.frecuencia ?? '', i.duracion ?? '']),
     theme: 'grid',
-    headStyles: { fillColor: _MORADO, fontSize: 9, textColor: 255 },
+    headStyles: { fillColor: rgbMarca(800), fontSize: 9, textColor: 255 },
     styles: { fontSize: 9, cellPadding: 2.5 },
     margin: { left: M, right: M },
   })
@@ -103,7 +103,7 @@ function construirPDF(paciente, cliente, receta) {
       head: [['Indicaciones para el propietario']],
       body: [[receta.indicaciones]],
       theme: 'grid',
-      headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+      headStyles: { fillColor: rgbMarca(800), fontSize: 9, halign: 'left', textColor: 255 },
       styles: { fontSize: 9, cellPadding: 2 },
       margin: { left: M, right: M },
     })

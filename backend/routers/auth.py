@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Usuario
+from models import Clinica, Usuario
 from core.security import crear_token, verify_password
 from core.config import settings
 from core import ratelimit
@@ -46,6 +46,13 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
     if not u or not u.activo or not verify_password(body.password, u.password_hash):
         ratelimit.registrar_fallo(clave)
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+
+    # Una clínica suspendida no inicia sesión (y las que ya la tenían abierta
+    # quedan bloqueadas por el middleware).
+    clinica = db.get(Clinica, u.clinica_id)
+    if not clinica or clinica.estado != "activa":
+        raise HTTPException(status_code=403,
+                            detail="La cuenta de tu clínica está suspendida. Contacta al soporte.")
 
     ratelimit.limpiar(clave)
     return LoginResponse(

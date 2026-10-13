@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { rgbMarca } from '../utils/paleta'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { SelloFirma, BotonFirmar, NotasCorreccion } from '../components/FirmaConsulta'
 import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, LayoutDashboard, Bug, Scissors, Microscope, Pill } from 'lucide-react'
@@ -187,7 +188,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete, onA
 
 // ── Gráfico de evolución clínica (peso / T° / FC / FR) ───────────────────────
 const METRICAS = [
-  { key: 'peso_kg',                 label: 'Peso',        unidad: 'kg',  color: '#335e8a' },
+  { key: 'peso_kg',                 label: 'Peso',        unidad: 'kg',  color: 'var(--color-brand-600)' },
   { key: 'temperatura_c',           label: 'Temperatura', unidad: '°C',  color: '#f59e0b' },
   { key: 'frecuencia_cardiaca',     label: 'Frec. cardiaca', unidad: 'lpm', color: '#ef4444' },
   { key: 'frecuencia_respiratoria', label: 'Frec. respiratoria', unidad: 'rpm', color: '#0ea5e9' },
@@ -265,7 +266,6 @@ function GraficoEvolucion({ historias }) {
 }
 
 // ── Helpers PDF compartidos ──────────────────────────────────────────────────
-const _MORADO = [33, 61, 90]
 const _W = 210, _M = 14
 
 function _seccion(doc, title, rows) {
@@ -276,7 +276,7 @@ function _seccion(doc, title, rows) {
     head: [[{ content: title, colSpan: 2 }]],
     body,
     theme: 'grid',
-    headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+    headStyles: { fillColor: rgbMarca(800), fontSize: 9, halign: 'left', textColor: 255 },
     columnStyles: {
       0: { cellWidth: 42, fontStyle: 'bold', textColor: [90, 90, 90] },
       1: { cellWidth: _W - 2 * _M - 42 },
@@ -339,7 +339,7 @@ function _seccionesClinicas(doc, h) {
 }
 
 function _cabecera(doc, subtitulo, derechaArriba, derechaAbajo) {
-  doc.setFillColor(..._MORADO)
+  doc.setFillColor(...rgbMarca(800))
   doc.rect(0, 0, _W, 24, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(15); doc.setFont(undefined, 'bold')
@@ -382,7 +382,7 @@ function generarPDF(paciente, cliente, historias) {
         (h.tipo_consulta ? ` · ${getLabel('tipo_consulta', h.tipo_consulta)}` : '') +
         (h.veterinario_nombre ? ` · Atendido por: ${h.veterinario_nombre}` : '')]],
       theme: 'plain',
-      styles: { fontSize: 11, fontStyle: 'bold', textColor: _MORADO, cellPadding: { top: 2, bottom: 1, left: 0 } },
+      styles: { fontSize: 11, fontStyle: 'bold', textColor: rgbMarca(800), cellPadding: { top: 2, bottom: 1, left: 0 } },
       margin: { left: _M, right: _M },
     })
     _seccionesClinicas(doc, h)

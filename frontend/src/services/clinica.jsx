@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { aplicarMarca } from '../utils/paleta'
 
 /**
  * Datos de la clínica (nombre, RUC, dirección, teléfono) disponibles en toda la app.
@@ -13,15 +14,17 @@ import { createContext, useContext, useEffect, useState } from 'react'
  */
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
-const CACHE_KEY = 'vet_clinica'
+export const CACHE_KEY = 'vet_clinica'
+const TOKEN_KEY = 'vet_token'
 
 const POR_DEFECTO = {
-  nombre: 'Mi Veterinaria',
+  nombre: 'Gestión Veterinaria',
   ruc: null,
   direccion: null,
   telefono: null,
   email: null,
   pie_comprobante: 'Gracias por su preferencia',
+  color_marca: null,
 }
 
 function leerCache() {
@@ -43,19 +46,28 @@ const ClinicaContext = createContext({ clinica: POR_DEFECTO, recargar: () => {} 
 export function ClinicaProvider({ children }) {
   const [clinica, setClinica] = useState(leerCache)
 
+  // Con sesión, el servidor responde con los datos de LA clínica de quien
+  // pregunta; sin sesión, con los genéricos del producto.
   const recargar = async () => {
     try {
-      const res = await fetch(`${BASE}/api/configuracion/`)
+      const token = localStorage.getItem(TOKEN_KEY)
+      const res = await fetch(`${BASE}/api/configuracion/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
       if (!res.ok) return
       const datos = await res.json()
       setClinica({ ...POR_DEFECTO, ...datos })
-      localStorage.setItem(CACHE_KEY, JSON.stringify(datos))
+      if (token) localStorage.setItem(CACHE_KEY, JSON.stringify(datos))
+      else localStorage.removeItem(CACHE_KEY)
     } catch {
       // Sin conexión se mantiene lo último conocido: la app sigue usable.
     }
   }
 
   useEffect(() => { recargar() }, [])
+
+  // El color de marca de la clínica reemplaza al del producto en toda la app
+  useEffect(() => { aplicarMarca(clinica.color_marca) }, [clinica.color_marca])
 
   // El título de la pestaña también lleva el nombre de la clínica
   useEffect(() => {

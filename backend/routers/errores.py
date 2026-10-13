@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ErrorRegistrado
+from models import ErrorRegistrado, Usuario
 from core.deps import solo_admin
 from core.security import verificar_token
 
@@ -44,6 +44,7 @@ def registrar_error(
     usuario: str | None = None,
     rol: str | None = None,
     navegador: str | None = None,
+    clinica_id: int | None = None,
 ) -> None:
     """Guarda un error, agrupándolo si ya ocurrió hace poco.
 
@@ -56,7 +57,8 @@ def registrar_error(
         desde = datetime.now(timezone.utc) - VENTANA_AGRUPADO
         existente = (
             db.query(ErrorRegistrado)
-            .filter(ErrorRegistrado.huella == h, ErrorRegistrado.fecha >= desde)
+            .filter(ErrorRegistrado.huella == h, ErrorRegistrado.fecha >= desde,
+                    ErrorRegistrado.clinica_id == clinica_id)
             .order_by(ErrorRegistrado.fecha.desc())
             .first()
         )
@@ -66,6 +68,7 @@ def registrar_error(
             existente.visto = False       # volvió a pasar: vuelve a ser relevante
         else:
             db.add(ErrorRegistrado(
+                clinica_id=clinica_id,
                 origen=origen,
                 mensaje=(mensaje or "(sin mensaje)")[:500],
                 detalle=detalle,
@@ -103,13 +106,16 @@ def reportar_error_frontend(
     Como el middleware saltea la autenticación en esta ruta (por ser pública),
     el token se lee acá a mano; si no hay o no vale, se registra sin usuario.
     """
-    usuario = rol = None
+    usuario = rol = clinica_id = None
     header = request.headers.get("Authorization", "")
     token = header.removeprefix("Bearer ").strip()
     if token:
         sesion = verificar_token(token)
         if sesion:
             usuario, rol = sesion.get("usuario"), sesion.get("rol")
+            # Esta ruta es pública y su sesión no está acotada: la clínica se
+            # busca a mano para que el error le aparezca a ella y no a otra.
+            clinica_id = db.query(Usuario.clinica_id).filter(Usuario.usuario == usuario).scalar()
 
     registrar_error(
         db,
@@ -120,6 +126,7 @@ def reportar_error_frontend(
         usuario=usuario,
         rol=rol,
         navegador=request.headers.get("user-agent"),
+        clinica_id=clinica_id,
     )
 
 
@@ -131,7 +138,7 @@ def listar_errores(
     db: Session = Depends(get_db),
 ):
     solo_admin(request)
-    q = db.query(ErrorRegistrado)
+    q = db.query(ErrorRegistrado).filter(ErrorRegistrado.clinica_id == request.state.clinica_id)
     if solo_pendientes:
         q = q.filter(ErrorRegistrado.visto.is_(False))
     filas = q.order_by(ErrorRegistrado.fecha.desc()).limit(limite).all()
@@ -157,13 +164,15 @@ def listar_errores(
 def contar_pendientes(request: Request, db: Session = Depends(get_db)):
     """Cuántos errores sin revisar hay (para el aviso en el menú)."""
     solo_admin(request)
-    return {"pendientes": db.query(ErrorRegistrado).filter(ErrorRegistrado.visto.is_(False)).count()}
+    return {"pendientes": db.query(ErrorRegistrado).filter(
+        ErrorRegistrado.clinica_id == request.state.clinica_id,
+        ErrorRegistrado.visto.is_(False)).count()}
 
 
 @router.put("/{error_id}/visto", status_code=204)
 def marcar_visto(error_id: int, request: Request, db: Session = Depends(get_db)):
     solo_admin(request)
     e = db.get(ErrorRegistrado, error_id)
-    if e:
+    if e and e.clinica_id == request.state.clinica_id:
         e.visto = True
         db.commit()

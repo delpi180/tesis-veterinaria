@@ -1,9 +1,10 @@
 import jsPDF from "jspdf";
+import { rgbMarca } from './paleta'
 import autoTable from "jspdf-autotable";
 import { clinicaActual } from '../services/clinica'
 
 // Colores e info de tamaño
-const _PDF_W = 210, _PDF_M = 14, _PDF_MORADO = [33, 61, 90];
+const _PDF_W = 210, _PDF_M = 14;
 
 const SISTEMAS_EOP = [
   "tegumentario", "cardiovascular", "respiratorio", "digestivo",
@@ -72,7 +73,7 @@ function _seccionPDF(doc, title, rows) {
     head: [[{ content: title, colSpan: 2 }]],
     body,
     theme: "grid",
-    headStyles: { fillColor: _PDF_MORADO, fontSize: 9, halign: "left", textColor: 255 },
+    headStyles: { fillColor: rgbMarca(800), fontSize: 9, halign: "left", textColor: 255 },
     columnStyles: {
       0: { cellWidth: 42, fontStyle: "bold", textColor: [90, 90, 90] },
       1: { cellWidth: _PDF_W - 2 * _PDF_M - 42 },
@@ -136,7 +137,7 @@ function _seccionesClinicasPDF(doc, h) {
 // PDF de la historia clínica COMPLETA (todas las consultas, todos los campos)
 export function generarPDF(paciente, historias) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  doc.setFillColor(..._PDF_MORADO);
+  doc.setFillColor(...rgbMarca(800));
   doc.rect(0, 0, _PDF_W, 24, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(15); doc.setFont(undefined, "bold");
@@ -170,7 +171,7 @@ export function generarPDF(paciente, historias) {
       startY: (doc.lastAutoTable ? doc.lastAutoTable.finalY : 26) + 6,
       body: [[`Consulta ${i + 1} — ${fecha}` + (h.tipo_consulta ? ` · ${getLabel("tipo_consulta", h.tipo_consulta)}` : "")]],
       theme: "plain",
-      styles: { fontSize: 11, fontStyle: "bold", textColor: _PDF_MORADO, cellPadding: { top: 2, bottom: 1, left: 0 } },
+      styles: { fontSize: 11, fontStyle: "bold", textColor: rgbMarca(800), cellPadding: { top: 2, bottom: 1, left: 0 } },
       margin: { left: _PDF_M, right: _PDF_M },
     });
     _seccionesClinicasPDF(doc, h);

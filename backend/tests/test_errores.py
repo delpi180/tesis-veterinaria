@@ -38,9 +38,28 @@ def test_reportar_error_del_navegador_sin_sesion(client, admin):
         })
         assert r.status_code == 204, "reportar un error no debe exigir sesión"
 
+        # Se guardó, pero sin sesión no pertenece a ninguna clínica: ninguna lo ve.
+        # (Si lo viera la primera que pregunta, un error de la pantalla de acceso
+        # de una clínica le aparecería a otra.)
+        visibles = client.get("/api/errores/", headers=admin).json()
+        assert not any(marca in e["mensaje"] for e in visibles)
+        db = SessionLocal()
+        try:
+            n = db.execute(text("SELECT count(*) FROM errores WHERE mensaje LIKE :m AND clinica_id IS NULL"),
+                           {"m": f"%{marca}%"}).scalar()
+        finally:
+            db.close()
+        assert n == 1, "el error reportado no quedó registrado"
+
+        # Con sesión, el error queda atribuido a la clínica y su administradora lo ve.
+        marca2 = marca + "S"
+        r = client.post("/api/errores/", headers=admin, json={
+            "mensaje": f"TypeError: {marca2}", "ruta": "/login", "detalle": "stack de prueba",
+        })
+        assert r.status_code == 204
         errores = client.get("/api/errores/", headers=admin).json()
-        guardado = next((e for e in errores if marca in e["mensaje"]), None)
-        assert guardado is not None, "el error reportado no quedó registrado"
+        guardado = next((e for e in errores if marca2 in e["mensaje"]), None)
+        assert guardado is not None, "el error reportado con sesión no quedó registrado"
         assert guardado["origen"] == "frontend"
         assert guardado["ruta"] == "/login"
     finally:
@@ -62,7 +81,8 @@ def test_errores_repetidos_se_agrupan(client, admin):
     marca = f"ErrorQA{uuid.uuid4().hex[:8]}"
     try:
         for _ in range(4):
-            client.post("/api/errores/", json={"mensaje": f"TypeError: {marca}", "ruta": "/clientes"})
+            client.post("/api/errores/", headers=admin,
+                        json={"mensaje": f"TypeError: {marca}", "ruta": "/clientes"})
 
         errores = client.get("/api/errores/", headers=admin).json()
         coincidencias = [e for e in errores if marca in e["mensaje"]]

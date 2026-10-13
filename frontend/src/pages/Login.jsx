@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { Lock, User, Eye, EyeOff } from 'lucide-react'
 import { api, setSesion } from '../services/api'
 import { useClinica } from '../services/clinica'
@@ -23,7 +23,11 @@ const DESTINO_POR_ROL = {
 
 export default function Login() {
   const navigate = useNavigate()
-  const { clinica } = useClinica()
+  const { clinica, recargar } = useClinica()
+
+  // Al llegar a la pantalla de acceso no hay sesión: se muestran el nombre y el
+  // color genéricos del producto, no los de la última clínica que usó el equipo.
+  useEffect(() => { recargar() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
   const [usuario,  setUsuario]  = useState('')
   const [password, setPassword] = useState('')
   const [verPass,  setVerPass]  = useState(false)
@@ -40,6 +44,7 @@ export default function Login() {
     try {
       const r = await api.post('/api/auth/login', { usuario: usuario.trim(), password })
       setSesion(r)
+      await recargar()   // ya con sesión: nombre y color de SU clínica
       navigate(DESTINO_POR_ROL[r.rol] ?? '/', { replace: true })
     } catch (err) {
       setError(err.message)
@@ -122,6 +127,10 @@ export default function Login() {
 
           <p className="text-sm text-slate-600 leading-snug">
             ¿Olvidaste tu contraseña? Pídele a la administradora que la cambie desde Usuarios.
+          </p>
+          <p className="text-sm text-slate-600 border-t border-slate-200 pt-4">
+            ¿Tu clínica aún no usa el sistema?{' '}
+            <Link to="/registro" className="font-semibold text-brand-700 hover:underline">Crea su cuenta</Link>
           </p>
         </form>
       </main>

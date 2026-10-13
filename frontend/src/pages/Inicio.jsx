@@ -211,7 +211,7 @@ export default function Inicio() {
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f2f6fa', radius: 6 }} />
                     <Bar dataKey="consultas" radius={[6, 6, 0, 0]}>
                       {semana.map((entry, index) => (
-                        <Cell key={index} fill={index === HOY_IDX ? '#335e8a' : '#c3d4e6'} />
+                        <Cell key={index} fill={index === HOY_IDX ? 'var(--color-brand-600)' : 'var(--color-brand-200)'} />
                       ))}
                     </Bar>
                   </BarChart>

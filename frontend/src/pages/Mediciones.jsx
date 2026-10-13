@@ -122,7 +122,7 @@ function TiemposPanel() {
 
   const chart = [
     { metodo: 'Manual', seg: d.manual.promedio_seg || 0, fill: '#f59e0b' },
-    { metodo: 'Con IA', seg: d.ia.promedio_seg || 0, fill: '#335e8a' },
+    { metodo: 'Con IA', seg: d.ia.promedio_seg || 0, fill: 'var(--color-brand-600)' },
   ]
 
   return (
@@ -879,7 +879,7 @@ export default function Mediciones() {
                       <BarraTAM
                         label="Utilidad Percibida (p1–p5)"
                         valor={resumen.util_percibida_promedio}
-                        hex="#335e8a"
+                        hex="var(--color-brand-600)"
                       />
                       <BarraTAM
                         label="Facilidad de Uso (p6–p9)"

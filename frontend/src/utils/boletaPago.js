@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf'
+import { rgbMarca } from './paleta'
 import autoTable from 'jspdf-autotable'
 import { clinicaActual } from '../services/clinica'
 
@@ -21,7 +22,7 @@ export function boletaPagoPDF(planilla, l) {
   const W = doc.internal.pageSize.getWidth()
   const clinica = clinicaActual()
 
-  doc.setFontSize(16); doc.setTextColor(33, 61, 90)
+  doc.setFontSize(16); doc.setTextColor(...rgbMarca(800))
   doc.text(clinica.nombre, W / 2, 16, { align: 'center' })
   doc.setFontSize(9); doc.setTextColor(100, 116, 139)
   const datos = [clinica.ruc ? `RUC ${clinica.ruc}` : null, clinica.direccion].filter(Boolean).join(' · ')
@@ -55,7 +56,7 @@ export function boletaPagoPDF(planilla, l) {
     body: filas,
     foot: [['Totales', soles(l.total_ingresos), soles(l.total_descuentos)],
            ['NETO A PAGAR', '', soles(l.neto)]],
-    headStyles: { fillColor: [33, 61, 90] },
+    headStyles: { fillColor: rgbMarca(800) },
     footStyles: { fillColor: [241, 245, 249], textColor: 30 },
     styles: { fontSize: 10 },
     columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },

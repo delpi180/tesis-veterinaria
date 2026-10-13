@@ -22,6 +22,9 @@ export function setSesion({ token, usuario, nombre, rol }) {
 
 export function cerrarSesion() {
   [TOKEN_KEY, USER_KEY, NAME_KEY, ROL_KEY].forEach(k => localStorage.removeItem(k))
+  // Los datos y el color de la clínica anterior no deben quedar en la pantalla
+  // de acceso: en un equipo compartido, otra clínica vería los de la primera.
+  localStorage.removeItem('vet_clinica')
 }
 
 /** Cabeceras de autorización para usar también en fetch directos (p. ej. /api/transcribe). */

@@ -13,7 +13,7 @@
    Se suben un punto los dos tamaños de trabajo, en vez de tocar cada
    componente: el ajuste llega a toda la aplicación de una sola vez.
    El interlineado sube en proporción para que nada se apriete.            */
-@theme {
+@theme static {
   --text-xs: 0.8125rem;        /* 13 px (antes 12) */
   --text-xs--line-height: 1.125rem;
   --text-sm: 0.9375rem;        /* 15 px (antes 14) */
@@ -41,24 +41,22 @@
   --color-slate-300: #8493a9;  /* 3.12:1 — apto para iconos y separadores */
 
   /* ── Color de marca ───────────────────────────────────────────────────────
-     Azul marino sobrio. Es el único bloque que hay que tocar para cambiar la
-     identidad de toda la aplicación: todas las pantallas usan `brand-*`.
-     Se eligió azul y no verde a propósito: el verde ya significa "correcto",
-     "pagado" y "enviado" en el sistema, y el rojo y el ámbar significan error
-     y aviso. Un color de marca que no compite con ninguno de ellos mantiene
-     legible el estado de cada cosa.
-     Blanco sobre brand-600 y más oscuros: ≥ 6.5:1.                          */
-  --color-brand-50:  #f2f6fa;
-  --color-brand-100: #e1eaf3;
-  --color-brand-200: #c3d4e6;
-  --color-brand-300: #97b5d3;
-  --color-brand-400: #6791bd;
-  --color-brand-500: #4575a6;
-  --color-brand-600: #335e8a;
-  --color-brand-700: #284b6f;
-  --color-brand-800: #213d5a;
-  --color-brand-900: #1b3249;
-  --color-brand-950: #111f2f;
+     Es el color POR DEFECTO del producto (teal). Cada clínica elige el suyo
+     en Ajustes y la aplicación lo reemplaza al iniciar sesión: ver
+     utils/paleta.js, que deriva los once tonos de un solo color y garantiza el
+     contraste. Todas las pantallas usan `brand-*`, nunca un color fijo.
+     Estos valores son los que genera generarPaleta('#0f766e').              */
+  --color-brand-50:  #f3f8f8;
+  --color-brand-100: #e2eeed;
+  --color-brand-200: #c3dcda;
+  --color-brand-300: #9ac3c0;
+  --color-brand-400: #6aa7a2;
+  --color-brand-500: #3a8b84;
+  --color-brand-600: #0e716a;
+  --color-brand-700: #0b5852;
+  --color-brand-800: #08423d;
+  --color-brand-900: #06302c;
+  --color-brand-950: #04201e;
 }
 
 :root {
@@ -91,7 +89,7 @@ body {
 /* El foco del teclado tiene que verse: se navega con Tab entre campos de la
    historia clínica y sin esto no se sabe dónde se está parado. */
 :focus-visible {
-  outline: 2px solid #4575a6;
+  outline: 2px solid var(--color-brand-500);
   outline-offset: 2px;
 }
 

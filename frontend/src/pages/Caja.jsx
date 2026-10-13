@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { rgbMarca } from '../utils/paleta'
 import { Wallet, Banknote, CreditCard, Smartphone, FileText, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -196,7 +197,7 @@ export default function Caja() {
   const exportarPDF = () => {
     if (!data) return
     const doc = new jsPDF({ unit: 'mm', format: 'a4' })
-    const morado = [33, 61, 90]
+    const morado = rgbMarca(800)
     doc.setFillColor(...morado); doc.rect(0, 0, 210, 24, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(15); doc.setFont(undefined, 'bold')

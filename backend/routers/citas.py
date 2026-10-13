@@ -16,36 +16,43 @@ router = APIRouter(prefix="/api/citas", tags=["Citas"])
 
 
 class ConnectionManager:
-    def __init__(self):
-        self.active_connections: Set[asyncio.Queue] = set()
+    """Avisos de la agenda en tiempo real. Cada clínica solo recibe los suyos."""
 
-    async def subscribe(self) -> asyncio.Queue:
+    def __init__(self):
+        # clínica → colas de las pantallas abiertas de esa clínica
+        self._por_clinica: dict[int, Set[asyncio.Queue]] = {}
+
+    @property
+    def active_connections(self) -> bool:
+        return any(self._por_clinica.values())
+
+    async def subscribe(self, clinica_id: int) -> asyncio.Queue:
         q = asyncio.Queue()
-        self.active_connections.add(q)
+        self._por_clinica.setdefault(clinica_id, set()).add(q)
         return q
 
-    def unsubscribe(self, q: asyncio.Queue):
-        self.active_connections.discard(q)
+    def unsubscribe(self, clinica_id: int, q: asyncio.Queue):
+        self._por_clinica.get(clinica_id, set()).discard(q)
 
-    def _local_broadcast(self, message: str):
-        for q in list(self.active_connections):
+    def _local_broadcast(self, message: str, clinica_id: Optional[int]):
+        for q in list(self._por_clinica.get(clinica_id, ())):
             q.put_nowait(message)
 
-    def broadcast(self, message: str):
+    def broadcast(self, message: str, clinica_id: Optional[int]):
         # 1. Enviar a BD para replicar en otras instancias
         import time
         from database import SessionLocal
         from models import SseEvent
         try:
             with SessionLocal() as db:
-                event = SseEvent(message=message, timestamp=time.time())
+                event = SseEvent(message=message, timestamp=time.time(), clinica_id=clinica_id)
                 db.add(event)
                 db.commit()
         except Exception as e:
             print(f"[SSE] Error al persistir evento en BD: {e}")
             
         # 2. Enviar localmente de forma inmediata a los conectados a esta instancia
-        self._local_broadcast(message)
+        self._local_broadcast(message, clinica_id)
 
 
 manager = ConnectionManager()
@@ -97,7 +104,7 @@ async def poll_sse_events():
                 if events:
                     for event in events:
                         # Broadcast local
-                        manager._local_broadcast(event.message)
+                        manager._local_broadcast(event.message, event.clinica_id)
                         last_timestamp = max(last_timestamp, event.timestamp)
 
                 # Purga periódica (cada 5 min). Antes solo se purgaba una vez,
@@ -156,7 +163,7 @@ def crear_cita(
     db.commit()
     db.refresh(cita)
     request.state.actividad_detalle = f"{paciente.nombre}"
-    manager.broadcast("citas_updated")
+    manager.broadcast("citas_updated", db.info.get("clinica_id"))
     return cita
 
 
@@ -209,9 +216,11 @@ def contar_citas(
 
 
 @router.get("/stream")
-async def stream_citas():
+async def stream_citas(request: Request):
+    clinica_id = request.state.clinica_id   # lo fija el middleware tras validar el token
+
     async def event_generator():
-        q = await manager.subscribe()
+        q = await manager.subscribe(clinica_id)
         try:
             yield "data: connected\n\n"
             while True:
@@ -223,7 +232,7 @@ async def stream_citas():
         except asyncio.CancelledError:
             pass
         finally:
-            manager.unsubscribe(q)
+            manager.unsubscribe(clinica_id, q)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -268,7 +277,7 @@ def actualizar_cita(
         request.state.actividad_detalle = f"{nombre} — estado: {estado_anterior} → {cita.estado}"
     else:
         request.state.actividad_detalle = nombre
-    manager.broadcast("citas_updated")
+    manager.broadcast("citas_updated", db.info.get("clinica_id"))
     return cita
 
 
@@ -282,4 +291,4 @@ def eliminar_cita(cita_id: int, request: Request, db: Session = Depends(get_db))
     db.delete(cita)
     db.commit()
     request.state.actividad_detalle = f"{nombre} — {fecha_txt}" if nombre else fecha_txt
-    manager.broadcast("citas_updated")
+    manager.broadcast("citas_updated", db.info.get("clinica_id"))

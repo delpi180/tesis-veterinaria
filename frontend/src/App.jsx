@@ -34,6 +34,7 @@ const Asistencia        = lazy(() => import('./pages/Asistencia'))
 const Actividad         = lazy(() => import('./pages/Actividad'))
 const Reportes          = lazy(() => import('./pages/Reportes'))
 const PanelRecepcion    = lazy(() => import('./pages/PanelRecepcion'))
+const Registro          = lazy(() => import('./pages/Registro'))
 const Contactos         = lazy(() => import('./pages/Contactos'))
 const Planilla          = lazy(() => import('./pages/Planilla'))
 const Vacunacion        = lazy(() => import('./pages/Vacunacion'))
@@ -111,6 +112,7 @@ export default function App() {
           <ConfirmarProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/registro" element={<Suspense fallback={<CargandoPantalla />}><Registro /></Suspense>} />
               <Route path="/*"     element={<AppProtegida />} />
             </Routes>
           </ConfirmarProvider>

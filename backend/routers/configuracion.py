@@ -10,22 +10,29 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ConfiguracionClinica
+from core.config import settings
+from models import Clinica, ConfiguracionClinica
 from schemas import ConfiguracionOut, ConfiguracionUpdate
 from core.deps import solo_admin
 
 router = APIRouter(prefix="/api/configuracion", tags=["Configuración"])
 
-ID_CONFIG = 1
-
 
 def obtener_o_crear(db: Session) -> ConfiguracionClinica:
-    """Devuelve la configuración; la crea con valores neutros si aún no existe."""
-    cfg = db.get(ConfiguracionClinica, ID_CONFIG)
+    """Configuración de la clínica de la sesión; la crea con su nombre si falta.
+
+    Sin clínica (nadie ha iniciado sesión) devuelve valores genéricos del
+    producto, sin guardar nada.
+    """
+    clinica_id = db.info.get("clinica_id")
+    if clinica_id is None:
+        return ConfiguracionClinica(nombre=settings.nombre_producto,
+                                    pie_comprobante="Gracias por su preferencia")
+    cfg = db.query(ConfiguracionClinica).first()   # la sesión ya la acota a su clínica
     if cfg is None:
+        clinica = db.get(Clinica, clinica_id)
         cfg = ConfiguracionClinica(
-            id=ID_CONFIG,
-            nombre="Mi Veterinaria",
+            nombre=clinica.nombre if clinica else "Mi Veterinaria",
             pie_comprobante="Gracias por su preferencia",
         )
         db.add(cfg)
@@ -36,8 +43,9 @@ def obtener_o_crear(db: Session) -> ConfiguracionClinica:
 
 @router.get("/", response_model=ConfiguracionOut)
 def obtener_configuracion(db: Session = Depends(get_db)):
-    """Lectura pública: la pantalla de acceso necesita el nombre de la clínica
-    antes de que nadie haya iniciado sesión. No expone ningún dato sensible."""
+    """Lectura sin exigir sesión: la pantalla de acceso necesita un nombre antes
+    de que nadie entre. Sin sesión devuelve los datos genéricos del producto; con
+    sesión, los de la clínica de quien pregunta. Nada sensible en ningún caso."""
     return obtener_o_crear(db)
 
 

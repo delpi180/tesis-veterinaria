@@ -113,7 +113,7 @@ def pendientes(db: Session, vencidas_dias: int = 120, proximas_dias: int = 15) -
     from routers.tratamientos import listar as _tratamientos
 
     hoy = datetime.now(_LIMA).date()
-    clinica = db.get(ConfiguracionClinica, 1)
+    clinica = db.query(ConfiguracionClinica).first()   # la de esta sesión
     nombre_clinica = (clinica.nombre if clinica else None) or "la clínica"
     textos = {m: p["texto"] for m, p in plantillas(db).items()}
     crudos: list[dict] = []
