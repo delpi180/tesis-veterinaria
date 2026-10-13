@@ -24,6 +24,9 @@ class Usuario(Base):
     # Perfil laboral del doctor (lo asigna la administradora)
     hora_entrada   = Column(String(5))    # horario de ingreso pactado, "HH:MM"
     dias_laborales = Column(String(40))   # CSV de días: "lun,mar,mie,jue,vie"
+    # Sueldo mensual pactado. Dato sensible: no sale en ningún schema de usuario;
+    # solo se ve y se edita desde la planilla (solo administradora).
+    sueldo_base    = Column(Numeric(10, 2))
 
 
 class Cliente(Base):
@@ -864,3 +867,51 @@ class PlantillaContacto(Base):
     texto           = Column(Text, nullable=False)
     actualizado_en  = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     actualizado_por = Column(String(50))
+
+
+class Planilla(Base):
+    """Planilla de un mes. 'borrador' se corrige; 'cerrada' ya no cambia."""
+    __tablename__ = "planillas"
+
+    id             = Column(Integer, primary_key=True)
+    periodo        = Column(String(7), nullable=False, unique=True)   # "2026-10"
+    estado         = Column(String(10), nullable=False, default="borrador", server_default="borrador")
+    tolerancia_min = Column(Integer, nullable=False, default=0, server_default="0")
+    dias_mes       = Column(Integer, nullable=False, default=30, server_default="30")
+    horas_dia      = Column(Integer, nullable=False, default=8, server_default="8")
+    creado_en      = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    creado_por     = Column(String(50))
+    cerrada_en     = Column(DateTime(timezone=True))
+    cerrada_por    = Column(String(50))
+
+    lineas = relationship("PlanillaLinea", back_populates="planilla",
+                          cascade="all, delete-orphan", order_by="PlanillaLinea.nombre")
+
+
+class PlanillaLinea(Base):
+    """Un trabajador en una planilla. Guarda una foto de su sueldo y nombre de
+    ese mes: si después cambian, la planilla cerrada no se altera."""
+    __tablename__ = "planilla_lineas"
+
+    id          = Column(Integer, primary_key=True)
+    planilla_id = Column(Integer, ForeignKey("planillas.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    usuario_id  = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"))
+    nombre      = Column(String(100), nullable=False)
+    rol         = Column(String(20))
+    sueldo_base = Column(Numeric(10, 2), nullable=False)
+
+    # Lo que salió de la asistencia, y lo que quedó (la administradora puede
+    # corregir, p. ej. por un feriado o una tardanza justificada).
+    minutos_auto  = Column(Integer, nullable=False, default=0, server_default="0")
+    faltas_auto   = Column(Integer, nullable=False, default=0, server_default="0")
+    minutos_tardanza = Column(Integer, nullable=False, default=0, server_default="0")
+    faltas           = Column(Integer, nullable=False, default=0, server_default="0")
+    sin_horario      = Column(Boolean, nullable=False, default=False, server_default="false")
+
+    bonos            = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
+    adelantos        = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
+    otros_descuentos = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
+    nota             = Column(String(200))
+
+    planilla = relationship("Planilla", back_populates="lineas")

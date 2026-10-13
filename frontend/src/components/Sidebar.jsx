@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, LogOut, Wallet, UserCog,
   Clock, ClipboardList, History, PieChart, ConciergeBell, Syringe, Menu, X, Bug,
-  Pill, PhoneCall,
+  Pill, PhoneCall, Banknote,
 } from 'lucide-react'
 import { api, getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
 import GlobalSearch from './GlobalSearch'
@@ -35,6 +35,7 @@ const SECCION_ADMIN = [
   { label: 'Contactar',          to: '/contactos',  Icon: PhoneCall, admin: true },
   { label: 'Vacunación',        to: '/vacunacion', Icon: Syringe,  admin: true },
   { label: 'Reportes',          to: '/reportes',   Icon: PieChart, admin: true },
+  { label: 'Planilla',          to: '/planilla',   Icon: Banknote, admin: true },
   { label: 'Asistencia',        to: '/asistencia', Icon: Clock,    admin: true },
   { label: 'Actividad',         to: '/actividad',  Icon: History,  admin: true },
   { label: 'Usuarios',          to: '/usuarios',   Icon: UserCog,  admin: true },
