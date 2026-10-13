@@ -10,6 +10,7 @@ import { useConfirmar } from "../components/Confirmar";
 import VoiceTextProcessor from "../components/VoiceTextProcessor";
 import DocumentosPaciente from "../components/DocumentosPaciente";
 import ResumenIA from "../components/ResumenIA";
+import { SelloFirma, BotonFirmar, NotasCorreccion } from "../components/FirmaConsulta";
 import { calcularDosis } from "../utils/dosis";
 import { CargandoPantalla } from "../components/Cargando";
 import { nombresSimilares } from "../utils/similitud";
@@ -678,7 +679,7 @@ function contarCamposLlenos(datos) {
   return n;
 }
 
-function HistoriaCard({ h, onEdit, onDelete }) {
+function HistoriaCard({ h, pacienteId, onEdit, onDelete, onActualizada }) {
   const fecha = new Date(h.fecha || h.creado_en).toLocaleString("es-PE", {
     day: "2-digit", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
@@ -722,14 +723,20 @@ function HistoriaCard({ h, onEdit, onDelete }) {
               <Paperclip className="w-3 h-3" /> {h.documentos_count}
             </span>
           )}
-          <button onClick={() => onEdit(h)}
-            className="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5 transition-colors">
-            Editar
-          </button>
-          <button onClick={() => onDelete(h)}
-            className="text-xs bg-rose-500/80 hover:bg-rose-500 rounded px-2 py-0.5 transition-colors">
-            Eliminar
-          </button>
+          <SelloFirma h={h} />
+          <BotonFirmar h={h} pacienteId={pacienteId} onActualizada={onActualizada} />
+          {!h.firmada && (
+            <>
+              <button onClick={() => onEdit(h)}
+                className="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5 transition-colors">
+                Editar
+              </button>
+              <button onClick={() => onDelete(h)}
+                className="text-xs bg-rose-500/80 hover:bg-rose-500 rounded px-2 py-0.5 transition-colors">
+                Eliminar
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="px-4 py-3 divide-y divide-slate-100 space-y-2">
@@ -780,6 +787,7 @@ function HistoriaCard({ h, onEdit, onDelete }) {
           <DRow label="Próx. cita"   value={h.proxima_cita ? new Date(h.proxima_cita).toLocaleDateString("es-PE") : null} />
         </DSec>
       </div>
+      <NotasCorreccion h={h} pacienteId={pacienteId} onActualizada={onActualizada} />
     </div>
   );
 }
@@ -1035,6 +1043,7 @@ export default function HistoriasClinicas() {
   };
 
   const handleEdit = h => {
+    if (h.firmada) return;   // una consulta firmada solo recibe notas de corrección
     setForm(formFromHistoria(h));
     setEditandoId(h.id);
     // Al corregir, se mantiene el doctor que ya figuraba
@@ -1592,7 +1601,8 @@ export default function HistoriasClinicas() {
           <h2 className="text-sm font-semibold text-slate-700">Historial ({historias.length})</h2>
           {historias.length === 0
             ? <p className="text-sm text-slate-400 italic">Sin consultas registradas.</p>
-            : historias.map(h => <HistoriaCard key={h.id} h={h} onEdit={handleEdit} onDelete={handleDelete} />)
+            : historias.map(h => <HistoriaCard key={h.id} h={h} pacienteId={id} onEdit={handleEdit} onDelete={handleDelete}
+                onActualizada={nueva => setHistorias(p => p.map(x => x.id === nueva.id ? nueva : x))} />)
           }
         </div>
 

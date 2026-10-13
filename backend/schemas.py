@@ -112,6 +112,27 @@ class HistoriaClinicaCreate(BaseModel):
         return v
 
 
+class AddendumOut(BaseModel):
+    id:           int
+    texto:        str
+    autor_nombre: str
+    creado_en:    datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AddendumIn(BaseModel):
+    texto: str
+
+    @field_validator("texto")
+    @classmethod
+    def _texto(cls, v):
+        v = (v or "").strip()
+        if len(v) < 5:
+            raise ValueError("Escribe la nota de corrección (mínimo 5 letras)")
+        return v[:4000]
+
+
 class HistoriaClinicaOut(BaseModel):
     """Respuesta completa con todos los campos clínicos."""
     id:          int
@@ -169,6 +190,16 @@ class HistoriaClinicaOut(BaseModel):
     # Autoría: doctor que la llenó (la hora de llenado es creado_en)
     veterinario_id:     Optional[int] = None
     veterinario_nombre: Optional[str] = None
+
+    # Firma: una consulta firmada no se edita; se le agregan notas
+    cerrada_en:  Optional[datetime] = None
+    cerrada_por: Optional[str] = None
+    addendums:   list["AddendumOut"] = []
+
+    @computed_field
+    @property
+    def firmada(self) -> bool:
+        return self.cerrada_en is not None
 
     # Adjuntos de esta consulta puntual (radiografías, análisis…). Solo el
     # conteo: la lista completa se pide aparte con /documentos/?historia_id=

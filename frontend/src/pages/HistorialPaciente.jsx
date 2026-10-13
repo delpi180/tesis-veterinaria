@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { SelloFirma, BotonFirmar, NotasCorreccion } from '../components/FirmaConsulta'
 import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, LayoutDashboard, Bug, Scissors, Microscope, Pill } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -66,7 +67,7 @@ function DSec({ title, show, children }) {
   )
 }
 
-function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
+function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete, onActualizada }) {
   const [open, setOpen] = useState(defaultOpen)
   const txItems = Array.isArray(h.tratamiento_items) ? h.tratamiento_items : []
   const vxItems = Array.isArray(h.vacunas_items) ? h.vacunas_items : []
@@ -103,6 +104,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
             {h.tipo_consulta && (
               <span className="text-xs bg-white/20 px-2 py-0.5 rounded">{getLabel('tipo_consulta', h.tipo_consulta)}</span>
             )}
+            <SelloFirma h={h} />
           </div>
         </button>
         <button
@@ -112,7 +114,8 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
         >
           <Download className="w-4 h-4" />
         </button>
-        {onEdit && (
+        <BotonFirmar h={h} pacienteId={paciente?.id} onActualizada={onActualizada} compacto />
+        {onEdit && !h.firmada && (
           <button
             onClick={() => onEdit(h)}
             title="Editar esta consulta"
@@ -121,7 +124,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
             <Pencil className="w-4 h-4" />
           </button>
         )}
-        {onDelete && (
+        {onDelete && !h.firmada && (
           <button
             onClick={() => onDelete(h)}
             title="Eliminar esta consulta"
@@ -175,6 +178,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
             <DRow label="Pronóstico" value={getLabel('pronostico', h.pronostico)} />
             <DRow label="Próx. cita" value={h.proxima_cita ? fmtFecha(h.proxima_cita) : null} />
           </DSec>
+          <NotasCorreccion h={h} pacienteId={paciente?.id} onActualizada={onActualizada} />
         </div>
       )}
     </div>
@@ -405,6 +409,29 @@ function fichaConsultaPDF(paciente, cliente, h) {
     doc.text('Médico Veterinario', _W - _M - 35, y + 9, { align: 'center' })
   } else {
     doc.text('Médico Veterinario', _W - _M - 35, y + 5, { align: 'center' })
+  }
+  if (h.firmada) {
+    doc.text(`Firmada el ${fmtFechaHora(h.cerrada_en)}`, _W - _M - 35, y + 13, { align: 'center' })
+  }
+
+  // Notas de corrección: se imprimen a continuación, con autor y fecha
+  const notas = h.addendums || []
+  if (notas.length) {
+    let ny = y + 24
+    doc.setTextColor(40); doc.setFontSize(10)
+    if (ny > 265) { doc.addPage(); ny = 20 }
+    doc.text('Notas de corrección', _M, ny)
+    ny += 6
+    doc.setFontSize(9)
+    for (const n of notas) {
+      const lineas = doc.splitTextToSize(n.texto, _W - 2 * _M)
+      if (ny + lineas.length * 4.5 + 6 > 285) { doc.addPage(); ny = 20 }
+      doc.setTextColor(40); doc.text(lineas, _M, ny)
+      ny += lineas.length * 4.5
+      doc.setTextColor(110)
+      doc.text(`${n.autor_nombre} · ${fmtFechaHora(n.creado_en)}`, _M, ny)
+      ny += 7
+    }
   }
 
   doc.save(`Consulta_${paciente?.nombre ?? 'paciente'}_${fmtFecha(h.fecha || h.creado_en).replace(/\s/g, '')}.pdf`)
@@ -649,6 +676,7 @@ export default function HistorialPaciente() {
                       defaultOpen={i === 0}
                       onEdit={handleEdit}
                       onDelete={esVeterinario() ? handleDelete : undefined}
+                      onActualizada={nueva => setHistorias(p => p.map(x => x.id === nueva.id ? nueva : x))}
                     />
                   ))
                 )}

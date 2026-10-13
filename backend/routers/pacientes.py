@@ -11,10 +11,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Cita, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Receta, Usuario
+from models import AddendumHistoria, Cita, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Receta, Usuario
 from schemas import (
     PacienteOut, PacienteUpdate,
-    HistoriaClinicaCreate, HistoriaClinicaOut,
+    AddendumIn, AddendumOut, HistoriaClinicaCreate, HistoriaClinicaOut,
     DocumentoOut,
     RegistroClinicoCreate, RegistroClinicoOut,
     RecetaCreate, RecetaUpdate, RecetaOut,
@@ -272,6 +272,76 @@ def obtener_historia(
     return historia
 
 
+def _exigir_abierta(historia: HistoriaClinica) -> None:
+    """Una consulta firmada es parte del expediente: no se reescribe."""
+    if historia.firmada:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta consulta ya está firmada y no se puede modificar. "
+                   "Agrega una nota de corrección.",
+        )
+
+
+@router.post("/{paciente_id}/historias/{historia_id}/firmar", response_model=HistoriaClinicaOut)
+def firmar_historia(
+    paciente_id: int,
+    historia_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Cierra la consulta. Solo la firma el veterinario que la atendió."""
+    historia = db.get(HistoriaClinica, historia_id)
+    if not historia or historia.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Historia clínica no encontrada")
+    if not usuario or usuario.rol != "veterinario":
+        raise HTTPException(status_code=403, detail="Solo el veterinario firma la consulta.")
+    if historia.veterinario_id and historia.veterinario_id != usuario.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Esta consulta la atendió otro veterinario; la firma él.",
+        )
+    if historia.firmada:
+        raise HTTPException(status_code=409, detail="La consulta ya está firmada.")
+    historia.veterinario_id = historia.veterinario_id or usuario.id
+    historia.firmado_por = historia.firmado_por or usuario.nombre
+    historia.cerrada_en = datetime.now(timezone.utc)
+    historia.cerrada_por = usuario.nombre
+    request.state.actividad_detalle = historia.paciente.nombre if historia.paciente else f"historia #{historia_id}"
+    db.commit()
+    db.refresh(historia)
+    return historia
+
+
+@router.post("/{paciente_id}/historias/{historia_id}/addendum",
+             response_model=HistoriaClinicaOut, status_code=status.HTTP_201_CREATED)
+def agregar_addendum(
+    paciente_id: int,
+    historia_id: int,
+    payload: AddendumIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Nota de corrección sobre una consulta firmada. La escribe un veterinario."""
+    historia = db.get(HistoriaClinica, historia_id)
+    if not historia or historia.paciente_id != paciente_id:
+        raise HTTPException(status_code=404, detail="Historia clínica no encontrada")
+    if not usuario or usuario.rol != "veterinario":
+        raise HTTPException(status_code=403, detail="Solo un veterinario agrega notas de corrección.")
+    if not historia.firmada:
+        raise HTTPException(
+            status_code=409,
+            detail="La consulta aún no está firmada: edítala directamente.",
+        )
+    db.add(AddendumHistoria(historia_id=historia.id, texto=payload.texto,
+                            autor_id=usuario.id, autor_nombre=usuario.nombre))
+    request.state.actividad_detalle = historia.paciente.nombre if historia.paciente else f"historia #{historia_id}"
+    db.commit()
+    db.refresh(historia)
+    return historia
+
+
 @router.put("/{paciente_id}/historias/{historia_id}", response_model=HistoriaClinicaOut)
 def actualizar_historia(
     paciente_id: int,
@@ -283,6 +353,7 @@ def actualizar_historia(
     historia = db.get(HistoriaClinica, historia_id)
     if not historia or historia.paciente_id != paciente_id:
         raise HTTPException(status_code=404, detail="Historia clínica no encontrada")
+    _exigir_abierta(historia)
     cita_anterior = historia.proxima_cita
     datos = payload.model_dump(exclude_unset=True)
     # La fecha solo se cambia si se manda una nueva; un None es "no la toques".
@@ -323,6 +394,7 @@ def eliminar_historia(
     historia = db.get(HistoriaClinica, historia_id)
     if not historia or historia.paciente_id != paciente_id:
         raise HTTPException(status_code=404, detail="Historia clínica no encontrada")
+    _exigir_abierta(historia)
     request.state.actividad_detalle = historia.paciente.nombre if historia.paciente else f"historia #{historia_id}"
     db.delete(historia)
     db.commit()

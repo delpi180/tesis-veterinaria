@@ -115,6 +115,8 @@ _ACCIONES = {
     ("DELETE", "/api/servicios/{id}"): "Eliminó un servicio",
     ("POST", "/api/inventario/aplicar"): "Actualizó inventario por dictado",
     ("PUT", "/api/configuracion"): "Actualizó los datos de la clínica",
+    ("POST", "/api/pacientes/{id}/historias/{id}/firmar"): "Firmó una consulta",
+    ("POST", "/api/pacientes/{id}/historias/{id}/addendum"): "Agregó una nota de corrección a una consulta",
     ("POST", "/api/glosario"): "Agregó una palabra al glosario del dictado",
     ("PUT", "/api/glosario/{id}"): "Editó una palabra del glosario",
     ("DELETE", "/api/glosario/{id}"): "Quitó una palabra del glosario",

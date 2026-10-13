@@ -319,10 +319,24 @@ class HistoriaClinica(Base):
     # Ver Receta.firmado_por: sobrevive al borrado de la cuenta.
     firmado_por    = Column(String(120))
 
+    # Cierre de la consulta. Una historia firmada ya no se edita ni se borra:
+    # lo que se descubra después se agrega como nota de corrección y deja
+    # constancia de quién, cuándo y qué. `firmado_por` (arriba) es la autoría;
+    # esto es el acto de firmar.
+    cerrada_en  = Column(DateTime(timezone=True))
+    cerrada_por = Column(String(120))
+
     paciente    = relationship("Paciente", back_populates="historias")
     veterinario = relationship("Usuario")
     documentos  = relationship("DocumentoPaciente", back_populates="historia", cascade="all, delete-orphan")
     tratamientos = relationship("Tratamiento", back_populates="historia", cascade="all, delete-orphan")
+    addendums   = relationship("AddendumHistoria", back_populates="historia",
+                               cascade="all, delete-orphan",
+                               order_by="AddendumHistoria.creado_en")
+
+    @property
+    def firmada(self) -> bool:
+        return self.cerrada_en is not None
 
     @property
     def veterinario_nombre(self):
@@ -780,3 +794,23 @@ class TerminoGlosario(Base):
     activo     = Column(Boolean, nullable=False, default=True, server_default="true")
     creado_en  = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     creado_por = Column(String(50))
+
+
+class AddendumHistoria(Base):
+    """Nota de corrección o ampliación de una consulta ya firmada.
+
+    No reemplaza nada: se suma al final. El texto original queda intacto y la
+    nota muestra quién la escribió y cuándo.
+    """
+    __tablename__ = "addendums_historia"
+
+    id          = Column(Integer, primary_key=True)
+    historia_id = Column(Integer, ForeignKey("historias_clinicas.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    texto       = Column(Text, nullable=False)
+    autor_id    = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"))
+    # Como Receta.firmado_por: sobrevive al borrado de la cuenta.
+    autor_nombre = Column(String(120), nullable=False)
+    creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    historia = relationship("HistoriaClinica", back_populates="addendums")
