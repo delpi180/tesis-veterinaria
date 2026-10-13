@@ -7,6 +7,7 @@ from database import get_db
 from models import Usuario, Asistencia, Cita, HistoriaClinica, Paciente, Receta
 from schemas import UsuarioCreate, UsuarioUpdate, UsuarioOut, DoctorOut
 from core.security import hash_password
+from core import cuentas
 from core.deps import solo_admin, usuario_actual
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
@@ -54,6 +55,24 @@ def crear_usuario(payload: UsuarioCreate, request: Request, db: Session = Depend
     return u
 
 
+def _exigir_otra_administradora(db: Session, usuario: Usuario) -> None:
+    """Una clínica no puede quedarse sin nadie que la administre: sin
+    administradora activa nadie podría agregar al equipo, cambiar contraseñas ni
+    ver la caja, y la única salida sería pedir soporte."""
+    if usuario.rol != "recepcionista" or not usuario.activo:
+        return
+    otras = (db.query(Usuario.id)
+               .filter(Usuario.rol == "recepcionista", Usuario.activo.is_(True),
+                       Usuario.id != usuario.id)
+               .count())
+    if otras == 0:
+        raise HTTPException(
+            status_code=409,
+            detail="La clínica debe tener al menos una administradora activa. "
+                   "Nombra a otra antes de hacer este cambio.",
+        )
+
+
 @router.put("/{usuario_id}", response_model=UsuarioOut)
 def actualizar_usuario(usuario_id: int, payload: UsuarioUpdate, request: Request, db: Session = Depends(get_db)):
     solo_admin(request)
@@ -61,12 +80,21 @@ def actualizar_usuario(usuario_id: int, payload: UsuarioUpdate, request: Request
     if not u:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     datos = payload.model_dump(exclude_unset=True)
+
+    quita_el_cargo = "rol" in datos and datos["rol"] != "recepcionista"
+    if datos.get("activo") is False and getattr(request.state, "usuario", None) == u.usuario:
+        raise HTTPException(status_code=409, detail="No puedes desactivar tu propia cuenta.")
+    if quita_el_cargo or datos.get("activo") is False:
+        _exigir_otra_administradora(db, u)
+
     if "password" in datos:
         u.password_hash = hash_password(datos.pop("password"))
     for campo, valor in datos.items():
         setattr(u, campo, valor)
     db.commit()
     db.refresh(u)
+    # El cambio (rol, desactivación, contraseña) rige ya, no cuando venza el caché.
+    cuentas.invalidar(u.usuario)
     return u
 
 
@@ -97,6 +125,7 @@ def eliminar_usuario(usuario_id: int, request: Request, db: Session = Depends(ge
             status_code=409,
             detail="No puedes eliminar tu propia cuenta. Pídeselo a otra administradora.",
         )
+    _exigir_otra_administradora(db, u)
 
     # No permitir quedarse sin veterinarios activos
     if u.rol == "veterinario":
@@ -139,8 +168,10 @@ def eliminar_usuario(usuario_id: int, request: Request, db: Session = Depends(ge
            .filter(Asistencia.usuario_id == usuario_id)
            .delete(synchronize_session=False))
 
+        usuario_borrado = u.usuario
         db.delete(u)
         db.commit()
+        cuentas.invalidar(usuario_borrado)
     except Exception:
         db.rollback()
         raise

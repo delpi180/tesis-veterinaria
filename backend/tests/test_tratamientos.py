@@ -175,12 +175,14 @@ def test_reabrir_deshace_un_cierre_por_error(client, admin, paciente):
     assert r.json()["motivo_corte"] is None
 
 
-def test_borrar_la_consulta_se_lleva_sus_tratamientos(client, admin, paciente):
+def test_borrar_la_consulta_se_lleva_sus_tratamientos(client, admin, doctor, paciente):
     """No pueden quedar tratamientos huérfanos de una consulta que ya no existe."""
     historias = client.get(f"/api/pacientes/{paciente}/historias/", headers=admin).json()
     h = next(x for x in historias if any(
         (i.get("medicamento") or "") == "Amoxicilina QA" for i in (x.get("tratamiento_items") or [])))
-    assert client.delete(f"/api/pacientes/{paciente}/historias/{h['id']}", headers=admin).status_code == 204
+    # Borrar una consulta es del veterinario: la recepcionista puede llenarla, no eliminarla.
+    assert client.delete(f"/api/pacientes/{paciente}/historias/{h['id']}", headers=admin).status_code == 403
+    assert client.delete(f"/api/pacientes/{paciente}/historias/{h['id']}", headers=doctor).status_code == 204
 
     assert not any(x["medicamento"] == "Amoxicilina QA" for x in _mios(client, admin, paciente))
 

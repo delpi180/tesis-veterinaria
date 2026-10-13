@@ -7,8 +7,8 @@ from services import vocabulario
 
 def test_glosario_crud_y_permisos(client, admin, doctor):
     nombre = f"Zeta{uuid.uuid4().hex[:6]}"
-    # El veterinario lee pero no edita
-    assert client.get("/api/glosario/", headers=doctor).status_code == 200
+    # El glosario es de la administradora: el veterinario no lo lee ni lo edita
+    assert client.get("/api/glosario/", headers=doctor).status_code == 403
     assert client.post("/api/glosario/", json={"termino": nombre}, headers=doctor).status_code == 403
 
     r = client.post("/api/glosario/", headers=admin,

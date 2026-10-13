@@ -38,23 +38,37 @@ def _firmar(data: str) -> str:
     return hmac.new(settings.auth_secret.encode(), data.encode(), hashlib.sha256).hexdigest()
 
 
-def crear_token(usuario: str, rol: str = "veterinario") -> str:
+def sello_de_sesion(password_hash: str) -> str:
+    """Huella corta de la contraseña vigente.
+
+    Va dentro del token. Al cambiar la contraseña (por la persona o porque la
+    administradora la reinició) la huella cambia y TODAS las sesiones abiertas
+    con la clave anterior dejan de valer, sin guardar sesiones en la base.
+    """
+    return hashlib.sha256(f"sello|{password_hash}".encode()).hexdigest()[:16]
+
+
+def crear_token(usuario: str, rol: str = "veterinario", sello: str = "") -> str:
     expira = int(time.time()) + settings.auth_token_horas * 3600
-    data = f"{usuario}|{rol}|{expira}"
+    data = f"{usuario}|{rol}|{expira}|{sello}"
     payload = base64.urlsafe_b64encode(data.encode()).decode()
     return f"{payload}.{_firmar(data)}"
 
 
 def verificar_token(token: str) -> dict | None:
-    """Devuelve {'usuario', 'rol'} si el token es válido y no expiró; None en caso contrario."""
+    """Devuelve {'usuario', 'rol', 'sello'} si el token es válido y no expiró.
+
+    El `rol` del token es solo informativo: el servidor decide con el rol que
+    la base de datos tiene HOY (ver core/cuentas.py), no con el que tenía al
+    iniciar sesión."""
     try:
         payload, firma = token.rsplit(".", 1)
         data = base64.urlsafe_b64decode(payload.encode()).decode()
         if not hmac.compare_digest(_firmar(data), firma):
             return None
-        usuario, rol, expira = data.split("|")
+        usuario, rol, expira, sello = data.split("|")   # un token del formato anterior no encaja
         if int(expira) < time.time():
             return None
-        return {"usuario": usuario, "rol": rol}
+        return {"usuario": usuario, "rol": rol, "sello": sello}
     except Exception:
         return None

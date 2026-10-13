@@ -139,7 +139,9 @@ export default function Usuarios() {
     if (!form.nombre.trim()) { setErrorModal('El nombre es obligatorio.'); return }
     if (!editId) {
       if (form.usuario.trim().length < 3) { setErrorModal('El usuario debe tener al menos 3 caracteres.'); return }
-      if (form.password.length < 4) { setErrorModal('La contraseña debe tener al menos 4 caracteres.'); return }
+      if (form.password.length < 8) { setErrorModal('La contraseña debe tener al menos 8 caracteres.'); return }
+    } else if (form.password && form.password.length < 8) {
+      setErrorModal('La nueva contraseña debe tener al menos 8 caracteres.'); return
     }
     setGuardando(true); setErrorModal(null)
     try {
@@ -362,7 +364,7 @@ export default function Usuarios() {
                   <div className="flex flex-col gap-1">
                     <label className={labelCls}>{editId ? 'Nueva contraseña' : 'Contraseña'} {!editId && <span className="text-rose-500">*</span>}</label>
                     <input type="password" className={inputCls} value={form.password}
-                      placeholder={editId ? 'Dejar vacío = sin cambio' : '••••'}
+                      placeholder={editId ? 'Dejar vacío = sin cambio' : 'Mínimo 8 caracteres'}
                       onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
                   </div>
                   <div className="flex flex-col gap-1">

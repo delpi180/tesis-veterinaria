@@ -784,7 +784,7 @@ def _validar_dni_telefono(dni, telefono):
 class UsuarioCreate(BaseModel):
     usuario:        str = Field(min_length=3, max_length=50)
     nombre:         str
-    password:       str = Field(min_length=4)
+    password:       str = Field(min_length=8)
     rol:            Literal['veterinario', 'recepcionista'] = 'veterinario'
     activo:         bool = True
     dni:            Optional[str] = None
@@ -801,7 +801,7 @@ class UsuarioCreate(BaseModel):
 
 class UsuarioUpdate(BaseModel):
     nombre:         Optional[str] = None
-    password:       Optional[str] = Field(None, min_length=4)
+    password:       Optional[str] = Field(None, min_length=8)
     rol:            Optional[Literal['veterinario', 'recepcionista']] = None
     activo:         Optional[bool] = None
     dni:            Optional[str] = None

@@ -428,10 +428,13 @@ function PanelMascota({ paciente, cliente, onAtender, onAgendar, onEditar, onEli
               className="p-2 rounded-lg text-brand-200 hover:text-white hover:bg-white/15 transition">
               <Pencil className="w-4 h-4" />
             </button>
-            <button onClick={() => onEliminar(paciente)} title="Eliminar mascota"
-              className="p-2 rounded-lg text-brand-200 hover:text-white hover:bg-white/15 transition">
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {/* Borrar una mascota arrastra todo su historial: solo la administradora */}
+            {esAdmin() && (
+              <button onClick={() => onEliminar(paciente)} title="Eliminar mascota"
+                className="p-2 rounded-lg text-brand-200 hover:text-white hover:bg-white/15 transition">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>

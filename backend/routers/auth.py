@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Clinica, Usuario
-from core.security import crear_token, verify_password
+from core.security import crear_token, sello_de_sesion, verify_password
 from core.config import settings
 from core import ratelimit
 
@@ -56,7 +56,7 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
     ratelimit.limpiar(clave)
     return LoginResponse(
-        token=crear_token(u.usuario, u.rol),
+        token=crear_token(u.usuario, u.rol, sello_de_sesion(u.password_hash)),
         usuario=u.usuario,
         nombre=u.nombre,
         rol=u.rol,

@@ -21,6 +21,7 @@ from routers import (
 )
 from core import ratelimit
 from core.config import settings
+from core import cuentas, permisos
 from core.security import verificar_token, hash_password
 from services.transcription import transcribe_audio
 from services.historia_extractor import extraer_historia
@@ -62,21 +63,10 @@ def _clave_cliente(request: Request) -> str:
 
 
 def _es_ruta_clinica(path: str) -> bool:
-    """Rutas reservadas al rol veterinario para escribir.
-
-    La receta es lo único que queda cerrado: es un documento que va firmado por
-    un colegiado y con su número de colegiatura, no algo que se pueda delegar.
-
-    Las historias clínicas sí las puede llenar la recepcionista. En consulta
-    cargada el doctor dicta y sigue atendiendo, y la alternativa real no es
-    "que la llene el doctor después" sino que la consulta quede sin registrar.
-    Queda constancia de quién la escribió (bitácora de actividad) y hay que
-    indicar qué veterinario atendió, así que la firma clínica no se falsea.
-    """
-    return (
-        "/recetas" in path
-        or path == "/api/procesar-receta"
-    )
+    """¿Esta ruta es exclusiva del veterinario? (compatibilidad: ahora la
+    respuesta sale de la tabla de core/permisos.py)."""
+    return any(permisos.roles_permitidos(m, path) == permisos.SOLO_VET
+               for m in ("POST", "PUT", "DELETE"))
 
 
 # ── Bitácora de actividad (auditoría) ────────────────────────────────────────
@@ -137,47 +127,8 @@ def _describir_accion(metodo: str, path: str) -> str:
 # consulta extra por request. Se cachea el resultado unos segundos: así
 # desactivar a alguien le corta el acceso en ~30 s (antes: hasta 12 h, lo que
 # durara su token) sin castigar el rendimiento. Sin Redis ni servicios pagos.
-_CACHE_CUENTAS: dict[str, tuple[float, "_Cuenta"]] = {}
-_CACHE_TTL_SEG = 30
-
-
-class _Cuenta:
-    """Lo que el middleware necesita saber de quien hace la petición."""
-    __slots__ = ("habilitada", "clinica_id", "suspendida")
-
-    def __init__(self, habilitada: bool, clinica_id: int | None, suspendida: bool):
-        self.habilitada, self.clinica_id, self.suspendida = habilitada, clinica_id, suspendida
-
-
-def _cuenta(usuario: str) -> "_Cuenta":
-    """Estado de la cuenta y a qué clínica pertenece. Se recuerda 30 s."""
-    ahora = time.time()
-    entrada = _CACHE_CUENTAS.get(usuario)
-    if entrada and (ahora - entrada[0]) < _CACHE_TTL_SEG:
-        return entrada[1]
-
-    db = None
-    try:
-        db = SessionLocal()   # sesión de sistema: aún no se sabe la clínica
-        fila = (
-            db.query(models.Usuario.activo, models.Usuario.clinica_id, models.Clinica.estado)
-            .join(models.Clinica, models.Clinica.id == models.Usuario.clinica_id)
-            .filter(models.Usuario.usuario == usuario)
-            .first()
-        )
-        cuenta = (_Cuenta(bool(fila[0]), fila[1], fila[2] != "activa")
-                  if fila else _Cuenta(False, None, False))
-    except Exception as e:
-        # Sin poder verificar la cuenta NO se deja pasar: ahora una petición sin
-        # clínica conocida sería una petición que podría ver datos de otra.
-        logger.warning("No se pudo verificar la cuenta '%s': %s", usuario, e)
-        return _Cuenta(False, None, False)
-    finally:
-        if db is not None:
-            db.close()
-
-    _CACHE_CUENTAS[usuario] = (ahora, cuenta)
-    return cuenta
+# Estado de las cuentas (activa, clínica, rol, sello de sesión): core/cuentas.py.
+_CACHE_CUENTAS = cuentas._CACHE   # alias, para las pruebas
 
 
 def _registrar_actividad(usuario, rol, metodo, ruta, estado, detalle=None, clinica_id=None):
@@ -227,33 +178,38 @@ async def auth_middleware(request: Request, call_next):
         # existiendo y activa: al desactivar a alguien (p. ej. personal que ya
         # no trabaja aquí) su sesión debe cortarse de inmediato, no seguir
         # abierta hasta que el token expire por su cuenta.
-        cuenta = _cuenta(sesion["usuario"])
+        cuenta = cuentas.cuenta(sesion["usuario"])
         if not cuenta.habilitada or cuenta.clinica_id is None:
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Tu cuenta fue desactivada. Contacta a la administradora."},
+            )
+        # La contraseña cambió desde que se abrió esta sesión: ya no vale.
+        if sesion["sello"] != cuenta.sello:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Tu sesión ya no es válida. Inicia sesión de nuevo."},
             )
         if cuenta.suspendida:
             return JSONResponse(
                 status_code=403,
                 content={"detail": "La cuenta de tu clínica está suspendida. Contacta al soporte."},
             )
-        # Control de rol: la recepcionista puede leer la ficha completa del
-        # paciente y llenar historias clínicas; emitir recetas no (ver
-        # `_es_ruta_clinica`). Leer una receta ya emitida sí, para reimprimirla
-        # o reenviarla al cliente.
-        lectura_recetas = request.method == "GET" and "/recetas" in path
-        if (
-            sesion["rol"] != "veterinario"
-            and _es_ruta_clinica(path)
-            and not lectura_recetas
-        ):
+        # El rol que manda es el de HOY en la base de datos, no el que traía el
+        # token: así degradar a alguien o cambiarle el rol rige de inmediato.
+        rol = cuenta.rol
+        # Control de rol, para TODAS las rutas y desde un solo lugar: la tabla de
+        # core/permisos.py. Lo que no está declarado ahí no lo puede llamar
+        # nadie (se niega por defecto).
+        if not permisos.permitido(request.method, path, rol):
+            if not permisos.regla_para(request.method, path):
+                logger.warning("Ruta sin permisos declarados: %s %s", request.method, path)
             return JSONResponse(
                 status_code=403,
-                content={"detail": "Acceso restringido al personal veterinario."},
+                content={"detail": "No tienes permiso para esta acción."},
             )
         request.state.usuario = sesion["usuario"]
-        request.state.rol = sesion["rol"]
+        request.state.rol = rol
         # De aquí en adelante TODA consulta de esta petición queda acotada a
         # esta clínica (ver database.get_db).
         request.state.clinica_id = cuenta.clinica_id
@@ -264,8 +220,8 @@ async def auth_middleware(request: Request, call_next):
         token = header.removeprefix("Bearer ").strip()
         sesion = verificar_token(token) if token else None
         if sesion:
-            cuenta = _cuenta(sesion["usuario"])
-            if cuenta.habilitada and not cuenta.suspendida:
+            cuenta = cuentas.cuenta(sesion["usuario"])
+            if cuenta.habilitada and not cuenta.suspendida and sesion["sello"] == cuenta.sello:
                 request.state.clinica_id = cuenta.clinica_id
 
     response = await call_next(request)

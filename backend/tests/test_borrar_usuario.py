@@ -21,7 +21,7 @@ def _crear_vet(client, admin, rol="veterinario"):
     sufijo = uuid.uuid4().hex[:8]
     r = client.post("/api/usuarios/", json={
         "usuario": f"qa_del_{sufijo}",
-        "password": "qa1234",
+        "password": "qa-clave-1234",
         "nombre": f"QA Borrable {sufijo}",
         "rol": rol,
     }, headers=admin)

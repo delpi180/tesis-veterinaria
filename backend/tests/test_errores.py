@@ -106,6 +106,12 @@ def test_error_no_controlado_del_backend_queda_registrado(client, admin):
     def _revienta():
         raise RuntimeError(f"Fallo simulado {marca}")
 
+    # Una ruta sin permisos declarados queda cerrada para todos (core/permisos.py);
+    # esta es de prueba, así que se declara a mano y se quita al terminar.
+    from core import permisos
+    regla = ({"GET"}, permisos._compilar(ruta), permisos.AMBOS, ruta)
+    permisos._COMPILADAS.insert(0, regla)
+
     # Por defecto TestClient re-lanza la excepción del servidor en vez de
     # devolver la respuesta; con raise_server_exceptions=False se comporta como
     # un navegador real y se puede comprobar el 500 que ve el usuario.
@@ -124,6 +130,7 @@ def test_error_no_controlado_del_backend_queda_registrado(client, admin):
         assert "Traceback" in (guardado["detalle"] or "")
     finally:
         _limpiar(marca)
+        permisos._COMPILADAS.remove(regla)
         # quitar la ruta de prueba para no afectar a los demás tests
         main.app.router.routes = [
             r for r in main.app.router.routes if getattr(r, "path", None) != ruta

@@ -732,10 +732,13 @@ function HistoriaCard({ h, pacienteId, onEdit, onDelete, onActualizada }) {
                 className="text-xs bg-white/20 hover:bg-white/30 rounded px-2 py-0.5 transition-colors">
                 Editar
               </button>
-              <button onClick={() => onDelete(h)}
-                className="text-xs bg-rose-500/80 hover:bg-rose-500 rounded px-2 py-0.5 transition-colors">
-                Eliminar
-              </button>
+              {/* La recepción puede llenar y corregir la consulta; borrarla es del veterinario */}
+              {esVeterinario() && (
+                <button onClick={() => onDelete(h)}
+                  className="text-xs bg-rose-500/80 hover:bg-rose-500 rounded px-2 py-0.5 transition-colors">
+                  Eliminar
+                </button>
+              )}
             </>
           )}
         </div>

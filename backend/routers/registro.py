@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from core import ratelimit
 from core.config import settings
-from core.security import crear_token, hash_password
+from core.security import crear_token, hash_password, sello_de_sesion
 from database import get_db
 from models import Clinica, ConfiguracionClinica, Usuario
 
@@ -89,6 +89,6 @@ def registrar_clinica(body: RegistroIn, request: Request, db: Session = Depends(
     ratelimit.registrar_fallo(clave)   # cuenta el alta contra el tope por IP
 
     return {
-        "token": crear_token(admin.usuario, admin.rol),
+        "token": crear_token(admin.usuario, admin.rol, sello_de_sesion(admin.password_hash)),
         "usuario": admin.usuario, "nombre": admin.nombre, "rol": admin.rol,
     }
