@@ -9,6 +9,7 @@ from schemas import UsuarioCreate, UsuarioUpdate, UsuarioOut, DoctorOut
 from core.security import hash_password
 from core import cuentas
 from core.deps import solo_admin, usuario_actual
+from core import limites
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
 
@@ -37,6 +38,8 @@ def crear_usuario(payload: UsuarioCreate, request: Request, db: Session = Depend
     solo_admin(request)
     if db.query(Usuario).filter(Usuario.usuario == payload.usuario).first():
         raise HTTPException(status_code=409, detail=f"El usuario '{payload.usuario}' ya existe")
+    if payload.activo:
+        limites.exigir_cupo(db, "usuarios")
     u = Usuario(
         usuario=payload.usuario,
         nombre=payload.nombre,
@@ -80,6 +83,10 @@ def actualizar_usuario(usuario_id: int, payload: UsuarioUpdate, request: Request
     if not u:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     datos = payload.model_dump(exclude_unset=True)
+
+    # Reactivar a alguien también ocupa un lugar del plan
+    if datos.get("activo") is True and not u.activo:
+        limites.exigir_cupo(db, "usuarios")
 
     quita_el_cargo = "rol" in datos and datos["rol"] != "recepcionista"
     if datos.get("activo") is False and getattr(request.state, "usuario", None) == u.usuario:

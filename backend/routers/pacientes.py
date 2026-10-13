@@ -20,6 +20,7 @@ from schemas import (
     RecetaCreate, RecetaUpdate, RecetaOut,
 )
 from core.deps import usuario_actual
+from core import limites
 from services.tratamientos import sincronizar_desde_historia as sincronizar_tratamientos
 
 router = APIRouter(prefix="/api/pacientes", tags=["Pacientes"])
@@ -452,6 +453,7 @@ async def subir_documento(
 
     cat = categoria if categoria in CATEGORIAS_DOC else "otro"
     contenido = await _validar_y_leer_archivo(archivo)
+    limites.exigir_cupo(db, "almacenamiento", len(contenido))
 
     doc = DocumentoPaciente(
         paciente_id=paciente_id,
@@ -537,6 +539,7 @@ async def adjuntar_documento_historia(
 
     cat = categoria if categoria in CATEGORIAS_DOC else "otro"
     contenido = await _validar_y_leer_archivo(archivo)
+    limites.exigir_cupo(db, "almacenamiento", len(contenido))
     doc = DocumentoPaciente(
         paciente_id=paciente_id,
         historia_id=historia_id,
@@ -618,6 +621,7 @@ async def adjuntar_documento_registro(
         )
 
     contenido = await _validar_y_leer_archivo(archivo)
+    limites.exigir_cupo(db, "almacenamiento", len(contenido))
     doc = DocumentoPaciente(
         paciente_id=paciente_id,
         registro_id=registro_id,

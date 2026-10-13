@@ -8,11 +8,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from core.deps import solo_admin, usuario_actual
+from core import limites
 from database import get_db
 from models import Cliente, ContactoCliente, Paciente, PlantillaContacto, Usuario, VacunaAvisada
 from services import contactos as svc
 
-router = APIRouter(prefix="/api/contactos", tags=["Contactos"])
+router = APIRouter(prefix="/api/contactos", tags=["Contactos"], dependencies=[Depends(limites.requiere_funcion("contactos"))])
 
 
 class ContactoIn(BaseModel):

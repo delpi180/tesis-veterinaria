@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import Column, Boolean, Date, Float, Integer, LargeBinary, Numeric, String, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Boolean, Date, Float, Integer, LargeBinary, Numeric, String, Text, DateTime, ForeignKey, UniqueConstraint, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import declared_attr
@@ -999,3 +999,87 @@ class AccionPlataforma(Base):
     accion         = Column(String(30), nullable=False)
     detalle        = Column(String(300))
     fecha          = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+
+class Plan(Base):
+    """Un plan de suscripción: qué incluye y cuánto cuesta.
+
+    Los límites son NULL = ilimitado. Se editan desde el panel del operador, así
+    que ni los precios ni los topes están escritos en el código. Lo que se valida
+    en cada petición vive en `core/limites.py`.
+    """
+    __tablename__ = "planes"
+
+    codigo   = Column(String(20), primary_key=True)          # 'prueba' | 'basico' | ...
+    nombre   = Column(String(60), nullable=False)
+    descripcion = Column(String(200))
+    precio_mensual = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
+    moneda   = Column(String(3), nullable=False, default="PEN", server_default="PEN")
+
+    max_usuarios        = Column(Integer)     # usuarios activos de la clínica
+    max_mascotas        = Column(Integer)     # pacientes registrados
+    max_almacenamiento_mb = Column(Integer)   # documentos adjuntos
+    max_ia_mes          = Column(Integer)     # usos de IA por mes (dictado y procesamiento)
+
+    incluye_planilla   = Column(Boolean, nullable=False, default=True, server_default="true")
+    incluye_contactos  = Column(Boolean, nullable=False, default=True, server_default="true")
+
+    # Aparece en la comparación de planes que ve la clínica (la prueba y los
+    # planes especiales no se ofrecen)
+    publico  = Column(Boolean, nullable=False, default=True, server_default="true")
+    orden    = Column(Integer, nullable=False, default=0, server_default="0")
+
+
+class UsoMensual(TenantMixin, Base):
+    """Cuántas veces usó la clínica lo que cuesta dinero cada vez (la IA)."""
+    __tablename__ = "uso_mensual"
+
+    id       = Column(Integer, primary_key=True)
+    periodo  = Column(String(7), nullable=False)         # "2026-10"
+    ia_usos  = Column(Integer, nullable=False, default=0, server_default="0")
+
+    __table_args__ = (UniqueConstraint("clinica_id", "periodo", name="uq_uso_clinica_periodo"),)
+
+
+class Pago(TenantMixin, Base):
+    """Libro de pagos de una clínica. Solo se agrega; no se edita ni se borra.
+
+    Hoy los registra el operador (Yape, transferencia, efectivo). El día que se
+    conecte una pasarela de pago usará el mismo camino (`services/cobro.py`), y
+    la restricción única (método, referencia) impide acreditar dos veces el mismo
+    cobro aunque la pasarela repita el aviso.
+    """
+    __tablename__ = "pagos"
+
+    id          = Column(Integer, primary_key=True)
+    plan        = Column(String(20), nullable=False)
+    monto       = Column(Numeric(10, 2), nullable=False)
+    moneda      = Column(String(3), nullable=False, default="PEN", server_default="PEN")
+    meses       = Column(Integer, nullable=False, default=1, server_default="1")
+    periodo_desde = Column(Date, nullable=False)
+    periodo_hasta = Column(Date, nullable=False)
+    # 'yape' | 'plin' | 'transferencia' | 'efectivo' | 'tarjeta' | 'otro'
+    metodo      = Column(String(20), nullable=False)
+    referencia  = Column(String(100))     # operación, voucher o id de la pasarela
+    nota        = Column(String(300))
+    registrado_por = Column(String(50))
+    creado_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+
+    __table_args__ = (
+        Index("uq_pago_metodo_referencia", "metodo", "referencia", unique=True,
+              postgresql_where=text("referencia IS NOT NULL")),
+    )
+
+
+class SolicitudPlan(TenantMixin, Base):
+    """La clínica pide cambiar de plan; el operador la atiende."""
+    __tablename__ = "solicitudes_plan"
+
+    id          = Column(Integer, primary_key=True)
+    plan        = Column(String(20), nullable=False)
+    mensaje     = Column(String(500))
+    estado      = Column(String(10), nullable=False, default="pendiente", server_default="pendiente")
+    creada_por  = Column(String(50))
+    creada_en   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    atendida_por = Column(String(50))
+    atendida_en = Column(DateTime(timezone=True))

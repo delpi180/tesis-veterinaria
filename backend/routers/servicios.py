@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from sqlalchemy.orm import Session
 
 from database import get_db
+from core import limites
 from models import Servicio, VentaItem
 from schemas import (
     ServicioCreate, ServicioUpdate, ServicioOut,
@@ -102,6 +103,7 @@ def eliminar_servicio(servicio_id: int, db: Session = Depends(get_db)):
 def interpretar(body: ServicioInterpretarReq, db: Session = Depends(get_db)):
     if not body.texto.strip():
         raise HTTPException(status_code=400, detail="El texto no puede estar vacío.")
+    limites.consumir_ia(db.info.get("clinica_id"))      # la IA cuesta: se descuenta del plan antes de llamar
     try:
         items = interpretar_servicios(body.texto)
     except Exception as e:
@@ -118,6 +120,7 @@ async def interpretar_audio(audio: UploadFile = File(...), db: Session = Depends
     data = await audio.read()
     if not data:
         raise HTTPException(status_code=400, detail="El audio está vacío.")
+    limites.consumir_ia(db.info.get("clinica_id"))      # la IA cuesta: se descuenta del plan antes de llamar
     try:
         import asyncio
         texto = await asyncio.to_thread(transcribe_audio, data, filename=audio.filename or "serv.webm")

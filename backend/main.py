@@ -16,12 +16,12 @@ import models  # registra todos los modelos en Base.metadata
 from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
-    busqueda, inventario, asistencia, mi_panel, actividad, configuracion, glosario, contactos, planilla, registro, plataforma, errores,
+    busqueda, inventario, asistencia, mi_panel, actividad, configuracion, glosario, contactos, planilla, registro, plataforma, plataforma_cobro, suscripcion, errores,
     respaldo, catalogos, tratamientos,
 )
 from core import ratelimit
 from core.config import settings
-from core import cuentas, permisos
+from core import cuentas, limites, permisos
 from core.security import verificar_token, hash_password
 from services.transcription import transcribe_audio
 from services.historia_extractor import extraer_historia
@@ -109,6 +109,7 @@ _ACCIONES = {
     ("POST", "/api/pacientes/{id}/historias/{id}/addendum"): "Agregó una nota de corrección a una consulta",
     ("PUT", "/api/planilla/personal/{id}"): "Registró el sueldo de un trabajador",
     ("POST", "/api/planilla"): "Generó una planilla",
+    ("POST", "/api/suscripcion/solicitar"): "Pidió un cambio de plan",
     ("PUT", "/api/plataforma/clinicas/{id}"): "Operador: cambió una clínica",
     ("POST", "/api/contactos"): "Registró un contacto con el dueño",
     ("POST", "/api/glosario"): "Agregó una palabra al glosario del dictado",
@@ -191,7 +192,10 @@ async def auth_middleware(request: Request, call_next):
                 status_code=401,
                 content={"detail": "Tu sesión ya no es válida. Inicia sesión de nuevo."},
             )
-        if cuenta.bloqueo and not cuenta.es_plataforma:
+        # Una clínica bloqueada (vencida o suspendida) solo puede ver su suscripción:
+        # necesita saber por qué y cómo regularizarse. Todo lo demás queda cerrado.
+        if (cuenta.bloqueo and not cuenta.es_plataforma
+                and not path.startswith("/api/suscripcion")):
             return JSONResponse(status_code=403, content={"detail": cuenta.bloqueo})
         # El rol que manda es el de HOY en la base de datos, no el que traía el
         # token: así degradar a alguien o cambiarle el rol rige de inmediato.
@@ -332,6 +336,8 @@ app.include_router(contactos.router)
 app.include_router(planilla.router)
 app.include_router(registro.router)
 app.include_router(plataforma.router)
+app.include_router(plataforma_cobro.router)
+app.include_router(suscripcion.router)
 app.include_router(errores.router)
 app.include_router(respaldo.router)
 app.include_router(catalogos.router)
@@ -515,6 +521,9 @@ async def transcribe_endpoint(request: Request, audio: UploadFile = File(...)):
                    f"límite de {MAX_AUDIO_MB} MB. Graba la consulta en tramos más cortos.",
         )
 
+    # La IA cuesta dinero cada vez: el cupo del plan se descuenta ANTES de llamar.
+    limites.consumir_ia(getattr(request.state, "clinica_id", None))
+
     # El vocabulario de refuerzo se arma con los medicamentos y razas de esta
     # clínica, así que hace falta una sesión. Se abre y cierra acá porque la
     # transcripción corre en otro hilo y puede tardar minutos: sostener una
@@ -554,6 +563,8 @@ def procesar_historia_endpoint(body: ProcessHistoriaRequest, request: Request):
     if not body.texto.strip():
         raise HTTPException(status_code=400, detail="El campo 'texto' no puede estar vacío.")
 
+    limites.consumir_ia(getattr(request.state, "clinica_id", None))
+
     # El catálogo de medicamentos de la clínica va al prompt: permite
     # reconocer una marca mal transcrita en vez de copiarla rota.
     db_cat = nueva_sesion(getattr(request.state, "clinica_id", None))
@@ -586,6 +597,7 @@ def procesar_receta_endpoint(body: ProcesarRecetaRequest, request: Request):
     if not body.texto.strip():
         raise HTTPException(status_code=400, detail="El campo 'texto' no puede estar vacío.")
 
+    limites.consumir_ia(getattr(request.state, "clinica_id", None))
     db_cat = nueva_sesion(getattr(request.state, "clinica_id", None))
     try:
         resultado = extraer_receta(body.texto, db=db_cat)

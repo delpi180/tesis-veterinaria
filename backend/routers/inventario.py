@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from database import get_db
+from core import limites
 from models import MovimientoInventario, Producto
 from schemas import (
     InventarioInterpretarReq, InvItemPreview,
@@ -90,6 +91,7 @@ def _armar_preview(items: list[dict], db: Session) -> list[dict]:
 def interpretar(body: InventarioInterpretarReq, db: Session = Depends(get_db)):
     if not body.texto.strip():
         raise HTTPException(status_code=400, detail="El texto no puede estar vacío.")
+    limites.consumir_ia(db.info.get("clinica_id"))      # la IA cuesta: se descuenta del plan antes de llamar
     try:
         items = interpretar_inventario(body.texto)
     except Exception as e:
@@ -107,6 +109,7 @@ async def interpretar_audio(audio: UploadFile = File(...), db: Session = Depends
     data = await audio.read()
     if not data:
         raise HTTPException(status_code=400, detail="El audio está vacío.")
+    limites.consumir_ia(db.info.get("clinica_id"))      # la IA cuesta: se descuenta del plan antes de llamar
     try:
         import asyncio
         texto = await asyncio.to_thread(transcribe_audio, data, filename=audio.filename or "inv.webm")

@@ -6,6 +6,8 @@ import { api } from '../services/api'
 import { useToast } from '../components/Toast'
 import { useConfirmar } from '../components/Confirmar'
 import { Cargando } from '../components/Cargando'
+import { PanelPlanes, PanelSolicitudes, PanelPagos, SeccionSuscripcion } from '../components/PlataformaCobro'
+import { soles } from '../utils/suscripcion'
 
 const PLANES = [
   ['prueba', 'Prueba'], ['basico', 'Básico'], ['profesional', 'Profesional'], ['fundadora', 'Fundadora'],
@@ -21,6 +23,7 @@ const ESTADOS = {
 const ACCIONES = {
   suspender: 'Suspendió', reactivar: 'Reactivó', plan: 'Cambió el plan', vencimiento: 'Cambió el vencimiento',
   nota: 'Editó la nota', restablecer_clave: 'Restableció una contraseña',
+  pago: 'Registró un pago', plan_edicion: 'Editó un plan', solicitud: 'Atendió una solicitud',
 }
 
 const fmtFecha = (iso) => {
@@ -216,6 +219,8 @@ function DetalleClinica({ id, onCerrar, onCambio }) {
               </button>
             </section>
 
+            <SeccionSuscripcion clinicaId={id} onCambio={async () => { onCambio(); aplicar(await api.get(`/api/plataforma/clinicas/${id}`)) }} />
+
             <section className="flex flex-col gap-2">
               <h3 className="text-sm font-semibold text-slate-700">Equipo ({d.equipo.length})</h3>
               <ul className="divide-y divide-slate-100 border border-slate-200 rounded-md text-sm">
@@ -328,10 +333,14 @@ export default function Plataforma() {
           <Cifra titulo="Vencen en 7 días" valor={resumen?.por_vencer_7d} aviso />
           <Cifra titulo="Altas (30 días)" valor={resumen?.nuevas_30d} />
           <Cifra titulo="Consultas (30 días)" valor={resumen?.consultas_30d} />
+          <Cifra titulo="Ingresos del mes" valor={resumen ? soles(resumen.ingresos_mes) : null} />
+          <Cifra titulo="Recurrente mensual" valor={resumen ? soles(resumen.mrr) : null} />
+          <Cifra titulo="Solicitudes de plan" valor={resumen?.solicitudes_pendientes} aviso />
         </div>
 
         <div className="flex gap-2 border-b border-slate-200">
-          {[['clinicas', 'Clínicas'], ['actividad', 'Actividad del operador']].map(([k, t]) => (
+          {[['clinicas', 'Clínicas'], ['solicitudes', `Solicitudes${resumen?.solicitudes_pendientes ? ` (${resumen.solicitudes_pendientes})` : ''}`],
+            ['pagos', 'Pagos'], ['planes', 'Planes'], ['actividad', 'Actividad del operador']].map(([k, t]) => (
             <button key={k} onClick={() => setVista(k)}
               className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${vista === k
                 ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-600 hover:text-slate-900'}`}>{t}</button>
@@ -394,6 +403,12 @@ export default function Plataforma() {
               </div>
             )}
           </>
+        ) : vista === 'solicitudes' ? (
+          <PanelSolicitudes onAbrir={setAbierta} onCambio={cargar} />
+        ) : vista === 'pagos' ? (
+          <PanelPagos />
+        ) : vista === 'planes' ? (
+          <PanelPlanes />
         ) : (
           <div className="bg-white border border-slate-200 rounded-xl">
             {acciones.length === 0 ? <p className="text-sm text-slate-500 py-10 text-center">Todavía no hay acciones.</p> : (

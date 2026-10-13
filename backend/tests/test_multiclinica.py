@@ -318,6 +318,7 @@ GLOBALES = {
     "clinicas", "rate_limit_hits",
     "evaluadores", "respuestas_sus", "respuestas_tam",   # módulos de tesis, apagados
     "acciones_plataforma",    # bitácora del operador del SaaS: es de la plataforma, no de una clínica
+    "planes",                 # catálogo de planes: lo define la plataforma y lo ven todas las clínicas
 }
 # Con clinica_id opcional: se filtran a mano en su router.
 OPCIONALES = {"errores", "sse_events"}

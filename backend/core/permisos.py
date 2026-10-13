@@ -101,6 +101,9 @@ REGLAS: list[tuple[tuple[str, ...], str, frozenset]] = [
     # Reportar un error es público (se resuelve antes); verlos es de la administradora.
     (TODOS,     "/api/errores/*",                         SOLO_ADMIN),
 
+    # ── Suscripción de la clínica: la ve y la pide la administradora ─────────
+    (TODOS,     "/api/suscripcion/*",                     SOLO_ADMIN),
+
     # ── Operación del SaaS ───────────────────────────────────────────────────
     # El operador gestiona clínicas (estado, plan, vencimiento) y NADA más: no
     # figura en ninguna otra regla, así que no puede abrir datos de una clínica.

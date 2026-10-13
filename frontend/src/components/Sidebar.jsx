@@ -4,12 +4,13 @@ import {
   LayoutDashboard, Users, Calendar,
   Package, Stethoscope, BarChart2, LogOut, Wallet, UserCog,
   Clock, ClipboardList, History, PieChart, ConciergeBell, Syringe, Menu, X, Bug,
-  Pill, PhoneCall, Banknote, Building2,
+  Pill, PhoneCall, Banknote, Building2, CreditCard,
 } from 'lucide-react'
 import { api, getNombre, getRol, cerrarSesion, esVeterinario, esAdmin, esPlataforma } from '../services/api'
 import GlobalSearch from './GlobalSearch'
 import { useClinica } from '../services/clinica'
 import { useRefrescoAuto } from '../hooks/useRefrescoAuto'
+import { useSuscripcion } from '../services/suscripcion'
 
 const PawIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
@@ -35,7 +36,7 @@ const SECCIONES = [
     // La ve el doctor (qué está medicado) y también recepción (a quién llamar).
     { label: 'Tratamientos', to: '/tratamientos', Icon: Pill },
     { label: 'Vacunación',   to: '/vacunacion',   Icon: Syringe,   admin: true },
-    { label: 'Contactar',    to: '/contactos',    Icon: PhoneCall, admin: true },
+    { label: 'Contactar',    to: '/contactos',    Icon: PhoneCall, admin: true, funcion: 'contactos' },
   ]},
   { titulo: 'Dinero', items: [
     { label: 'Ventas',     to: '/ventas',     Icon: BarChart2,   admin: true },
@@ -46,8 +47,9 @@ const SECCIONES = [
   ]},
   { titulo: 'Equipo', items: [
     { label: 'Asistencia', to: '/asistencia', Icon: Clock,    admin: true },
-    { label: 'Planilla',   to: '/planilla',   Icon: Banknote, admin: true },
+    { label: 'Planilla',   to: '/planilla',   Icon: Banknote, admin: true, funcion: 'planilla' },
     { label: 'Usuarios',   to: '/usuarios',   Icon: UserCog,  admin: true },
+    { label: 'Mi plan',    to: '/suscripcion', Icon: CreditCard, admin: true },
   ]},
   { titulo: 'Sistema', items: [
     { label: 'Actividad', to: '/actividad', Icon: History, admin: true },
@@ -107,10 +109,14 @@ export default function Sidebar() {
   const nombre = getNombre() || 'Veterinario'
   const rol = getRol() || 'veterinario'
   // El operador del SaaS solo ve su panel; las clínicas nunca ven el de plataforma.
+  // Lo que el plan de la clínica no incluye no se ofrece en el menú (el servidor
+  // igual lo rechaza; esto solo evita mostrar un camino que termina en un error).
+  const { datos: suscripcion } = useSuscripcion()
+  const incluida = (i) => !i.funcion || suscripcion?.funciones?.[i.funcion] !== false
   const visible = (items) => items.filter(i =>
     esPlataforma()
       ? i.plataforma
-      : (!i.plataforma && (!i.vet || esVeterinario()) && (!i.admin || esAdmin()))
+      : (!i.plataforma && incluida(i) && (!i.vet || esVeterinario()) && (!i.admin || esAdmin()))
   )
 
   // Errores sin revisar. El sistema ya los registraba, pero había que

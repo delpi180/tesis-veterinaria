@@ -1,3 +1,4 @@
+from core import limites
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -107,6 +108,7 @@ def agregar_paciente(
 ):
     if not db.get(Cliente, cliente_id):
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    limites.exigir_cupo(db, "mascotas")
     paciente = Paciente(**payload.model_dump(), cliente_id=cliente_id)
     db.add(paciente)
     db.commit()

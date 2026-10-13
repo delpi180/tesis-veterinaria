@@ -82,14 +82,61 @@ Reglas de seguridad:
 - `DIAS_DE_PRUEBA` (por defecto 0 = sin vencimiento) fija el plazo de las clínicas
   que se registran solas.
 
+## Planes, límites y cobro
+
+Qué incluye cada plan vive en la tabla `planes` y se edita desde el panel del
+operador (pestaña **Planes**): precio, topes de **usuarios activos**, **mascotas**,
+**almacenamiento** de documentos y **usos de IA por mes**, y si incluye la
+**planilla** y el **contacto con clientes**. Un tope vacío es "sin límite".
+
+> Los planes y precios iniciales (Prueba, Básico S/ 79, Profesional S/ 149,
+> Fundadora) son **ejemplos** para arrancar. Ajústalos antes de vender.
+
+**Quién lo hace cumplir.** El servidor, en cada petición (`core/limites.py`); el
+frontend solo muestra el uso y avisa.
+
+| Recurso | Dónde se corta |
+|---|---|
+| Usuarios activos | Al crear un usuario o reactivarlo |
+| Mascotas | Al registrar una mascota |
+| Almacenamiento | Al subir un documento (los tres caminos de subida) |
+| IA por mes | **Antes** de llamar al proveedor (dictado, procesar historia/receta, inventario, servicios). Es atómico: dos peticiones simultáneas no pasan el tope |
+| Planilla, Contactos | Todo el módulo, si el plan no lo incluye |
+
+Reglas: se corta lo **nuevo**, nunca se borra lo existente (bajar de plan no
+elimina datos); responde **402** con un mensaje que dice el plan y el tope; un plan
+que no exista en la tabla no bloquea (se registra un aviso).
+
+**Vencimiento y bloqueo.** Pasado `vence_en` la clínica queda bloqueada. Una
+clínica bloqueada (vencida o suspendida) solo puede ver su **Mi plan** y pedir la
+renovación; todo lo demás responde 403. Sus datos no se tocan.
+
+**Pagos.** `services/cobro.registrar_pago` es el **único** camino por el que entra
+dinero: acredita el periodo (renovar antes de vencer suma al final de lo ya
+pagado), fija el plan y puede reactivar una clínica suspendida. Es **idempotente**
+por (método, referencia): el mismo cobro no se acredita dos veces. Hoy lo usa el
+operador al confirmar un Yape o una transferencia. La clínica ve su plan, su uso
+y sus pagos, y puede **pedir** un cambio; el operador lo atiende.
+
+Configuración: `INSTRUCCIONES_PAGO` (texto que la clínica ve en "Cómo pagar") y
+`DIAS_DE_PRUEBA` (0 = sin vencimiento).
+
+### Conectar una pasarela de pago (pendiente)
+
+No hay pasarela conectada: exige una cuenta de comercio y claves, y no se puede
+probar contra un cobro real sin ellas. Cuando se elija una (Culqi, Stripe, Mercado
+Pago…), solo hace falta un endpoint que **verifique la firma** de su aviso de cobro
+y llame a `registrar_pago(..., metodo="tarjeta", referencia=<id del cobro>)`. La
+idempotencia y la renovación ya están resueltas.
+
 ## Pendiente (no cubierto aún)
 
-- **Cobro:** `plan` y `vence_en` los fija el operador a mano; no hay pasarela de
-  pago ni facturación, ni límites por plan (usuarios, almacenamiento, IA).
+- **Pasarela de pago** y cobro automático (ver arriba), facturación electrónica y
+  cobros recurrentes. Hoy cada renovación la confirma el operador a mano.
+- **Periodo de gracia** antes de bloquear una clínica vencida (hoy es inmediato).
 - **Segundo factor** para las cuentas de operador (hoy: contraseña de 12+).
 - **Baja y borrado de datos** de una clínica que se va: hoy solo se suspende.
-- **Archivos:** los documentos de los pacientes viven en la base (por clínica);
-  a escala convendrá un almacenamiento de objetos con prefijo por clínica.
-- **Límite de uso de IA** por clínica (hoy es por IP).
+- **Archivos:** los documentos viven en la base (por clínica); a escala convendrá
+  un almacenamiento de objetos con prefijo por clínica.
 - **Módulos de tesis** (SUS/TAM): globales y apagados por defecto; no son
   multi-clínica.

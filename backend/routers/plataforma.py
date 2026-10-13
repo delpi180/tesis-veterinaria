@@ -25,7 +25,7 @@ from core.security import hash_password
 from database import get_db
 from models import (
     AccionPlataforma, Actividad, Cliente, Clinica, ConfiguracionClinica,
-    HistoriaClinica, Paciente, Usuario,
+    HistoriaClinica, Pago, Paciente, Plan, SolicitudPlan, Usuario,
 )
 from services.plataforma import PLAN_INTERNO
 
@@ -124,6 +124,21 @@ def resumen(request: Request, db: Session = Depends(get_db)):
         "usuarios_activos": sum(n for cid, n in conteos["usuarios"].items() if cid in ids),
         "consultas_30d": sum(n for cid, n in conteos["consultas_30d"].items() if cid in ids),
         "por_vencer_7d": sum(1 for c in clinicas if c.vence_en and date.today() <= c.vence_en <= date.today() + timedelta(days=7)),
+        **_dinero(db, clinicas, estados),
+    }
+
+
+def _dinero(db: Session, clinicas: list[Clinica], estados: list[str]) -> dict:
+    """Ingresos del mes y recurrente mensual (MRR), con los precios de hoy."""
+    precios = {p.codigo: float(p.precio_mensual) for p in db.query(Plan)}
+    inicio_mes = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    cobrado = db.query(func.coalesce(func.sum(Pago.monto), 0)).filter(Pago.creado_en >= inicio_mes).scalar()
+    pendientes = db.query(func.count(SolicitudPlan.id)).filter(SolicitudPlan.estado == "pendiente").scalar()
+    return {
+        "ingresos_mes": float(cobrado or 0),
+        # Recurrente: lo que pagarían este mes las clínicas activas de un plan de pago
+        "mrr": round(sum(precios.get(c.plan, 0) for c, e in zip(clinicas, estados) if e == "activa"), 2),
+        "solicitudes_pendientes": pendientes or 0,
     }
 
 

@@ -9,11 +9,12 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from core.deps import solo_admin
+from core import limites
 from database import get_db
 from models import Planilla, PlanillaLinea, Usuario
 from services import planilla as svc
 
-router = APIRouter(prefix="/api/planilla", tags=["Planilla"])
+router = APIRouter(prefix="/api/planilla", tags=["Planilla"], dependencies=[Depends(limites.requiere_funcion("planilla"))])
 _LIMA = ZoneInfo("America/Lima")
 
 

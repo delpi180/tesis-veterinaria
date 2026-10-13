@@ -1,6 +1,9 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
+import AvisoSuscripcion from './components/AvisoSuscripcion'
+import CuentaBloqueada from './components/CuentaBloqueada'
+import { SuscripcionProvider, useSuscripcion } from './services/suscripcion'
 import { ToastProvider } from './components/Toast'
 import { ConfirmarProvider } from './components/Confirmar'
 import { CargandoPantalla } from './components/Cargando'
@@ -34,6 +37,7 @@ const Asistencia        = lazy(() => import('./pages/Asistencia'))
 const Actividad         = lazy(() => import('./pages/Actividad'))
 const Reportes          = lazy(() => import('./pages/Reportes'))
 const PanelRecepcion    = lazy(() => import('./pages/PanelRecepcion'))
+const Suscripcion        = lazy(() => import('./pages/Suscripcion'))
 const Plataforma        = lazy(() => import('./pages/Plataforma'))
 const Registro          = lazy(() => import('./pages/Registro'))
 const Contactos         = lazy(() => import('./pages/Contactos'))
@@ -77,6 +81,18 @@ function AppProtegida() {
     )
   }
   return (
+    <SuscripcionProvider>
+      <ShellClinica />
+    </SuscripcionProvider>
+  )
+}
+
+function ShellClinica() {
+  const { datos } = useSuscripcion()
+  // Clínica vencida o suspendida: solo se muestra por qué y cómo regularizarse
+  // (el servidor ya tiene cerrado todo lo demás).
+  if (datos && datos.estado !== 'activa') return <CuentaBloqueada />
+  return (
     // `min-w-0`: sin esto el contenedor no baja de su ancho de contenido y una
     // tabla o barra de pestañas ancha estira TODA la aplicación de lado en
     // móvil, en vez de desplazarse dentro de su propia caja.
@@ -84,6 +100,7 @@ function AppProtegida() {
       <Sidebar />
       {/* min-w-0 evita que gráficos/tablas anchos rompan el centrado del contenido */}
       <div className="flex-1 min-w-0 flex flex-col pt-12 md:pt-0">
+        <AvisoSuscripcion />
         <Suspense fallback={<CargandoPantalla />}>
         <Routes>
           <Route path="/"                       element={<Home />} />
@@ -110,6 +127,7 @@ function AppProtegida() {
           <Route path="/actividad"              element={<SoloAdmin><Actividad /></SoloAdmin>} />
           <Route path="/reportes"               element={<SoloAdmin><Reportes /></SoloAdmin>} />
           <Route path="/recepcion"              element={<SoloAdmin><PanelRecepcion /></SoloAdmin>} />
+          <Route path="/suscripcion"            element={<SoloAdmin><Suscripcion /></SoloAdmin>} />
           <Route path="/planilla"               element={<SoloAdmin><Planilla /></SoloAdmin>} />
           <Route path="/contactos"              element={<SoloAdmin><Contactos /></SoloAdmin>} />
           <Route path="/vacunacion"             element={<SoloAdmin><Vacunacion /></SoloAdmin>} />

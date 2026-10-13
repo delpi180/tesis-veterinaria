@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # operador lo extienda.
     dias_de_prueba: int = 0
 
+    # Cómo pagar, que la clínica ve en su pantalla de suscripción (p. ej. el número
+    # de Yape o la cuenta bancaria). Vacío = "escríbenos para coordinar el pago".
+    instrucciones_pago: str = ""
+
     # CORS: "*" en dev; en prod poner el dominio de Vercel (CSV) vía variable.
     cors_origins: str = "*"
 
