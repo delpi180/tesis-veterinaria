@@ -216,8 +216,8 @@ export default function MiPanel() {
                   <div className="divide-y divide-slate-50">
                     {data.mis_turnos.map(t => (
                       <div key={t.id} className="px-4 md:px-5 py-3 hover:bg-slate-50/70 transition flex items-center gap-3">
-                        <div className="text-center shrink-0 w-16">
-                          <p className="text-sm font-bold text-brand-700">{fmtHora(t.fecha_hora)}</p>
+                        <div className="text-center shrink-0 w-24">
+                          <p className="text-sm font-bold text-brand-700 whitespace-nowrap">{fmtHora(t.fecha_hora)}</p>
                           <p className="text-[10px] text-slate-400">{fmtFecha(t.fecha_hora)}</p>
                         </div>
                         <button onClick={() => irACliente(t.cliente_id)} className="min-w-0 flex-1 text-left">

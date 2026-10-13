@@ -728,50 +728,50 @@ export default function Inventario() {
               <div className="overflow-x-auto"><table className="w-full text-sm">
                 <thead>
                   <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
-                    <th className="text-left px-5 py-3 font-semibold">Código</th>
-                    <th className="text-left px-5 py-3 font-semibold">Producto</th>
-                    <th className="text-left px-5 py-3 font-semibold">Categoría</th>
-                    <th className="text-left px-5 py-3 font-semibold">Proveedor</th>
-                    <th className="text-center px-5 py-3 font-semibold">Stock</th>
-                    <th className="text-right px-5 py-3 font-semibold">Precio</th>
-                    <th className="text-right px-5 py-3 font-semibold">Valor</th>
-                    <th className="text-center px-5 py-3 font-semibold">Estado</th>
-                    <th className="px-5 py-3" />
+                    <th className="text-left px-3 py-3 font-semibold">Código</th>
+                    <th className="text-left px-3 py-3 font-semibold">Producto</th>
+                    <th className="text-left px-3 py-3 font-semibold">Categoría</th>
+                    <th className="text-left px-3 py-3 font-semibold">Proveedor</th>
+                    <th className="text-center px-3 py-3 font-semibold">Stock</th>
+                    <th className="text-right px-3 py-3 font-semibold">Precio</th>
+                    <th className="text-right px-3 py-3 font-semibold">Valor</th>
+                    <th className="text-center px-3 py-3 font-semibold">Estado</th>
+                    <th className="px-3 py-3" />
                   </tr>
                 </thead>
                 <tbody>
                   {filtrados.map((p, i) => (
                     <tr key={p.id} className={`border-b border-slate-50 hover:bg-slate-50/60 transition ${i % 2 ? 'bg-slate-50/30' : ''} ${!p.activo ? 'opacity-50' : ''}`}>
-                      <td className="px-5 py-3.5">
-                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                      <td className="px-3 py-3.5">
+                        <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded whitespace-nowrap">
                           {p.codigo ?? '—'}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-3 py-3.5">
                         <p className="font-semibold text-slate-800">{p.nombre}</p>
                         <p className="text-xs text-slate-400">
                           {[p.unidad, `Mín: ${p.stock_minimo}`].filter(Boolean).join(' · ')}
                         </p>
                         <BadgeVencimiento producto={p} />
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-3 py-3.5">
                         <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${CAT_COLORS[p.categoria] ?? 'bg-slate-100 text-slate-600'}`}>
                           {CAT_LABEL[p.categoria] ?? p.categoria ?? '—'}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-slate-500 text-xs">{p.proveedor || '—'}</td>
-                      <td className="px-5 py-3.5 text-center">
+                      <td className="px-3 py-3.5 text-slate-500 text-xs">{p.proveedor || '—'}</td>
+                      <td className="px-3 py-3.5 text-center">
                         <span className={`font-bold text-sm ${p.stock_bajo ? 'text-red-600' : 'text-slate-700'}`}>
                           {p.stock}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-right font-semibold text-slate-700">
+                      <td className="px-3 py-3.5 text-right font-semibold text-slate-700 whitespace-nowrap">
                         {fmtMoneda(p.precio)}
                       </td>
-                      <td className="px-5 py-3.5 text-right text-slate-500 text-xs">
+                      <td className="px-3 py-3.5 text-right text-slate-500 text-xs whitespace-nowrap">
                         {fmtMoneda(p.valor_stock ?? p.stock * Number(p.precio))}
                       </td>
-                      <td className="px-5 py-3.5 text-center">
+                      <td className="px-3 py-3.5 text-center">
                         {!p.activo ? (
                           <span className="inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-500">
                             Inactivo
@@ -783,7 +783,7 @@ export default function Inventario() {
                           </span>
                         )}
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-3 py-3.5">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setKardexProd(p)}
