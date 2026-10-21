@@ -74,6 +74,13 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+      # Las pantallas migradas a TypeScript (stack de CorAll) se comprueban aquí:
+      # el build de Vite transpila pero no valida tipos, así que sin este paso
+      # un error de tipos pasaría a producción igual que uno de JS sin lint.
+      - name: Revisar tipos
+        working-directory: frontend
+        run: npm run typecheck
+
       - name: Ejecutar tests
         working-directory: frontend
         run: npm run test -- --run

@@ -19,8 +19,8 @@ const fmtHora = (iso) => iso ? new Date(iso).toLocaleTimeString('es-PE', {
 function DatoPersonal({ Icon, label, value }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="w-9 h-9 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
-        <Icon className="w-4 h-4 text-purple-600" />
+      <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center shrink-0">
+        <Icon className="w-4 h-4 text-brand-600" />
       </div>
       <div className="min-w-0">
         <p className="text-xs text-slate-400 font-medium">{label}</p>
@@ -78,7 +78,7 @@ export default function PerfilDoctor() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-3">
         <p className="text-sm text-rose-600">⚠ {error || 'No se pudo cargar el perfil.'}</p>
-        <button onClick={() => navigate(rutaVolver)} className="text-sm text-purple-700 font-medium hover:underline">Volver</button>
+        <button onClick={() => navigate(rutaVolver)} className="text-sm text-brand-700 font-medium hover:underline">Volver</button>
       </div>
     )
   }
@@ -91,14 +91,14 @@ export default function PerfilDoctor() {
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center gap-3 static md:sticky md:top-0 md:z-10 flex-wrap">
         <button onClick={() => navigate(rutaVolver)}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-700 transition font-medium shrink-0">
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-brand-700 transition font-medium shrink-0">
           <ChevronLeft className="w-4 h-4" /> Volver
         </button>
         <span className="text-slate-300">/</span>
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-slate-800 truncate">Perfil — {u.nombre}</h1>
           <p className="text-xs text-slate-400">
-            <span className={`inline-flex items-center gap-1 font-semibold ${esVet ? 'text-purple-600' : 'text-sky-600'}`}>
+            <span className={`inline-flex items-center gap-1 font-semibold ${esVet ? 'text-brand-600' : 'text-sky-600'}`}>
               {esVet ? <Stethoscope className="w-3 h-3" /> : <User className="w-3 h-3" />}
               {esVet ? 'Veterinario' : 'Recepcionista'}
             </span>
@@ -130,7 +130,7 @@ export default function PerfilDoctor() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {esVet && (
             <>
-              <StatCard Icon={PawPrint} label="Pacientes tratados" value={pacientes_tratados.total} color="bg-purple-100 text-purple-600" />
+              <StatCard Icon={PawPrint} label="Pacientes tratados" value={pacientes_tratados.total} color="bg-brand-100 text-brand-600" />
               <StatCard Icon={ClipboardList} label="Historias registradas" value={total_historias} color="bg-sky-100 text-sky-600" />
               <StatCard Icon={CalendarCheck} label="En seguimiento" value={seguimiento.length} color="bg-amber-100 text-amber-600" />
             </>
@@ -174,7 +174,7 @@ export default function PerfilDoctor() {
           <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
               <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Pacientes tratados</h2>
-              <span className="ml-auto text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{pacientes_tratados.total}</span>
+              <span className="ml-auto text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{pacientes_tratados.total}</span>
             </div>
             {pacientes_tratados.lista.length === 0 ? (
               <p className="text-sm text-slate-400 text-center py-8">Aún no ha atendido pacientes</p>
@@ -192,7 +192,7 @@ export default function PerfilDoctor() {
                     <tr key={i} className="border-b border-slate-50">
                       <td className="px-5 py-3">
                         {p.paciente_id ? (
-                          <Link to={`/pacientes/${p.paciente_id}/historial`} className="font-medium text-purple-700 hover:underline">
+                          <Link to={`/pacientes/${p.paciente_id}/historial`} className="font-medium text-brand-700 hover:underline">
                             {p.paciente}
                           </Link>
                         ) : <span className="font-medium text-slate-800">{p.paciente}</span>}

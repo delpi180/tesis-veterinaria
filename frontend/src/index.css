@@ -1,55 +1,81 @@
 @import "tailwindcss";
 
-/* Inter en formato variable, servido desde la propia app (no desde un CDN):
-   funciona sin internet de terceros y no filtra a los usuarios a Google.
-   Antes se pedía 'Inter' por nombre sin cargarla nunca, así que en la práctica
-   todos veían la tipografía del sistema. */
-@import "@fontsource-variable/inter";
+/* Nunito, la misma tipografía que usan CorAll y trailers. Se sirve desde la
+   propia app (no desde un CDN): funciona sin internet de terceros y no filtra
+   a los usuarios a Google. */
+@import "@fontsource-variable/nunito";
 
-/* ── Escala tipográfica ──────────────────────────────────────────────────────
-   Este es un sistema clínico que se mira ocho horas al día para leer dosis,
-   temperaturas y diagnósticos. Los tamaños por defecto de Tailwind (12 px para
-   `text-xs`, que aquí se usa en cientos de lugares) cansan la vista en ese uso.
-   Se suben un punto los dos tamaños de trabajo, en vez de tocar cada
-   componente: el ajuste llega a toda la aplicación de una sola vez.
-   El interlineado sube en proporción para que nada se apriete.            */
+/* ── Identidad ───────────────────────────────────────────────────────────────
+   Antes toda la app era morado + degradados + tarjetas pastel: la receta por
+   defecto de un panel generado. Ahora hay una identidad propia, con la misma
+   lógica de tokens que la cafetería (nombres con significado, no colores
+   sueltos): verde bosque como color de marca, crema cálida de fondo y arcilla
+   como acento cálido de uso escaso.
+
+   `brand` reemplaza a `purple`/`violet`: el renombrado se hizo en todo el
+   código, así que no queda ningún "morado" que en realidad sea verde.        */
 @theme {
+  --font-sans: "Nunito Variable", "Nunito", system-ui, sans-serif;
+  --font-display: "Nunito Variable", "Nunito", system-ui, sans-serif;
+
+  --color-brand-50:  #eef6f3;
+  --color-brand-100: #d9ebe4;
+  --color-brand-200: #b3d6c9;
+  --color-brand-300: #86bba9;   /* 7.8:1 sobre el menú oscuro */
+  --color-brand-400: #5a9d88;   /* 5.3:1 sobre el menú oscuro */
+  --color-brand-500: #37776a;   /* 5.2:1 sobre blanco — apto para texto */
+  --color-brand-600: #2e6d5a;   /* botones y enlaces: 6.1:1 con texto blanco */
+  --color-brand-700: #235646;
+  --color-brand-800: #1b4437;
+  --color-brand-900: #143329;
+  --color-brand-950: #0d2119;   /* fondo del menú lateral */
+
+  /* Acento cálido, solo para lo que debe llamar la atención sin ser una
+     alarma: el día de hoy en un gráfico, un dato destacado. */
+  --color-arcilla-50:  #fbf1ec;
+  --color-arcilla-100: #f5ddd2;
+  --color-arcilla-500: #c8623f;
+  --color-arcilla-600: #a94a29;   /* 5.0:1 sobre blanco */
+
+  /* Escala de tamaños de trabajo (se subió un punto respecto a Tailwind: es un
+     sistema que se mira ocho horas al día para leer dosis y diagnósticos). */
   --text-xs: 0.8125rem;        /* 13 px (antes 12) */
   --text-xs--line-height: 1.125rem;
   --text-sm: 0.9375rem;        /* 15 px (antes 14) */
   --text-sm--line-height: 1.375rem;
 
-  /* ── Contraste de los grises secundarios ──────────────────────────────────
-     Medido sobre fondo blanco con la fórmula de WCAG (mínimo exigido: 4.5:1
-     para texto normal, 3:1 para iconos y elementos gráficos):
+  /* ── Grises con temperatura ───────────────────────────────────────────────
+     Los `slate` de Tailwind son gris azulado: sobre crema cálida se ven fríos
+     y "de plantilla". Se tiñen hacia el verde de la marca, conservando el
+     contraste WCAG medido sobre blanco, crema (#f7f5f0) y gris (#efece5):
 
-        slate-400 original  #94a3b8 → 2.56:1   se usa en 272 lugares, casi
-                                               todos texto: no llegaba ni a la
-                                               mitad del mínimo
-        slate-300 original  #cbd5e1 → 1.48:1   prácticamente invisible
+        slate-400  #5e6d66   ≥ 4.5:1 en blanco y crema (texto secundario)
+        slate-500  #56655d   ≥ 5.2:1 en todos los fondos
+        slate-300  #8a978f   3.1:1 — solo iconos y separadores
 
-     El slate-500 cumplía sobre blanco (4.76:1) pero no sobre las tarjetas con
-     fondo teñido que usa la app (4.43:1 sobre purple-50, 4.34:1 sobre
-     slate-100), y ahí es donde viven las etiquetas de los formularios.
-
-     Se corrigen aquí, en el token, para arreglar los ~296 usos a la vez sin
-     tocar componente por componente (y sin riesgo de romper diagramaciones).
-     slate-400 queda igual que el slate-500 original: era un escalón que no se
-     podía usar para texto, así que se pierde poco y se gana legibilidad. */
-  --color-slate-500: #5f6f85;  /* peor caso 4.68:1 — apto para texto */
-  --color-slate-400: #64748b;  /* 4.76:1 sobre blanco — apto para texto */
-  --color-slate-300: #8493a9;  /* 3.12:1 — apto para iconos y separadores */
+     Se corrige aquí, en el token, para llegar de una vez a los ~1000 usos sin
+     tocar componente por componente (y sin riesgo de romper diagramaciones). */
+  --color-slate-50:  #f7f5f0;
+  --color-slate-100: #efece5;
+  --color-slate-200: #e4dfd5;
+  --color-slate-300: #8a978f;
+  --color-slate-400: #5e6d66;
+  --color-slate-500: #56655d;
+  --color-slate-600: #43514a;
+  --color-slate-700: #33413a;
+  --color-slate-800: #1f2a25;
+  --color-slate-900: #141d19;
 }
 
 :root {
-  --bg-primary: #f8fafc;       /* slate-50 */
+  --bg-primary: #f7f5f0;       /* crema */
   --bg-card: #ffffff;
   --bg-header: #ffffff;
-  --text-primary: #1e293b;     /* slate-800 */
-  --text-secondary: #64748b;   /* slate-500 */
-  --border-color: #e2e8f0;     /* slate-200 */
-  --hover-bg: #f1f5f9;         /* slate-100 */
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.06);
+  --text-primary: #1f2a25;
+  --text-secondary: #56655d;
+  --border-color: #e4dfd5;
+  --hover-bg: #efece5;
+  --shadow-card: 0 1px 2px rgba(31, 42, 37, 0.05), 0 8px 24px -16px rgba(31, 42, 37, 0.25);
   --input-bg: #ffffff;
 }
 
@@ -57,13 +83,18 @@
 
 body {
   margin: 0;
-  font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  /* Inter trae las cifras con ancho variable; en columnas de horas, pesos y
-     dosis eso hace que los números "bailen" al actualizarse. */
+  /* Las cifras con ancho variable hacen que los números "bailen" al
+     actualizarse en columnas de horas, pesos y dosis. */
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+}
+
+h1, h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 #root { width: 100%; min-height: 100vh; display: flex; }
@@ -71,9 +102,111 @@ body {
 /* El foco del teclado tiene que verse: se navega con Tab entre campos de la
    historia clínica y sin esto no se sabe dónde se está parado. */
 :focus-visible {
-  outline: 2px solid #a855f7;
+  outline: 2px solid var(--color-brand-500);
   outline-offset: 2px;
 }
+
+/* ── Componentes ─────────────────────────────────────────────────────────────
+   Mismas piezas que la cafetería (tarjeta, campo, botón) para que las dos
+   apps se sientan de la misma mano. Las pantallas nuevas las usan; las viejas
+   siguen con utilidades de Tailwind y se van pasando por tandas.
+
+   Van dentro de `@layer components` a propósito: fuera de esa capa ganarían
+   sobre cualquier utilidad (`pl-10`, `w-full`…) y no se podrían ajustar.     */
+@layer components {
+  .panel {
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Título de una sección dentro de un panel: sin barra gris de fondo, para que
+     el contenido —no el marco— lleve la atención. */
+  .panel-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem 0.75rem;
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+
+  .etiqueta {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-slate-400);
+  }
+
+  .btn-marca {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 0.6rem 1.1rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #fff;
+    background: var(--color-brand-600);
+    border: 0;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.06s;
+  }
+  .btn-marca:hover { background: var(--color-brand-700); }
+  .btn-marca:active { transform: translateY(1px); }
+  .btn-marca:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-borde {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 0.6rem 1.1rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--color-brand-700);
+    background: #fff;
+    border: 1px solid var(--color-slate-200);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-borde:hover { background: var(--color-brand-50); border-color: var(--color-brand-200); }
+  .btn-borde:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .campo {
+    width: 100%;
+    border: 1.5px solid var(--color-slate-200);
+    background: #fff;
+    border-radius: 0.75rem;
+    padding: 0.7rem 1rem;
+    font-size: 1rem;
+    color: var(--color-slate-800);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .campo:focus {
+    outline: none;
+    border-color: var(--color-brand-500);
+    box-shadow: 0 0 0 4px rgba(55, 119, 106, 0.16);
+  }
+}
+
+/* Barra de desplazamiento fina y discreta, como la de CorAll: la nativa de
+   Windows es gris claro y muy ancha, y sobre el menú oscuro parecía un error. */
+.scroll-fino { scrollbar-width: thin; scrollbar-color: #cfc9bd transparent; }
+.scroll-fino-oscuro { scrollbar-color: #2a4a3d transparent; }
+
+/* Entrada suave al cambiar de pantalla. */
+@keyframes subir {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animar { animation: subir 0.3s ease both; }
 
 /* En el celular, ningún campo por debajo de 16px.
  *

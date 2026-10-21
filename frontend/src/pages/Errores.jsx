@@ -14,7 +14,7 @@ const fmtFechaHora = (iso) => iso
 
 const ORIGEN = {
   frontend: { label: 'Navegador', Icon: Monitor, cls: 'bg-sky-100 text-sky-800' },
-  backend:  { label: 'Servidor',  Icon: Server,  cls: 'bg-purple-100 text-purple-800' },
+  backend:  { label: 'Servidor',  Icon: Server,  cls: 'bg-brand-100 text-brand-800' },
 }
 
 /**
@@ -71,11 +71,11 @@ export default function Errores() {
           <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
             <input type="checkbox" checked={soloPendientes}
               onChange={e => setSoloPendientes(e.target.checked)}
-              className="rounded border-slate-300 text-purple-600 focus:ring-purple-300" />
+              className="rounded border-slate-300 text-brand-600 focus:ring-brand-300" />
             Solo sin revisar
           </label>
           <button onClick={refrescar} disabled={refrescando}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${refrescando ? 'animate-spin' : ''}`} /> Actualizar
           </button>
         </div>
@@ -137,7 +137,7 @@ export default function Errores() {
                       {e.detalle && (
                         <button onClick={() => setAbierto(expandido ? null : e.id)}
                           title={expandido ? 'Ocultar detalle' : 'Ver detalle técnico'}
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-purple-700 hover:bg-purple-50 transition">
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-brand-700 hover:bg-brand-50 transition">
                           {expandido ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                         </button>
                       )}

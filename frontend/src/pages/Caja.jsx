@@ -1,3 +1,4 @@
+import { PDF_MARCA } from '../core/color'
 import { useState, useEffect } from 'react'
 import { Wallet, Banknote, CreditCard, Smartphone, FileText, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { jsPDF } from 'jspdf'
@@ -20,7 +21,7 @@ const fechaLocal = () => {
 const METODO_INFO = {
   efectivo: { label: 'Efectivo', Icon: Banknote,   color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
   tarjeta:  { label: 'Tarjeta',  Icon: CreditCard,  color: 'text-sky-600',     bg: 'bg-sky-50',     border: 'border-sky-200' },
-  yape:     { label: 'Yape',     Icon: Smartphone,  color: 'text-purple-600',  bg: 'bg-purple-50',  border: 'border-purple-200' },
+  yape:     { label: 'Yape',     Icon: Smartphone,  color: 'text-brand-600',  bg: 'bg-brand-50',  border: 'border-brand-200' },
   plin:     { label: 'Plin',     Icon: Smartphone,  color: 'text-cyan-600',    bg: 'bg-cyan-50',    border: 'border-cyan-200' },
 }
 
@@ -128,7 +129,7 @@ function ArqueoCaja({ fecha, esperado, cierre, onCerrado }) {
               type="number" step="0.01" min="0" value={contado}
               onChange={e => setContado(e.target.value)}
               placeholder="0.00"
-              className="w-36 text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white tabular-nums focus:outline-none focus:ring-2 focus:ring-purple-300"
+              className="w-36 text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-300"
             />
           </div>
           {diferencia !== null && (
@@ -151,7 +152,7 @@ function ArqueoCaja({ fecha, esperado, cierre, onCerrado }) {
             <input
               type="text" value={notas} onChange={e => setNotas(e.target.value)}
               placeholder="Ej. se dio un vuelto de más en la mañana"
-              className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-300"
+              className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-300"
             />
           </div>
         )}
@@ -196,8 +197,8 @@ export default function Caja() {
   const exportarPDF = () => {
     if (!data) return
     const doc = new jsPDF({ unit: 'mm', format: 'a4' })
-    const morado = [88, 28, 135]
-    doc.setFillColor(...morado); doc.rect(0, 0, 210, 24, 'F')
+    const marca = PDF_MARCA
+    doc.setFillColor(...marca); doc.rect(0, 0, 210, 24, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(15); doc.setFont(undefined, 'bold')
     doc.text(clinicaActual().nombre, 14, 11)
@@ -209,8 +210,8 @@ export default function Caja() {
       head: [['Método de pago', 'N° ventas', 'Total']],
       body: data.por_metodo.map(m => [METODO_INFO[m.metodo]?.label ?? m.metodo, m.cantidad, fmtMoneda(m.total)]),
       foot: [['TOTAL', data.num_ventas, fmtMoneda(data.total)]],
-      headStyles: { fillColor: morado, fontSize: 9 },
-      footStyles: { fillColor: [243, 240, 250], textColor: morado, fontStyle: 'bold' },
+      headStyles: { fillColor: marca, fontSize: 9 },
+      footStyles: { fillColor: [238, 246, 243], textColor: marca, fontStyle: 'bold' },
       styles: { fontSize: 9 }, margin: { left: 14, right: 14 },
     })
     if (data.ventas.length) {
@@ -221,7 +222,7 @@ export default function Caja() {
           `B-${String(v.id).padStart(6, '0')}`, fmtHora(v.hora), v.cliente,
           METODO_INFO[v.metodo_pago]?.label ?? v.metodo_pago, fmtMoneda(v.total),
         ]),
-        headStyles: { fillColor: morado, fontSize: 8.5 },
+        headStyles: { fillColor: marca, fontSize: 8.5 },
         styles: { fontSize: 8, cellPadding: 2 }, margin: { left: 14, right: 14 },
       })
     }
@@ -238,9 +239,9 @@ export default function Caja() {
         </div>
         <div className="flex items-center gap-2">
           <input type="date" value={fecha} max={hoy} onChange={e => setFecha(e.target.value)}
-            className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            className="text-sm px-3 py-2 border border-slate-200 rounded-lg bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-brand-300" />
           <button onClick={exportarPDF} disabled={!data || data.num_ventas === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition disabled:opacity-50">
+            className="flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow transition disabled:opacity-50">
             <FileText className="w-4 h-4" /> Exportar PDF
           </button>
         </div>
@@ -252,18 +253,18 @@ export default function Caja() {
         ) : (
           <>
             {/* Total del día */}
-            <div className="bg-gradient-to-r from-purple-700 to-violet-600 rounded-2xl px-7 py-6 text-white shadow-md flex items-center justify-between">
+            <div className="bg-gradient-to-r from-brand-700 to-brand-600 rounded-2xl px-7 py-6 text-white shadow-md flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center">
                   <Wallet className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-purple-200 text-sm font-medium">Total recaudado</p>
+                  <p className="text-brand-200 text-sm font-medium">Total recaudado</p>
                   <p className="text-3xl font-bold">{fmtMoneda(data.total)}</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-purple-200 text-sm">Ventas del día</p>
+                <p className="text-brand-200 text-sm">Ventas del día</p>
                 <p className="text-2xl font-bold">{data.num_ventas}</p>
               </div>
             </div>

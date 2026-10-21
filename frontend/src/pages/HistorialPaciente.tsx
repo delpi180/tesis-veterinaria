@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Stethoscope, Download, FileText, Weight, CalendarClock, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, LayoutDashboard, Bug, Scissors, Microscope, Pill } from 'lucide-react'
+import { Avatar, Button, Card, Col, Flex, Row, Space, Statistic, Tabs, Tag, Typography } from 'antd'
+import { LeftOutlined, DownloadOutlined, MedicineBoxOutlined } from '@ant-design/icons'
+import { BRAND, PDF_MARCA } from '@src/core/color'
+import { Download, FileText, Weight, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, LayoutDashboard, Bug, Scissors, Microscope, Pill } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+
+// autoTable deja en el documento dónde terminó la última tabla; el tipo de jsPDF no lo declara.
+const _ultimaTabla = (d: jsPDF) => (d as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
 import { api, esVeterinario } from '../services/api'
 import { useConfirmar } from '../components/Confirmar'
 import { Skeleton, SkeletonFilas, SkeletonTexto } from '../components/Skeleton'
@@ -60,7 +66,7 @@ function DSec({ title, show, children }) {
   if (!show) return null
   return (
     <div className="pt-2 first:pt-0">
-      <p className="text-xs font-semibold uppercase tracking-wide text-purple-700 mb-1">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-brand-700 mb-1">{title}</p>
       <div className="space-y-0.5 pl-1">{children}</div>
     </div>
   )
@@ -81,19 +87,19 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
 
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
-      <div className="flex items-stretch bg-purple-700 text-white">
+      <div className="flex items-stretch bg-brand-700 text-white">
         <button
           onClick={() => setOpen(o => !o)}
-          className="flex-1 flex items-center justify-between px-4 py-2.5 hover:bg-purple-800 text-left transition min-w-0"
+          className="flex-1 flex items-center justify-between px-4 py-2.5 hover:bg-brand-800 text-left transition min-w-0"
         >
           <div className="min-w-0">
             <span className="text-sm font-semibold">{fmtFechaHora(h.fecha || h.creado_en)}</span>
-            <span className="block text-xs text-purple-200 truncate">
+            <span className="block text-xs text-brand-200 truncate">
               {h.motivo_consulta || '(sin motivo)'}
               {h.diagnostico_presuntivo ? ` · Dx: ${h.diagnostico_presuntivo}` : ''}
             </span>
             {h.veterinario_nombre && (
-              <span className="block text-xs text-purple-200/90 truncate">
+              <span className="block text-xs text-brand-200/90 truncate">
                 Atendido por: {h.veterinario_nombre}
               </span>
             )}
@@ -108,7 +114,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
         <button
           onClick={() => fichaConsultaPDF(paciente, cliente, h)}
           title="Descargar esta consulta en PDF"
-          className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-purple-800 transition shrink-0"
+          className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-brand-800 transition shrink-0"
         >
           <Download className="w-4 h-4" />
         </button>
@@ -116,7 +122,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
           <button
             onClick={() => onEdit(h)}
             title="Editar esta consulta"
-            className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-purple-800 transition shrink-0"
+            className="px-3 flex items-center justify-center border-l border-white/20 hover:bg-brand-800 transition shrink-0"
           >
             <Pencil className="w-4 h-4" />
           </button>
@@ -183,7 +189,7 @@ function HistoriaCard({ h, paciente, cliente, defaultOpen, onEdit, onDelete }) {
 
 // ── Gráfico de evolución clínica (peso / T° / FC / FR) ───────────────────────
 const METRICAS = [
-  { key: 'peso_kg',                 label: 'Peso',        unidad: 'kg',  color: '#7c3aed' },
+  { key: 'peso_kg',                 label: 'Peso',        unidad: 'kg',  color: '#2e6d5a' },
   { key: 'temperatura_c',           label: 'Temperatura', unidad: '°C',  color: '#f59e0b' },
   { key: 'frecuencia_cardiaca',     label: 'Frec. cardiaca', unidad: 'lpm', color: '#ef4444' },
   { key: 'frecuencia_respiratoria', label: 'Frec. respiratoria', unidad: 'rpm', color: '#0ea5e9' },
@@ -195,7 +201,7 @@ function GraficoEvolucion({ historias }) {
 
   // Cronológico ascendente, solo consultas con valor para la métrica elegida
   const puntos = [...historias]
-    .sort((a, b) => new Date(a.fecha || a.creado_en) - new Date(b.fecha || b.creado_en))
+    .sort((a, b) => new Date(a.fecha || a.creado_en).getTime() - new Date(b.fecha || b.creado_en).getTime())
     .filter(h => h[metrica] != null)
     .map(h => ({
       fecha: new Date(h.fecha || h.creado_en).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }),
@@ -207,9 +213,9 @@ function GraficoEvolucion({ historias }) {
   if (disponibles.length === 0) return null
 
   return (
-    <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <section className="panel overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2 flex-wrap">
-        <TrendingUp className="w-4 h-4 text-purple-500" />
+        <TrendingUp className="w-4 h-4 text-brand-500" />
         <h2 className="text-sm font-semibold text-slate-700">Evolución clínica</h2>
         <div className="ml-auto flex items-center gap-1.5 flex-wrap">
           {disponibles.map(x => (
@@ -261,7 +267,7 @@ function GraficoEvolucion({ historias }) {
 }
 
 // ── Helpers PDF compartidos ──────────────────────────────────────────────────
-const _MORADO = [88, 28, 135]
+const _MARCA = PDF_MARCA
 const _W = 210, _M = 14
 
 function _seccion(doc, title, rows) {
@@ -272,7 +278,7 @@ function _seccion(doc, title, rows) {
     head: [[{ content: title, colSpan: 2 }]],
     body,
     theme: 'grid',
-    headStyles: { fillColor: _MORADO, fontSize: 9, halign: 'left', textColor: 255 },
+    headStyles: { fillColor: _MARCA, fontSize: 9, halign: 'left', textColor: 255 },
     columnStyles: {
       0: { cellWidth: 42, fontStyle: 'bold', textColor: [90, 90, 90] },
       1: { cellWidth: _W - 2 * _M - 42 },
@@ -335,7 +341,7 @@ function _seccionesClinicas(doc, h) {
 }
 
 function _cabecera(doc, subtitulo, derechaArriba, derechaAbajo) {
-  doc.setFillColor(..._MORADO)
+  doc.setFillColor(..._MARCA)
   doc.rect(0, 0, _W, 24, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFontSize(15); doc.setFont(undefined, 'bold')
@@ -369,16 +375,16 @@ function generarPDF(paciente, cliente, historias) {
 
   // Cronológico ascendente (de la más antigua a la más reciente)
   const orden = [...(historias || [])].sort(
-    (a, b) => new Date(a.fecha || a.creado_en) - new Date(b.fecha || b.creado_en))
+    (a, b) => new Date(a.fecha || a.creado_en).getTime() - new Date(b.fecha || b.creado_en).getTime())
 
   orden.forEach((h, i) => {
     autoTable(doc, {
-      startY: (doc.lastAutoTable ? doc.lastAutoTable.finalY : 26) + 6,
+      startY: (_ultimaTabla(doc)?.finalY ?? 26) + 6,
       body: [[`Consulta ${i + 1} — ${fmtFechaHora(h.fecha || h.creado_en)}` +
         (h.tipo_consulta ? ` · ${getLabel('tipo_consulta', h.tipo_consulta)}` : '') +
         (h.veterinario_nombre ? ` · Atendido por: ${h.veterinario_nombre}` : '')]],
       theme: 'plain',
-      styles: { fontSize: 11, fontStyle: 'bold', textColor: _MORADO, cellPadding: { top: 2, bottom: 1, left: 0 } },
+      styles: { fontSize: 11, fontStyle: 'bold', textColor: _MARCA, cellPadding: { top: 2, bottom: 1, left: 0 } },
       margin: { left: _M, right: _M },
     })
     _seccionesClinicas(doc, h)
@@ -396,7 +402,7 @@ function fichaConsultaPDF(paciente, cliente, h) {
   _seccionesClinicas(doc, h)
 
   // Firma
-  const y = Math.min(doc.lastAutoTable.finalY + 22, 280)
+  const y = Math.min((_ultimaTabla(doc)?.finalY ?? 26) + 22, 280)
   doc.setDrawColor(150); doc.setLineWidth(0.3)
   doc.line(_W - _M - 70, y, _W - _M, y)
   doc.setTextColor(110); doc.setFontSize(9)
@@ -479,7 +485,7 @@ export default function HistorialPaciente() {
 
   // Más reciente primero
   const ordenadas = [...historias].sort(
-    (a, b) => new Date(b.fecha || b.creado_en) - new Date(a.fecha || a.creado_en))
+    (a, b) => new Date(b.fecha || b.creado_en).getTime() - new Date(a.fecha || a.creado_en).getTime())
   const ultima = ordenadas[0] ?? null
   const pesoActual = ordenadas.find(h => h.peso_kg != null)?.peso_kg ?? null
   const proximaCita = ordenadas.map(h => h.proxima_cita).find(Boolean) ?? null
@@ -506,80 +512,85 @@ export default function HistorialPaciente() {
   ]
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col min-h-screen bg-slate-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-4 flex items-center gap-3 static md:sticky md:top-0 md:z-10 flex-wrap">
-        <button onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-purple-700 transition font-medium shrink-0">
-          <ChevronLeft className="w-4 h-4" /> Volver
-        </button>
-        <span className="text-slate-300">/</span>
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold text-slate-800 truncate">
-            Historial — {paciente?.nombre ?? `Paciente #${pacienteId}`}
-          </h1>
-          {paciente && (
-            <p className="text-xs text-slate-400">
-              {paciente.especie}{paciente.raza ? ` · ${paciente.raza}` : ''}
-              {paciente.edad != null ? ` · ${paciente.edad} año${paciente.edad !== 1 ? 's' : ''}` : ''}
-              {cliente?.nombre ? ` · ${cliente.nombre}` : ''}
-            </p>
-          )}
-        </div>
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => generarPDF(paciente, cliente, ordenadas)}
-            disabled={ordenadas.length === 0}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-40"
-          >
-            <Download className="w-4 h-4" /> PDF
-          </button>
-          <button
-            onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente } })}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg shadow-sm transition"
-          >
-            <Stethoscope className="w-4 h-4" /> Atender / Nueva consulta
-          </button>
-        </div>
-      </header>
+    <div className="flex-1 min-w-0 flex flex-col min-h-screen">
+      <main className="flex-1 min-w-0 px-4 md:px-8 pt-6 md:pt-8 pb-8 flex flex-col gap-5 max-w-4xl w-full mx-auto animar">
 
-      <main className="flex-1 min-w-0 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
+        {/* Identidad del paciente. Antes era una barra blanca fija con
+            "Historial — Nombre" y una línea de datos en gris claro; ahora lo
+            primero que se ve es QUIÉN es el paciente, que es lo que se
+            necesita confirmar antes de tocar su historia. */}
+        <div>
+          <Button type="link" icon={<LeftOutlined />} onClick={() => navigate(-1)}
+            style={{ padding: 0, height: 'auto', marginBottom: 12 }}>
+            Volver
+          </Button>
+          <Flex justify="space-between" align="flex-start" wrap gap={16}>
+            <Flex gap={16} align="center" style={{ minWidth: 0 }}>
+              <Avatar size={64} style={{ background: BRAND.primary, fontSize: 28, fontWeight: 700, flexShrink: 0 }}>
+                {(paciente?.nombre ?? '?').charAt(0).toUpperCase()}
+              </Avatar>
+              <div style={{ minWidth: 0 }}>
+                <Typography.Title level={2} ellipsis style={{ margin: 0 }}>
+                  {paciente?.nombre ?? `Paciente #${pacienteId}`}
+                </Typography.Title>
+                {paciente && (
+                  <Space wrap size={[6, 6]} style={{ marginTop: 6 }}>
+                    {paciente.especie && <Tag color="green" variant="filled">{paciente.especie}</Tag>}
+                    {paciente.raza && <Tag>{paciente.raza}</Tag>}
+                    {paciente.edad != null && <Tag>{paciente.edad} año{paciente.edad !== 1 ? 's' : ''}</Tag>}
+                  </Space>
+                )}
+                {cliente?.nombre && (
+                  <div style={{ marginTop: 6 }}>
+                    <Typography.Text type="secondary">Dueño: </Typography.Text>
+                    <Typography.Text strong>{cliente.nombre}</Typography.Text>
+                  </div>
+                )}
+              </div>
+            </Flex>
+            <Space wrap>
+              <Button icon={<DownloadOutlined />} disabled={ordenadas.length === 0}
+                onClick={() => generarPDF(paciente, cliente, ordenadas)}>
+                PDF
+              </Button>
+              <Button type="primary" icon={<MedicineBoxOutlined />}
+                onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente } })}>
+                Atender / Nueva consulta
+              </Button>
+            </Space>
+          </Flex>
+        </div>
 
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">⚠ {error}</div>
         )}
 
-        {/* Barra de pestañas (estilo ficha del paciente).
-            `min-w-0` es lo que hace efectivo al `overflow-x-auto`: dentro de un
-            contenedor flex, un hijo no baja de su ancho de contenido salvo que
-            se le permita, y sin eso las pestañas estiraban la página a 896 px
-            en móvil (se desplazaba de lado toda la ficha en vez de solo ellas). */}
-        <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto min-w-0">
-          {TABS.map(({ id, label, Icon, count }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition ${
-                tab === id
-                  ? 'border-purple-600 text-purple-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <Icon className="w-4 h-4" /> {label}
-              {count != null && count > 0 && (
-                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${tab === id ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-500'}`}>{count}</span>
-              )}
-            </button>
-          ))}
-        </div>
+        {/* Pestañas (estilo ficha del paciente). Ahora son el Tabs de Ant Design:
+            en móvil se desplazan solas dentro de su caja, sin estirar la página
+            (el `min-w-0` y el `overflow-x-auto` que hacían falta a mano). */}
+        <Tabs
+          activeKey={tab}
+          onChange={setTab}
+          style={{ minWidth: 0 }}
+          items={TABS.map(({ id, label, Icon, count }) => ({
+            key: id,
+            icon: <Icon size={15} />,
+            label: (
+              <span>
+                {label}
+                {count != null && count > 0 && <Tag style={{ marginInlineStart: 8, marginInlineEnd: 0 }}>{count}</Tag>}
+              </span>
+            ),
+          }))}
+        />
 
         {loading ? (
           <>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
+            <div className="panel p-5 space-y-3">
               <Skeleton className="h-4 w-1/3" />
               <SkeletonTexto lineas={3} />
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="panel overflow-hidden">
               <SkeletonFilas filas={4} conAvatar={false} />
             </div>
           </>
@@ -588,44 +599,20 @@ export default function HistorialPaciente() {
             {/* ── RESUMEN ─────────────────────────────────────────────────── */}
             {tab === 'resumen' && (
               <div className="flex flex-col gap-5">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
-                    <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center">
-                      <ClipboardList className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-400 font-medium">Consultas</p>
-                      <p className="text-xl font-bold text-slate-800">{historias.length}</p>
-                    </div>
-                  </div>
-                  <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
-                    <div className="w-9 h-9 rounded-lg bg-sky-100 flex items-center justify-center">
-                      <FileText className="w-4 h-4 text-sky-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-400 font-medium">Última visita</p>
-                      <p className="text-sm font-bold text-slate-800">{ultima ? fmtFecha(ultima.fecha || ultima.creado_en) : '—'}</p>
-                    </div>
-                  </div>
-                  <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
-                    <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center">
-                      <Weight className="w-4 h-4 text-amber-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-400 font-medium">Peso reciente</p>
-                      <p className="text-sm font-bold text-slate-800">{pesoActual != null ? `${pesoActual} kg` : '—'}</p>
-                    </div>
-                  </div>
-                  <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-3 shadow-sm">
-                    <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center">
-                      <CalendarClock className="w-4 h-4 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-400 font-medium">Próxima cita</p>
-                      <p className="text-sm font-bold text-slate-800">{proximaCita ? fmtFecha(proximaCita) : 'Sin programar'}</p>
-                    </div>
-                  </div>
-                </div>
+                <Row gutter={[12, 12]}>
+                  {[
+                    { titulo: 'Consultas', valor: historias.length },
+                    { titulo: 'Última visita', valor: ultima ? fmtFecha(ultima.fecha || ultima.creado_en) : '—' },
+                    { titulo: 'Peso reciente', valor: pesoActual != null ? `${pesoActual} kg` : '—' },
+                    { titulo: 'Próxima cita', valor: proximaCita ? fmtFecha(proximaCita) : 'Sin programar' },
+                  ].map(({ titulo, valor }) => (
+                    <Col key={titulo} xs={12} md={6}>
+                      <Card size="small">
+                        <Statistic title={titulo} value={valor} styles={{ content: { fontSize: 20, fontWeight: 700 } }} />
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
                 {historias.length > 0 && <GraficoEvolucion historias={historias} />}
               </div>
             )}
@@ -657,7 +644,7 @@ export default function HistorialPaciente() {
 
             {/* ── VACUNAS ─────────────────────────────────────────────────── */}
             {tab === 'vacunas' && (
-              <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <section className="panel overflow-hidden">
                 {vacunas.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                     <Syringe className="w-7 h-7 mb-2 opacity-40" />
@@ -692,7 +679,7 @@ export default function HistorialPaciente() {
             {tab === 'peso' && (
               <div className="flex flex-col gap-5">
                 {historias.length > 0 && <GraficoEvolucion historias={historias} />}
-                <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <section className="panel overflow-hidden">
                   {pesos.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                       <Weight className="w-7 h-7 mb-2 opacity-40" />

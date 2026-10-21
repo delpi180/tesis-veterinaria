@@ -26,7 +26,7 @@ function PanelEstadistico({ estad }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-5">
       <div className="flex items-center gap-2">
-        <Sigma className="w-5 h-5 text-purple-600" />
+        <Sigma className="w-5 h-5 text-brand-600" />
         <h3 className="text-sm font-bold text-slate-800">Rigor estadístico</h3>
         <span className="text-xs text-slate-400">N = {n_evaluadores} evaluadores</span>
       </div>
@@ -54,7 +54,7 @@ function PanelEstadistico({ estad }) {
             <p className="text-xs text-slate-500 mt-1">IC 95%: <strong>[{fmtN(sus.ic95_low)} – {fmtN(sus.ic95_high)}]</strong></p>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">{ip.adjetivo}</span>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700">{ip.adjetivo}</span>
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ip.aceptabilidad === 'Aceptable' ? 'bg-emerald-100 text-emerald-700' : ip.aceptabilidad === 'Marginal' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>{ip.aceptabilidad}</span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Percentil {fmtN(ip.percentil)}</span>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Nota {ip.nota}</span>
@@ -98,7 +98,14 @@ const fmtSeg = (s) => {
   return m ? `${m}m ${r}s` : `${r}s`
 }
 
-// ── Panel: Tiempo de registro (manual vs IA) ─────────────────────────────────
+// Cómo se llama cada método de registro en pantalla y en el Excel
+const METODOS = {
+  ia:     { texto: 'Con IA',        csv: 'IA',     pill: 'bg-brand-100 text-brand-700' },
+  manual: { texto: 'Manual',        csv: 'Manual', pill: 'bg-amber-100 text-amber-700' },
+}
+const metodoDe = (m) => METODOS[m] ?? METODOS.manual
+
+// ── Panel: Tiempo de registro (manual vs IA, mismo formulario) ───────────────
 function TiemposPanel() {
   const [d, setD] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -122,7 +129,7 @@ function TiemposPanel() {
 
   const chart = [
     { metodo: 'Manual', seg: d.manual.promedio_seg || 0, fill: '#f59e0b' },
-    { metodo: 'Con IA', seg: d.ia.promedio_seg || 0, fill: '#7c3aed' },
+    { metodo: 'Con IA', seg: d.ia.promedio_seg || 0, fill: '#2e6d5a' },
   ]
 
   return (
@@ -136,9 +143,9 @@ function TiemposPanel() {
           <p className="text-2xl font-bold text-slate-800">{fmtSeg(d.manual.promedio_seg)}</p>
           <p className="text-xs text-slate-400">{d.manual.n} reg.{d.manual.sd_seg != null ? ` · DE ${fmtSeg(d.manual.sd_seg)}` : ''}</p>
         </div>
-        <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3">
+        <div className="bg-brand-50 border border-brand-200 rounded-xl px-4 py-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-500">Promedio con IA</p><Sparkles className="w-4 h-4 text-purple-500" />
+            <p className="text-xs text-slate-500">Promedio con IA</p><Sparkles className="w-4 h-4 text-brand-500" />
           </div>
           <p className="text-2xl font-bold text-slate-800">{fmtSeg(d.ia.promedio_seg)}</p>
           <p className="text-xs text-slate-400">{d.ia.n} reg.{d.ia.sd_seg != null ? ` · DE ${fmtSeg(d.ia.sd_seg)}` : ''}</p>
@@ -158,6 +165,7 @@ function TiemposPanel() {
           <p className="text-xs text-slate-400">historias</p>
         </div>
       </div>
+
 
       {/* Significancia estadística (prueba t de Welch) */}
       {d.prueba_t && (
@@ -202,20 +210,20 @@ function TiemposPanel() {
       {/* Historial de registros cronometrados */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-          <Timer className="w-4 h-4 text-purple-500" />
+          <Timer className="w-4 h-4 text-brand-500" />
           <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Historial de registros</h4>
-          <span className="text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{d.recientes.length}</span>
+          <span className="text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{d.recientes.length}</span>
           <button
             onClick={() => {
               if (d.recientes.length === 0) return
               exportarCSV(
                 'Tiempos de documentacion manual vs IA',
                 ['ID', 'Fecha', 'Paciente', 'Metodo', 'Segundos'],
-                d.recientes.map(h => [h.id, h.fecha ? new Date(h.fecha).toISOString() : '', h.paciente, h.metodo === 'ia' ? 'IA' : 'Manual', h.segundos]),
+                d.recientes.map(h => [h.id, h.fecha ? new Date(h.fecha).toISOString() : '', h.paciente, metodoDe(h.metodo).csv, h.segundos]),
               )
             }}
             disabled={d.recientes.length === 0}
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50"
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" /> Excel
           </button>
@@ -238,8 +246,8 @@ function TiemposPanel() {
                   </td>
                   <td className="px-5 py-2.5 font-medium text-slate-700">{h.paciente}</td>
                   <td className="px-5 py-2.5 text-center">
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${h.metodo === 'ia' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
-                      {h.metodo === 'ia' ? 'Con IA' : 'Manual'}
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${metodoDe(h.metodo).pill}`}>
+                      {metodoDe(h.metodo).texto}
                     </span>
                   </td>
                   <td className="px-5 py-2.5 text-right font-bold text-slate-700">{fmtSeg(h.segundos)}</td>
@@ -311,7 +319,7 @@ function ExactitudPanel() {
       </p>
 
       <textarea rows={3} value={texto} onChange={e => setTexto(e.target.value)}
-        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white resize-none"
+        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white resize-none"
         placeholder="Transcripción de la consulta…" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -427,7 +435,7 @@ function ComparativaIA() {
   return (
     <section className="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col gap-4 mt-8">
       <div className="flex items-center gap-2">
-        <Sparkles className="w-5 h-5 text-purple-600" />
+        <Sparkles className="w-5 h-5 text-brand-600" />
         <h3 className="text-sm font-bold text-slate-800">Comparativa: IA vs. método léxico</h3>
       </div>
       <p className="text-xs text-slate-500 -mt-2">
@@ -435,12 +443,12 @@ function ComparativaIA() {
       </p>
       <textarea
         rows={4} value={texto} onChange={e => setTexto(e.target.value)}
-        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white resize-none"
+        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white resize-none"
         placeholder="Pega aquí la transcripción de una consulta…"
       />
       {error && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">{error}</p>}
       <button onClick={comparar} disabled={cargando}
-        className="self-start flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg shadow transition disabled:opacity-50">
+        className="self-start flex items-center gap-2 px-4 py-2 bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold rounded-lg shadow transition disabled:opacity-50">
         <Zap className="w-4 h-4" /> {cargando ? 'Comparando…' : 'Comparar métodos'}
       </button>
 
@@ -449,7 +457,7 @@ function ComparativaIA() {
           <Tarjeta titulo="Método léxico (reglas)" Icon={ClipboardList}
             color={{ bg: 'bg-amber-100', text: 'text-amber-600', bar: 'bg-amber-500' }} dato={res.lexico} />
           <Tarjeta titulo="Método IA (GPT)" Icon={Cpu}
-            color={{ bg: 'bg-purple-100', text: 'text-purple-600', bar: 'bg-purple-600' }} dato={res.ia} />
+            color={{ bg: 'bg-brand-100', text: 'text-brand-600', bar: 'bg-brand-600' }} dato={res.ia} />
         </div>
       )}
     </section>
@@ -493,7 +501,7 @@ const initRespuestas = (n) =>
 
 const inputCls =
   'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 ' +
-  'focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
+  'focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
 
 const TABS = [
@@ -531,7 +539,7 @@ function PreguntaEscala({ numero, texto, valor, onChange, max }) {
   return (
     <div className="flex flex-col gap-3 py-4 border-b border-slate-100 last:border-0">
       <p className="text-sm text-slate-700 leading-relaxed">
-        <span className="font-bold text-purple-700 mr-1.5">{numero}.</span>
+        <span className="font-bold text-brand-700 mr-1.5">{numero}.</span>
         {texto}
       </p>
       <div className="flex items-center gap-3 flex-wrap">
@@ -545,8 +553,8 @@ function PreguntaEscala({ numero, texto, valor, onChange, max }) {
               className={[
                 'w-9 h-9 rounded-full text-sm font-bold transition-all',
                 valor === v
-                  ? 'bg-purple-700 text-white shadow-sm ring-2 ring-purple-300'
-                  : 'bg-slate-100 text-slate-600 hover:bg-purple-100 hover:text-purple-700',
+                  ? 'bg-brand-700 text-white shadow-sm ring-2 ring-brand-300'
+                  : 'bg-slate-100 text-slate-600 hover:bg-brand-100 hover:text-brand-700',
               ].join(' ')}
             >
               {v}
@@ -771,7 +779,7 @@ export default function Mediciones() {
             className={[
               'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all',
               tabActiva === id
-                ? 'border-purple-700 text-purple-700'
+                ? 'border-brand-700 text-brand-700'
                 : 'border-transparent text-slate-500 hover:text-slate-700',
             ].join(' ')}
           >
@@ -793,11 +801,11 @@ export default function Mediciones() {
                   <div key={n} className="flex items-center gap-2">
                     <div className={[
                       'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all',
-                      paso > n ? 'bg-emerald-500 text-white' : paso === n ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-400',
+                      paso > n ? 'bg-emerald-500 text-white' : paso === n ? 'bg-brand-700 text-white' : 'bg-slate-200 text-slate-400',
                     ].join(' ')}>
                       {paso > n ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : n}
                     </div>
-                    <span className={`text-xs font-medium ${paso === n ? 'text-purple-700' : 'text-slate-400'}`}>{label}</span>
+                    <span className={`text-xs font-medium ${paso === n ? 'text-brand-700' : 'text-slate-400'}`}>{label}</span>
                     {i < PASOS.length - 1 && (
                       <div className={`h-px w-8 ${paso > n ? 'bg-emerald-300' : 'bg-slate-200'}`} />
                     )}
@@ -829,7 +837,7 @@ export default function Mediciones() {
                   {errEv && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg">{errEv}</p>}
                   <div className="flex justify-end">
                     <button type="submit" disabled={loadEv}
-                      className="px-5 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+                      className="px-5 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
                       {loadEv ? 'Registrando...' : 'Continuar →'}
                     </button>
                   </div>
@@ -851,7 +859,7 @@ export default function Mediciones() {
                   {errSus && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg mt-3">{errSus}</p>}
                   <div className="py-5 flex justify-end">
                     <button type="submit" disabled={loadSus}
-                      className="px-5 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+                      className="px-5 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
                       {loadSus ? 'Guardando...' : 'Continuar →'}
                     </button>
                   </div>
@@ -873,7 +881,7 @@ export default function Mediciones() {
                   {errTam && <p className="text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-2 rounded-lg mt-3">{errTam}</p>}
                   <div className="py-5 flex justify-end">
                     <button type="submit" disabled={loadTam}
-                      className="px-5 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+                      className="px-5 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
                       {loadTam ? 'Enviando...' : 'Enviar respuestas'}
                     </button>
                   </div>
@@ -895,7 +903,7 @@ export default function Mediciones() {
                   <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" strokeWidth={2.5} />Encuesta TAM registrada</span>
                 </div>
                 <button onClick={reiniciar}
-                  className="mt-3 px-5 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition">
+                  className="mt-3 px-5 py-2 text-sm font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition">
                   Registrar otro evaluador
                 </button>
               </div>
@@ -931,7 +939,7 @@ export default function Mediciones() {
                     )
                   }}
                   disabled={susList.length === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-50"
                 >
                   <Download className="w-3.5 h-3.5" /> SUS (Excel)
                 </button>
@@ -1058,7 +1066,7 @@ export default function Mediciones() {
                       <BarraTAM
                         label="Utilidad Percibida (p1–p5)"
                         valor={resumen.util_percibida_promedio}
-                        hex="#7c3aed"
+                        hex="#2e6d5a"
                       />
                       <BarraTAM
                         label="Facilidad de Uso (p6–p9)"
@@ -1075,7 +1083,7 @@ export default function Mediciones() {
                     {/* Resumen numérico */}
                     <div className="grid grid-cols-3 gap-3 pt-2 border-t border-slate-100">
                       {[
-                        { label: 'Utilidad',   val: resumen.util_percibida_promedio, color: 'text-purple-700' },
+                        { label: 'Utilidad',   val: resumen.util_percibida_promedio, color: 'text-brand-700' },
                         { label: 'Facilidad',  val: resumen.facilidad_uso_promedio,  color: 'text-sky-700'    },
                         { label: 'Intención',  val: resumen.intencion_uso_promedio,  color: 'text-emerald-700'},
                       ].map(({ label, val, color }) => (
@@ -1190,7 +1198,7 @@ export default function Mediciones() {
           <div className="flex flex-col gap-6">
             <div>
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-purple-600" /> Tiempo de registro — Manual vs. IA
+                <Clock className="w-4 h-4 text-brand-600" /> Tiempo de registro — Manual vs. IA
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 Eficiencia documental: cuánto se tarda en llenar una historia con cada método (medido automáticamente).

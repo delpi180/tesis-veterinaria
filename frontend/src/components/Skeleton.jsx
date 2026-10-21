@@ -14,7 +14,7 @@
  */
 
 /** Bloque gris básico. `className` define el tamaño. */
-export function Skeleton({ className = '', style }) {
+export function Skeleton({ className = '', style = undefined }) {
   return (
     <div
       aria-hidden="true"

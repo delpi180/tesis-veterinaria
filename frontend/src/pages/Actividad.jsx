@@ -109,7 +109,7 @@ export default function Actividad() {
 
   const rolPill = (rol) => rol === 'recepcionista'
     ? 'bg-sky-100 text-sky-700'
-    : 'bg-purple-100 text-purple-700'
+    : 'bg-brand-100 text-brand-700'
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-slate-50">
@@ -123,7 +123,7 @@ export default function Actividad() {
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer">
             <input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)}
-              className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-300" />
+              className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-300" />
             Auto-actualizar
           </label>
           <button onClick={exportarCSV} disabled={exportando || total === 0}
@@ -131,7 +131,7 @@ export default function Actividad() {
             <Download className={`w-4 h-4 ${exportando ? 'animate-spin' : ''}`} /> {exportando ? 'Exportando…' : 'Exportar'}
           </button>
           <button onClick={() => cargar()} disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition disabled:opacity-50">
+            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-brand-700 border border-brand-200 rounded-lg hover:bg-brand-50 transition disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar
           </button>
         </div>
@@ -144,9 +144,9 @@ export default function Actividad() {
 
         {/* Filtros */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 mb-4 flex flex-wrap items-center gap-2">
-          <Filter className="w-4 h-4 text-purple-500" />
+          <Filter className="w-4 h-4 text-brand-500" />
           <select value={filtros.usuario} onChange={e => setFiltros(f => ({ ...f, usuario: e.target.value }))}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300">
+            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300">
             <option value="">Todos los usuarios</option>
             {usuarios.map(u => <option key={u.id} value={u.usuario}>{u.nombre} ({u.usuario})</option>)}
           </select>
@@ -155,7 +155,7 @@ export default function Actividad() {
           <input type="date" value={filtros.hasta} onChange={e => setFiltros(f => ({ ...f, hasta: e.target.value }))}
             className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700" />
           <button onClick={buscar}
-            className="px-3 py-1.5 text-sm font-semibold text-white bg-purple-700 hover:bg-purple-600 rounded-lg transition">Buscar</button>
+            className="px-3 py-1.5 text-sm font-semibold text-white bg-brand-700 hover:bg-brand-600 rounded-lg transition">Buscar</button>
           {(filtros.usuario || filtros.desde || filtros.hasta) && (
             <button onClick={limpiar}
               className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700">Limpiar</button>
@@ -164,9 +164,9 @@ export default function Actividad() {
 
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-            <History className="w-4 h-4 text-purple-500" />
+            <History className="w-4 h-4 text-brand-500" />
             <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Últimas acciones</h2>
-            <span className="ml-auto text-xs bg-purple-100 text-purple-700 font-semibold px-2 py-0.5 rounded-full">{total}</span>
+            <span className="ml-auto text-xs bg-brand-100 text-brand-700 font-semibold px-2 py-0.5 rounded-full">{total}</span>
           </div>
 
           {loading && items.length === 0 ? (

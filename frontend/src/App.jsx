@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Sidebar from './components/Sidebar'
+import MenuLateral from './components/MenuLateral'
 import { ToastProvider } from './components/Toast'
 import { ConfirmarProvider } from './components/Confirmar'
 import { CargandoPantalla } from './components/Cargando'
@@ -60,7 +60,7 @@ function AppProtegida() {
     // tabla o barra de pestañas ancha estira TODA la aplicación de lado en
     // móvil, en vez de desplazarse dentro de su propia caja.
     <div className="flex min-w-0 min-h-screen">
-      <Sidebar />
+      <MenuLateral />
       {/* min-w-0 evita que gráficos/tablas anchos rompan el centrado del contenido */}
       <div className="flex-1 min-w-0 flex flex-col pt-12 md:pt-0">
         <Suspense fallback={<CargandoPantalla />}>

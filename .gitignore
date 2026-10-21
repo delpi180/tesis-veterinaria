@@ -31,3 +31,6 @@ backend/backups/
 
 # Migración: CSV con datos personales de clientes + cadena de conexión (no versionar)
 migracion/
+
+# Capturas del navegador de pruebas (pueden tener datos reales de clientes)
+.playwright-mcp/

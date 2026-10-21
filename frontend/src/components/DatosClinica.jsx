@@ -4,7 +4,7 @@ import { api } from '../services/api'
 import { useClinica } from '../services/clinica'
 import { useToast } from './Toast'
 
-const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white'
+const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-300 bg-white'
 const labelCls = 'text-xs font-semibold text-slate-600'
 
 /**
@@ -48,7 +48,7 @@ export default function DatosClinica() {
   return (
     <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <Building2 className="w-4 h-4 text-purple-500" />
+        <Building2 className="w-4 h-4 text-brand-500" />
         <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Datos de la clínica</h2>
       </div>
 
@@ -100,7 +100,7 @@ export default function DatosClinica() {
 
         <div className="flex justify-end">
           <button type="submit" disabled={guardando}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 transition disabled:opacity-50">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand-700 rounded-lg hover:bg-brand-800 transition disabled:opacity-50">
             <Save className="w-4 h-4" /> {guardando ? 'Guardando…' : 'Guardar datos'}
           </button>
         </div>
