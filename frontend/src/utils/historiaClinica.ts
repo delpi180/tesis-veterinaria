@@ -366,6 +366,117 @@ export const CAMPOS_FUERA_DE_VOLKI: (keyof FormConsulta)[] = [
   'examenes_solicitados', 'pronostico', 'vacunas_items',
 ]
 
+/** A qué casilla del formulario de Volki va lo que Volki no tiene cuando la IA lo
+ *  entiende al dictar. Antes se descartaba sin avisar (y el diagnóstico quedaba
+ *  vacío si la IA lo ponía solo como «presuntivo»); ahora va con su etiqueta a
+ *  una casilla que sí existe, para no perder nada. */
+export const DESTINO_VOLKI: Record<string, CampoTexto> = {
+  diagnostico_presuntivo: 'diagnostico_definitivo',
+  diagnosticos_diferenciales: 'diagnostico_definitivo',
+  antecedentes: 'detalle', tiempo_evolucion: 'detalle', linfonodulos: 'detalle',
+  examenes_solicitados: 'indicaciones',
+  frecuencia_cardiaca: 'observaciones', frecuencia_respiratoria: 'observaciones',
+  tllc: 'observaciones', pulso: 'observaciones', pronostico: 'observaciones',
+  tipo_consulta: 'observaciones', vacunas_items: 'observaciones',
+}
+
+/** Minúsculas, sin tildes ni signos y con espacios simples: para comparar textos. */
+function normalizarTexto(t: unknown): string {
+  return String(t ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+/** Agrega `linea` debajo de lo que ya había, salvo que `clave` (el contenido) ya esté escrito. */
+function agregarLinea(actual: string, linea: string, clave: string): string {
+  const base = (actual ?? '').trim()
+  if (normalizarTexto(clave) === '' || normalizarTexto(base).includes(normalizarTexto(clave))) return actual ?? ''
+  return base === '' ? linea : `${base}\n${linea}`
+}
+
+/** Junta textos sin repetir: si uno ya contiene a otro se queda el más largo. */
+function unirUnicos(partes: string[]): string {
+  const out: string[] = []
+  for (const p of partes.map(x => x.trim()).filter(Boolean)) {
+    const n = normalizarTexto(p)
+    // Igual al anterior: queda el último (el definitivo gana al presuntivo)
+    const igual = out.findIndex(o => normalizarTexto(o) === n)
+    if (igual >= 0) { out[igual] = p; continue }
+    if (out.some(o => normalizarTexto(o).includes(n))) continue
+    const j = out.findIndex(o => n.includes(normalizarTexto(o)))
+    if (j >= 0) out[j] = p
+    else out.push(p)
+  }
+  return out.join('; ')
+}
+
+/** Suma `valor` a lo que el doctor ya había escrito en la casilla, sin pisarlo ni repetirlo. */
+function combinarTexto(base: string, valor: string): string {
+  if (!valor) return base
+  if (base.trim() === '') return valor
+  const nb = normalizarTexto(base), nv = normalizarTexto(valor)
+  if (nb.includes(nv)) return base
+  if (nv.includes(nb)) return valor
+  return `${base.trim()}; ${valor}`
+}
+
+const TIPO_CONSULTA_DICHO: Record<string, string> = {
+  primera_vez: 'primera vez', control: 'control', urgencia: 'urgencia / emergencia', vacunacion: 'vacunación',
+}
+
+/** Pasa a casillas de Volki lo que Volki no tiene (ver DESTINO_VOLKI). Modifica `next`.
+ *  Es idempotente: procesar dos veces el mismo dictado no repite nada. */
+export function redirigirAVolki(next: FormConsulta, prev: FormConsulta, datos: DatosIA): void {
+  const txt = (k: string): string => {
+    const v = (datos as Record<string, unknown>)[k]
+    return v === null || v === undefined ? '' : String(v).trim()
+  }
+
+  // Diagnóstico: el presuntivo no se pierde si la IA no dio uno definitivo.
+  const dx = unirUnicos([txt('diagnostico_presuntivo'), txt('diagnostico_definitivo')])
+  if (dx) next.diagnostico_definitivo = combinarTexto(prev.diagnostico_definitivo ?? '', dx)
+  if (txt('diagnosticos_diferenciales'))
+    next.diagnostico_definitivo = agregarLinea(
+      next.diagnostico_definitivo, `Diferenciales: ${txt('diagnosticos_diferenciales')}`, txt('diagnosticos_diferenciales'))
+
+  // Anamnesis
+  for (const [campo, etiqueta] of [
+    ['antecedentes', 'Antecedentes'], ['tiempo_evolucion', 'Evolución'], ['linfonodulos', 'Linfonódulos'],
+  ] as const) {
+    if (txt(campo)) next.detalle = agregarLinea(next.detalle, `${etiqueta}: ${txt(campo)}`, txt(campo))
+  }
+
+  // Indicaciones
+  if (txt('examenes_solicitados'))
+    next.indicaciones = agregarLinea(next.indicaciones, `Exámenes: ${txt('examenes_solicitados')}`, txt('examenes_solicitados'))
+
+  // Observaciones: datos sueltos del dictado y vacunas
+  const piezas: string[] = []
+  if (txt('frecuencia_cardiaca')) piezas.push(`FC ${txt('frecuencia_cardiaca')} lpm`)
+  if (txt('frecuencia_respiratoria')) piezas.push(`FR ${txt('frecuencia_respiratoria')} rpm`)
+  if (txt('tllc')) piezas.push(`TLLC ${txt('tllc')}`)
+  if (txt('pulso')) piezas.push(`Pulso ${txt('pulso')}`)
+  if (txt('pronostico')) piezas.push(`Pronóstico ${txt('pronostico')}`)
+  if (txt('tipo_consulta')) piezas.push(`Tipo de consulta ${TIPO_CONSULTA_DICHO[txt('tipo_consulta')] ?? txt('tipo_consulta')}`)
+  const nuevas = piezas.filter(p => !normalizarTexto(next.observaciones).includes(normalizarTexto(p)))
+  if (nuevas.length > 0)
+    next.observaciones = next.observaciones.trim() === ''
+      ? `Dictado: ${nuevas.join('; ')}`
+      : `${next.observaciones.trim()}\nDictado: ${nuevas.join('; ')}`
+
+  const vacunas = (datos.vacunas_items ?? [])
+    .filter(v => v?.vacuna?.trim())
+    .map(v => {
+      const extra = [v.lote ? `lote ${v.lote}` : '', v.proxima_dosis ? `próxima dosis ${v.proxima_dosis}` : '']
+        .filter(Boolean).join(', ')
+      return extra ? `${v.vacuna!.trim()} (${extra})` : v.vacuna!.trim()
+    })
+    .filter(v => !normalizarTexto(next.observaciones).includes(normalizarTexto(v)))
+  if (vacunas.length > 0)
+    next.observaciones = next.observaciones.trim() === ''
+      ? `Vacunas: ${vacunas.join('; ')}`
+      : `${next.observaciones.trim()}\nVacunas: ${vacunas.join('; ')}`
+}
+
 export function buildPayload(formCompleto: FormConsulta, soloVolki = false) {
   let form = formCompleto
   if (soloVolki) {
@@ -651,14 +762,15 @@ export function ultimoPeso(historias: Historia[]): { kg: string; fecha: string }
 
 // ── Datos que devuelve la IA ────────────────────────────────────────────────
 
-/** Cuenta los campos que la IA logró completar (incluye los sistemas del EOP). */
-export function contarCamposLlenos(datos?: DatosIA | null, soloVolki = false): number {
+/** Cuenta los campos que la IA logró completar (incluye los sistemas del EOP).
+ *  Con el formulario de Volki también cuentan los que van redirigidos a otra
+ *  casilla (ver DESTINO_VOLKI): ya no se descarta nada, así que el número no cambia. */
+export function contarCamposLlenos(datos?: DatosIA | null): number {
   if (!datos) return 0
   const lleno = (v: unknown) => v !== null && v !== undefined && v !== '' &&
     !(Array.isArray(v) && v.length === 0)
   let n = 0
   for (const [k, v] of Object.entries(datos)) {
-    if (soloVolki && (CAMPOS_FUERA_DE_VOLKI as string[]).includes(k)) continue
     if (k === 'examen_particular') {
       n += Object.values(v || {}).filter(lleno).length
     } else if (lleno(v)) {
@@ -718,6 +830,8 @@ export function mezclarDatosIA(
       next[k] = String(val)
     }
   }
+  // Lo que Volki no tiene no se descarta: va con etiqueta a una casilla que sí existe
+  if (soloVolki) redirigirAVolki(next, prev, datos)
   // EOP (Examen objetivo particular por sistemas) - Mezcla inteligente en lugar de sobreescribir todo
   const ep: Record<string, EstadoSistema> = next.examen_particular
     ? Object.fromEntries(

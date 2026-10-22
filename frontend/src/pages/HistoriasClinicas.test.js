@@ -3,7 +3,8 @@ import {
   buildPayload, formularioVacio, normalizarBorrador, esReciente,
 } from './HistoriasClinicas'
 import {
-  armarPayloadConsulta, buscarMedicamento, contarCamposLlenos, describirCuando,
+  armarPayloadConsulta, buscarMedicamento, CAMPOS_FUERA_DE_VOLKI, contarCamposLlenos, describirCuando,
+  DESTINO_VOLKI,
   diasDeDuracion, fechaBaseISO, fechaISOCorta, fechaNumericaPeru, mezclarDatosIA,
   sumarDiasISO,
 } from '@src/utils/historiaClinica'
@@ -146,7 +147,7 @@ describe('armarPayloadConsulta', () => {
   })
 })
 
-describe('la IA en una consulta nueva solo llena los campos de Volki', () => {
+describe('la IA en una consulta nueva no pierde lo que Volki no tiene', () => {
   const datos = {
     motivo_consulta: 'Vómitos', peso_kg: 4.5, diagnostico_definitivo: 'Gastritis',
     antecedentes: 'Cirugía previa', frecuencia_cardiaca: 120, pronostico: 'reservado',
@@ -154,15 +155,6 @@ describe('la IA en una consulta nueva solo llena los campos de Volki', () => {
     vacunas_items: [{ vacuna: 'Antirrábica' }],
     tratamiento_items: [{ medicamento: 'Omeprazol', dosis: '1 mg/kg' }],
   }
-
-  it('ignora lo que Volki no tiene', () => {
-    const r = mezclarDatosIA(formBase(), datos, [], true)
-    expect(r.antecedentes).toBe('')
-    expect(r.frecuencia_cardiaca).toBe('')
-    expect(r.pronostico).toBe('')
-    expect(r.diagnostico_presuntivo).toBe('')
-    expect(r.vacunas_items).toEqual([])
-  })
 
   it('llena lo que sí tiene', () => {
     const r = mezclarDatosIA(formBase(), datos, [], true)
@@ -172,16 +164,108 @@ describe('la IA en una consulta nueva solo llena los campos de Volki', () => {
     expect(r.tratamiento_items).toHaveLength(1)
   })
 
-  it('al corregir una consulta guardada la IA sigue llenando todo', () => {
-    const r = mezclarDatosIA(formBase(), datos, [], false)
+  it('no escribe en las casillas que Volki no tiene', () => {
+    const r = mezclarDatosIA(formBase(), datos, [], true)
+    expect(r.antecedentes).toBe('')
+    expect(r.frecuencia_cardiaca).toBe('')
+    expect(r.pronostico).toBe('')
+    expect(r.diagnostico_presuntivo).toBe('')
+    expect(r.vacunas_items).toEqual([])
+  })
+
+  it('el diagnóstico dictado solo como «presuntivo» llega a la casilla Diagnóstico', () => {
+    const r = mezclarDatosIA(formBase(), { diagnostico_presuntivo: 'Piometra de cuello cerrado' }, [], true)
+    expect(r.diagnostico_definitivo).toBe('Piometra de cuello cerrado')
+  })
+
+  it('con presuntivo y definitivo distintos junta los dos, y no repite si son iguales', () => {
+    const dos = mezclarDatosIA(formBase(), {
+      diagnostico_presuntivo: 'Gastritis', diagnostico_definitivo: 'Gastritis por Helicobacter',
+    }, [], true)
+    expect(dos.diagnostico_definitivo).toBe('Gastritis por Helicobacter')   // el más completo ya contiene al otro
+    const distintos = mezclarDatosIA(formBase(), {
+      diagnostico_presuntivo: 'Parvovirus', diagnostico_definitivo: 'Gastroenteritis hemorrágica',
+    }, [], true)
+    expect(distintos.diagnostico_definitivo).toBe('Parvovirus; Gastroenteritis hemorrágica')
+    const iguales = mezclarDatosIA(formBase(), {
+      diagnostico_presuntivo: 'Otitis externa?', diagnostico_definitivo: 'Otitis externa',
+    }, [], true)
+    expect(iguales.diagnostico_definitivo).toBe('Otitis externa')
+  })
+
+  it('los diferenciales van debajo del diagnóstico con su etiqueta', () => {
+    const r = mezclarDatosIA(formBase(), {
+      diagnostico_presuntivo: 'Cojera', diagnosticos_diferenciales: 'Rotura de ligamento, luxación',
+    }, [], true)
+    expect(r.diagnostico_definitivo).toBe('Cojera\nDiferenciales: Rotura de ligamento, luxación')
+  })
+
+  it('antecedentes, evolución y linfonódulos van a Anamnesis con etiqueta', () => {
+    const r = mezclarDatosIA(formBase(), {
+      detalle: 'Vomita desde ayer', antecedentes: 'Cirugía previa', tiempo_evolucion: '3 días',
+      linfonodulos: 'poplíteos aumentados',
+    }, [], true)
+    expect(r.detalle).toBe(
+      'Vomita desde ayer\nAntecedentes: Cirugía previa\nEvolución: 3 días\nLinfonódulos: poplíteos aumentados')
+  })
+
+  it('los exámenes solicitados van a Indicaciones', () => {
+    const r = mezclarDatosIA(formBase(), { indicaciones: 'Dieta blanda', examenes_solicitados: 'Hemograma' }, [], true)
+    expect(r.indicaciones).toBe('Dieta blanda\nExámenes: Hemograma')
+  })
+
+  it('FC, FR, TLLC, pulso, pronóstico y urgencia dictados quedan en Observaciones', () => {
+    const r = mezclarDatosIA(formBase(), {
+      frecuencia_cardiaca: 120, frecuencia_respiratoria: 28, tllc: 'normal', pulso: 'fuerte',
+      pronostico: 'reservado', tipo_consulta: 'urgencia',
+    }, [], true)
+    expect(r.observaciones).toBe(
+      'Dictado: FC 120 lpm; FR 28 rpm; TLLC normal; Pulso fuerte; Pronóstico reservado; Tipo de consulta urgencia / emergencia')
+  })
+
+  it('las vacunas dictadas quedan en Observaciones con su lote y próxima dosis', () => {
+    const r = mezclarDatosIA(formBase(), {
+      vacunas_items: [{ vacuna: 'Antirrábica', lote: 'AB123', proxima_dosis: '2027-10-21' }, { vacuna: 'Sextuple' }],
+    }, [], true)
+    expect(r.observaciones).toBe('Vacunas: Antirrábica (lote AB123, próxima dosis 2027-10-21); Sextuple')
+    expect(r.vacunas_items).toEqual([])
+  })
+
+  it('agrega debajo de lo que el doctor ya escribió, sin pisarlo', () => {
+    const prev = { ...formBase(), observaciones: 'Dueño llega tarde.', diagnostico_definitivo: 'Gastritis' }
+    const r = mezclarDatosIA(prev, { pronostico: 'bueno', diagnostico_presuntivo: 'Gastritis aguda' }, [], true)
+    expect(r.observaciones).toBe('Dueño llega tarde.\nDictado: Pronóstico bueno')
+    expect(r.diagnostico_definitivo).toBe('Gastritis aguda')   // lo suyo estaba dentro de lo dictado
+    const otro = mezclarDatosIA({ ...formBase(), diagnostico_definitivo: 'Anemia' },
+      { diagnostico_presuntivo: 'Parasitosis' }, [], true)
+    expect(otro.diagnostico_definitivo).toBe('Anemia; Parasitosis')
+  })
+
+  it('procesar dos veces el mismo dictado no repite nada', () => {
+    const una = mezclarDatosIA(formBase(), datos, [], true)
+    const dos = mezclarDatosIA(una, datos, [], true)
+    expect(dos.observaciones).toBe(una.observaciones)
+    expect(dos.detalle).toBe(una.detalle)
+    expect(dos.diagnostico_definitivo).toBe(una.diagnostico_definitivo)
+    expect(dos.indicaciones).toBe(una.indicaciones)
+  })
+
+  it('al corregir una consulta guardada la IA sigue llenando todo, sin redirigir', () => {
+    const r = mezclarDatosIA(formBase(), { ...datos, diagnostico_definitivo: null }, [], false)
     expect(r.antecedentes).toBe('Cirugía previa')
     expect(r.frecuencia_cardiaca).toBe('120')
+    expect(r.diagnostico_presuntivo).toBe('Gastritis?')
+    expect(r.diagnostico_definitivo).toBe('')
+    expect(r.observaciones).toBe('')
     expect(r.vacunas_items).toHaveLength(1)
   })
 
-  it('el resumen «N campos completados» no cuenta lo que se ignora', () => {
-    expect(contarCamposLlenos(datos, true)).toBe(4)   // motivo, peso, diagnóstico, tratamiento
-    expect(contarCamposLlenos(datos, false)).toBe(9)
+  it('cada campo que Volki no tiene tiene casilla de destino', () => {
+    for (const campo of CAMPOS_FUERA_DE_VOLKI) expect(DESTINO_VOLKI[campo]).toBeTruthy()
+  })
+
+  it('el resumen «N campos completados» cuenta todo lo que se entendió', () => {
+    expect(contarCamposLlenos(datos)).toBe(9)
   })
 })
 

@@ -22,26 +22,34 @@ from sqlalchemy.orm import Session
 
 from models import Paciente, Producto
 
-# Vocabulario veterinario general: sirve en cualquier clínica.
+# Vocabulario veterinario general: sirve en cualquier clínica. La terminología
+# clínica amplia (fármacos, diagnósticos, procedimientos) vive en
+# vocabulario_clinico.py; acá quedan las marcas y algunos fármacos de uso diario.
 KEYTERMS_BASE = [
-    # Vacunas
+    # Vacunas y marcas comerciales
     "Nobivac", "Vanguard", "Eurican", "Defensor", "Rabisin", "Bravecto",
-    "Quíntuple", "Séxtuple", "Antirrábica", "Triple felina", "Puppy",
-    # Fármacos
+    "Quíntuple", "Séxtuple", "Antirrábica", "Triple felina", "Cerenia", "Apoquel",
+    # Fármacos de uso diario
     "Amoxicilina", "Metronidazol", "Meloxicam", "Carprofeno", "Enrofloxacina",
-    "Ivermectina", "Cefalexina", "Dexametasona", "Prednisona", "Tramadol",
-    "Maropitant", "Cerenia", "Omeprazol", "Ranitidina", "Furosemida",
-    "Doxiciclina", "Gabapentina", "Apoquel",
+    "Ivermectina", "Cefalexina", "Dexametasona", "Prednisona", "Omeprazol",
+    "Furosemida", "Doxiciclina",
     # Términos clínicos
-    "mucosas", "ictéricas", "cianóticas", "linfonódulos", "taquicardia",
-    "deshidratado", "hematuria", "anorexia", "condición corporal",
+    "mucosas", "ictéricas", "cianóticas", "linfonódulos", "condición corporal",
 ]
 
-# Tope de términos. Deepgram admite más, pero una lista enorme diluye el
-# refuerzo (todo "importante" es nada importante) y encarece la llamada. Se
-# prioriza: primero los medicamentos de la clínica, después las razas que
-# realmente atiende, y al final el vocabulario general.
-MAX_KEYTERMS = 120
+# LÍMITE REAL de Deepgram (nova-3): ~500 tokens de keyterms por pedido, no un
+# número de términos. Se midió con llamadas reales: 90 términos técnicos en
+# español (996 caracteres) pasan; 100 (1168 caracteres) devuelven "Keyterm limit
+# exceeded", y el reintento sin keyterms deja el dictado SIN refuerzo en
+# silencio. Por eso se presupuesta por caracteres, con margen, y no por cantidad.
+# La documentación oficial recomienda además 20 a 50 términos clave.
+MAX_CARACTERES_KEYTERMS = 850
+MAX_KEYTERMS = 120   # tope duro de cantidad; en la práctica manda el presupuesto
+
+# Reparto del presupuesto: lo propio de la clínica (marcas que ningún
+# diccionario conoce) pesa más que la lista general, pero no puede comérselo todo.
+CUOTA_MEDICAMENTOS_CLINICA = 300
+CUOTA_RAZAS = 80
 
 # El inventario cambia poco; consultarlo en cada dictado sería una consulta de
 # más por consulta médica. Se recuerda un rato: cargar un producto nuevo tarda
@@ -88,8 +96,9 @@ def _limpiar(nombre: str) -> str:
     return " ".join(palabras[:3]).strip()
 
 
-def _de_la_base(db: Session) -> list[str]:
-    terminos: list[str] = []
+def _de_la_base(db: Session) -> tuple[list[str], list[str]]:
+    meds: list[str] = []
+    razas_out: list[str] = []
 
     # Medicamentos primero: son los que más se dictan y los que peor se oyen.
     for (nombre,) in (db.query(Producto.nombre)
@@ -98,7 +107,7 @@ def _de_la_base(db: Session) -> list[str]:
                         .all()):
         limpio = _limpiar(nombre)
         if len(limpio) >= 4:
-            terminos.append(limpio)
+            meds.append(limpio)
 
     # Razas que la clínica atiende de verdad, por frecuencia. "Mestizo" domina
     # la lista pero no necesita refuerzo; las que importan son las de nombre
@@ -112,15 +121,63 @@ def _de_la_base(db: Session) -> list[str]:
     for raza, _n in razas:
         limpia = (raza or "").strip()
         if len(limpia) >= 4 and limpia.lower() not in _RAZAS_GENERICAS:
-            terminos.append(limpia)
+            razas_out.append(limpia)
 
-    return terminos
+    return meds, razas_out
+
+
+def _clave_unica(t: str) -> str:
+    """Para no repetir un término por tildes o mayúsculas."""
+    base = unicodedata.normalize("NFKD", t.lower())
+    return "".join(c for c in base if not unicodedata.combining(c)).strip()
+
+
+def _armar(propios_meds: list[str], propias_razas: list[str]) -> list[str]:
+    """Lista final respetando el presupuesto de caracteres de Deepgram.
+
+    Orden de prioridad: medicamentos de la clínica (hasta su cuota), razas
+    (hasta la suya) y luego la terminología clínica general mezclada en ronda
+    por categoría, para que al cortar queden términos de todas y no solo de la
+    primera.
+    """
+    from itertools import zip_longest
+    from services.vocabulario_clinico import CATEGORIAS
+
+    vistos: set[str] = set()
+    final: list[str] = []
+    gastado = 0
+
+    def agregar(t: str, tope: int) -> bool:
+        nonlocal gastado
+        clave = _clave_unica(t)
+        if not clave or clave in vistos:
+            return True            # repetido: se salta, se sigue
+        costo = len(t) + 1
+        if gastado + costo > tope or len(final) >= MAX_KEYTERMS:
+            return False
+        vistos.add(clave)
+        final.append(t)
+        gastado += costo
+        return True
+
+    for t in propios_meds:
+        agregar(t, CUOTA_MEDICAMENTOS_CLINICA)   # uno largo no cabe: se prueba con el siguiente
+    tope_razas = gastado + CUOTA_RAZAS
+    for t in propias_razas:
+        agregar(t, tope_razas)
+
+    general = [t for tupla in zip_longest(KEYTERMS_BASE[:12], *CATEGORIAS)
+               for t in tupla if t]
+    general += KEYTERMS_BASE[12:]
+    for t in general:
+        agregar(t, MAX_CARACTERES_KEYTERMS)      # un largo no cabe, uno corto más adelante sí
+    return final
 
 
 def keyterms(db: Session | None = None) -> list[str]:
-    """Vocabulario final, sin repetidos y acotado.
+    """Vocabulario final, sin repetidos y dentro del límite de Deepgram.
 
-    Si la base no responde se devuelve la lista base: un dictado no puede
+    Si la base no responde se devuelve la lista general: un dictado no puede
     fallar porque el vocabulario no se pudo armar.
     """
     global _cache
@@ -128,24 +185,15 @@ def keyterms(db: Session | None = None) -> list[str]:
     if _cache and (ahora - _cache[0]) < _TTL_SEGUNDOS:
         return _cache[1]
 
-    propios: list[str] = []
+    meds: list[str] = []
+    razas: list[str] = []
     if db is not None:
         try:
-            propios = _de_la_base(db)
+            meds, razas = _de_la_base(db)
         except Exception:
-            propios = []
+            meds, razas = [], []
 
-    vistos: set[str] = set()
-    final: list[str] = []
-    for t in propios + KEYTERMS_BASE:
-        clave = t.lower()
-        if clave in vistos:
-            continue
-        vistos.add(clave)
-        final.append(t)
-        if len(final) >= MAX_KEYTERMS:
-            break
-
+    final = _armar(meds, razas)
     _cache = (ahora, final)
     return final
 

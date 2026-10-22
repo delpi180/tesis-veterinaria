@@ -409,6 +409,9 @@ class TranscribeResponse(BaseModel):
 
 class ProcessHistoriaRequest(BaseModel):
     texto: str
+    # Consulta nueva con el formulario de Volki: lo no ubicado se revisa contra lo que
+    # ese formulario deja ver (no contra datos ocultos como `dicho`).
+    solo_volki: bool = False
 
 
 class ProcessHistoriaResponse(BaseModel):
@@ -549,7 +552,7 @@ def procesar_historia_endpoint(body: ProcessHistoriaRequest, request: Request):
     # reconocer una marca mal transcrita en vez de copiarla rota.
     db_cat = SessionLocal()
     try:
-        resultado = extraer_historia(body.texto, db=db_cat)
+        resultado = extraer_historia(body.texto, db=db_cat, solo_volki=body.solo_volki)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en extracción IA: {str(e)}")
     finally:

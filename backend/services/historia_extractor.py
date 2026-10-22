@@ -14,6 +14,7 @@ Devuelve:
 
 import json
 import re
+import unicodedata
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -142,6 +143,21 @@ UNA LÍNEA POR PAUTA:
   nombre del medicamento.
 - "dicho" es el fragmento LITERAL del dictado del que sacaste esa línea,
   copiado tal cual. Deja ver qué se oyó, para poder compararlo de un vistazo.
+
+NO PIERDAS LO DICTADO — dónde va cada cosa:
+- "tratamiento_items": SOLO fármacos con nombre (con o sin dosis). Si el dictado
+  menciona varios fármacos como opciones ("fenbendazol o pirantel"), pon cada uno
+  en su línea; no elijas por el veterinario.
+- "indicaciones": todo lo demás del plan que no es un fármaco: dieta, reposo,
+  manejo ("manejo multimodal", "arnés en lugar de collar"), cirugía o procedimiento
+  indicado, fluidoterapia, fisioterapia, control de peso, seguimiento y
+  recomendaciones al propietario. Copia estas frases tal como se dictaron; no las
+  resumas ni las descartes porque no tengan dosis.
+- "diagnostico_*": el nombre de la enfermedad con sus siglas y grados tal cual
+  ("grado III", "Estadio C", "(DAPP)"). No los acortes.
+- Nunca dejes fuera un término clínico dictado (diagnóstico, sigla, fármaco,
+  procedimiento, hallazgo). Si no sabes en qué campo va, ponlo en "detalle" o en
+  "indicaciones" en vez de omitirlo.
 
 MAPEO DE ESCALAS CLÍNICAS (opciones cerradas):
 
@@ -361,7 +377,103 @@ def _validar_rangos(datos: dict) -> dict:
     return alertas
 
 
-def extraer_historia(texto: str, db=None) -> dict:
+# ── Red de seguridad: lo dictado que no quedó en ningún campo ────────────────
+#
+# El modelo puede dejar fuera una palabra clínica sin avisar. Esta revisión es
+# determinista (sin IA): compara las palabras del dictado contra todo lo que
+# quedó escrito en el resultado y devuelve las que no aparecen. Así el doctor
+# las ve y decide, en vez de que se pierdan en silencio. Es una lista de
+# "posibles": una palabra reescrita con otras (sinónimo) también puede salir.
+
+_PALABRAS_COMUNES = set("""
+para pero porque como cuando donde desde hasta entre sobre según segun tras ante bajo contra
+durante mediante cada todo todos toda todas otro otra otros otras mismo misma mismos mismas
+este esta esto estos estas ese esa eso esos esas aquel aquella
+también tambien además ademas luego después despues antes ahora aquí aqui allí
+muy más menos mucho mucha muchos muchas poco poca pocos pocas bastante demasiado
+tiene tienen tenía presenta presentan presentó viene vienen vino trae trajo llega llegó
+hace hacen hizo hecho dice dicen dijo está esta están estan estaba estuvo sido siendo
+puede pueden podría debe deben debería será serán fue fueron eran había habían
+paciente pacientes dueño dueña dueños propietario propietaria señora señor doctor doctora
+motivo consulta consultas diagnóstico diagnostico tratamiento tratamientos indicaciones indicación
+indicacion observaciones observación observacion anamnesis examen exámenes examenes
+canino canina caninos felino felina felinos perro perra perros gato gata gatos
+años año anos meses mes semanas semana días dias día dia horas hora
+primero primera segundo segunda tercero tercera
+nombre llamado llamada edad sexo hembra macho peso kilos kilo
+sigue siguiente siguientes tipo forma manera caso casos parte partes
+recomienda recomiendo recomendó indico indicó indicamos indicar sugiere sugiero
+indica indican indicado indicada indicados receta recetó receto recetan aplica aplicar aplicó
+usar usa usan usó dar dan dio mantener mantiene continuar continúa continua seguir
+""".split())
+
+
+def _quitar_tildes(t: str) -> str:
+    base = unicodedata.normalize("NFKD", (t or "").lower())
+    return "".join(c for c in base if not unicodedata.combining(c))
+
+
+# Datos internos del resultado que el formulario de Volki NO muestra: `dicho` es el
+# fragmento literal que oyó la IA (solo sirve para auditar) y `en_catalogo` es una
+# marca. Si cuentan como «ubicado», una palabra que solo vive ahí parece a salvo
+# cuando el doctor no la ve en ninguna casilla.
+_CLAVES_OCULTAS_EN_VOLKI = frozenset({"dicho", "en_catalogo"})
+
+
+def _textos_del_resultado(x, ignorar: frozenset = frozenset()) -> str:
+    """Todo lo escrito en el resultado, de cualquier campo o lista."""
+    if x is None or isinstance(x, bool):
+        return ""
+    if isinstance(x, (str, int, float)):
+        return str(x)
+    if isinstance(x, dict):
+        return " ".join(_textos_del_resultado(v, ignorar) for k, v in x.items() if k not in ignorar)
+    if isinstance(x, (list, tuple)):
+        return " ".join(_textos_del_resultado(v, ignorar) for v in x)
+    return ""
+
+
+def terminos_sin_ubicar(texto: str, datos: dict, maximo: int = 12, solo_volki: bool = False) -> list[str]:
+    """Palabras clínicas del dictado que no aparecen en ningún campo del resultado.
+
+    Compara por raíz (primeras 5 letras sin tildes) para tolerar plurales y
+    conjugaciones. Ignora palabras comunes, el "guion" del dictado y números.
+    Las siglas en mayúsculas de 3+ letras (AINEs, PIF) cuentan aunque sean cortas.
+
+    Con `solo_volki` (consulta nueva con el formulario de Volki) se compara solo contra
+    lo que ese formulario deja ver. El frontend pasa a casillas de Volki todo lo que
+    la IA entiende y Volki no tiene (diagnóstico presuntivo, FC, vacunas…), así que esos
+    campos siguen contando; solo se ignoran los datos internos (`dicho`, `en_catalogo`).
+    """
+    ignorar = _CLAVES_OCULTAS_EN_VOLKI if solo_volki else frozenset()
+    escrito = _quitar_tildes(_textos_del_resultado(datos, ignorar))
+    raices_escritas = {w[:5] for w in re.findall(r"[a-z0-9]+", escrito)}
+
+    vistos: set[str] = set()
+    faltan: list[str] = []
+    for palabra in re.findall(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9][A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9\-]*", texto or ""):
+        limpia = palabra.strip("-")
+        base = _quitar_tildes(limpia)
+        # Sigla: 3+ letras con al menos 2 mayúsculas (AINEs, PIF, ViLeF); un nombre
+        # propio con una sola mayúscula inicial (Malassezia) no lo es.
+        es_sigla = (len(limpia) >= 3 and limpia.isalpha()
+                    and sum(c.isupper() for c in limpia) >= 2)
+        if not es_sigla and len(base) < 6:
+            continue
+        if base.isdigit() or base in _PALABRAS_COMUNES:
+            continue
+        raiz = base[:5]
+        if raiz in raices_escritas or raiz in vistos:
+            continue
+        vistos.add(raiz)
+        faltan.append(limpia)
+        if len(faltan) >= maximo:
+            break
+    return faltan
+
+
+
+def extraer_historia(texto: str, db=None, solo_volki: bool = False) -> dict:
     """
     Llama al LLM para extraer los campos de la historia clínica usando
     salida estructurada (JSON Schema estricto).
@@ -463,5 +575,6 @@ def extraer_historia(texto: str, db=None) -> dict:
         "datos":         parsed,
         "inferencias":   inferencias,
         "alertas_rango": alertas_rango,
+        "sin_ubicar":    terminos_sin_ubicar(texto, parsed, solo_volki=solo_volki),
         "transcripcion": texto,
     }

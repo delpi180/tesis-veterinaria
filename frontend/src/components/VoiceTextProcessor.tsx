@@ -29,6 +29,9 @@ interface Props {
    *  («24 campos completados») para confirmarle al usuario qué se extrajo. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resumirResultado?: (resultado: any) => string | null | undefined
+  /** Consulta nueva con el formulario de Volki: el servidor revisa lo no ubicado
+   *  contra lo que ese formulario conserva. */
+  soloVolki?: boolean
 }
 
 const fmtSec = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -94,6 +97,7 @@ export default function VoiceTextProcessor({
   labelGrabar = 'Grabar consulta',
   placeholderTexto = 'Pegue la transcripción o escriba el resumen de la consulta para que la IA extraiga los campos…',
   resumirResultado,
+  soloVolki = false,
 }: Props) {
   const movil = !Grid.useBreakpoint().md
   const [modoTexto, setModoTexto] = useState(false)
@@ -175,7 +179,7 @@ export default function VoiceTextProcessor({
 
       // 2. Extraer con GPT
       updateAiState('processing')
-      const resultado = await api.post(endpoint, { texto: transcripcion })
+      const resultado = await api.post(endpoint, { texto: transcripcion, solo_volki: soloVolki })
 
       onResult?.({ ...resultado, transcripcion })
       setResumen(resumirResultado?.({ ...resultado, transcripcion }) ?? null)
@@ -225,7 +229,7 @@ export default function VoiceTextProcessor({
     updateAiState('processing')
     setAiError(null)
     try {
-      const resultado = await api.post(endpoint, { texto: textoManual })
+      const resultado = await api.post(endpoint, { texto: textoManual, solo_volki: soloVolki })
       setTranscripcionIA(resultado.transcripcion)
       onResult?.(resultado)
       setResumen(resumirResultado?.(resultado) ?? null)

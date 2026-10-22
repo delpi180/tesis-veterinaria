@@ -69,17 +69,19 @@ def test_incluye_los_medicamentos_de_la_clinica(client, admin):
 
 def test_incluye_las_razas_que_se_atienden():
     """"Shih Tzu" y "Schnauzer" son las que peor salen dictadas y son las que
-    esta clínica ve todos los días."""
+    esta clínica ve todos los días. Por el presupuesto de Deepgram entran las
+    más frecuentes (hasta su cuota), no todas."""
     vocabulario.invalidar_cache()
     db = SessionLocal()
     try:
+        _meds, razas_clinica = vocabulario._de_la_base(db)
         terminos = [t.lower() for t in vocabulario.keyterms(db)]
     finally:
         db.close()
         vocabulario.invalidar_cache()
-    # Al menos alguna raza real de la base tiene que haber entrado
-    assert any(r in terminos for r in ("shih tzu", "schnauzer", "french poodle")), \
-        f"no entró ninguna raza; se obtuvo: {terminos[:15]}"
+    assert razas_clinica, "la base de prueba no tiene razas"
+    # La más frecuente de la clínica tiene que haber entrado
+    assert razas_clinica[0].lower() in terminos,         f"no entró la raza más atendida ({razas_clinica[0]}); se obtuvo: {terminos[:15]}"
 
 
 def test_no_refuerza_palabras_corrientes():
@@ -105,8 +107,11 @@ def test_conserva_el_vocabulario_general():
     finally:
         db.close()
         vocabulario.invalidar_cache()
-    assert "Amoxicilina" in terminos
-    assert "mucosas" in terminos
+    # El vocabulario se presupuesta por caracteres (límite de Deepgram), así que ya
+    # no entra todo el listado antiguo: quedan las marcas y la terminología que
+    # un reconocedor general suele destrozar. Lo corriente («Amoxicilina») no hace falta.
+    assert "Nobivac" in terminos
+    assert "metimazol" in terminos
 
 
 def test_sin_base_de_datos_igual_devuelve_el_vocabulario_base():
@@ -114,7 +119,7 @@ def test_sin_base_de_datos_igual_devuelve_el_vocabulario_base():
     vocabulario.invalidar_cache()
     try:
         terminos = vocabulario.keyterms(None)
-        assert "Amoxicilina" in terminos
+        assert "Nobivac" in terminos
     finally:
         vocabulario.invalidar_cache()
 

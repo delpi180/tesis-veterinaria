@@ -44,22 +44,31 @@ def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav", db=None) -
     vocabulario = keyterms(db)
     print(f"[DEEPGRAM] {len(vocabulario)} términos de refuerzo")
 
-    def _llamar(con_keyterms: bool):
+    def _llamar_con(lista: list[str]):
         kwargs = dict(base_kwargs)
-        if con_keyterms:
-            kwargs["keyterm"] = vocabulario
+        if lista:
+            kwargs["keyterm"] = lista
         return client.listen.v1.media.transcribe_file(**kwargs)
 
-    try:
+    # Reintento escalonado: lista completa → mitad (por si pasamos el límite de
+    # ~500 tokens de Deepgram) → sin refuerzo. Antes era todo o nada, y un solo
+    # término de más dejaba el dictado entero sin refuerzo, en silencio.
+    intentos = [vocabulario, vocabulario[: max(len(vocabulario) // 2, 1)], []]
+    response = None
+    ultimo_error: Exception | None = None
+    for i, lista in enumerate(intentos):
+        if i > 0 and not lista and not vocabulario:
+            break          # ya se intentó sin refuerzo
         try:
-            response = _llamar(con_keyterms=True)
-        except Exception as exc_kt:
-            # El parámetro keyterm puede no estar soportado por el modelo/idioma:
-            # reintentar sin él en vez de fallar la consulta.
-            print(f"[DEEPGRAM] keyterm no aplicado ({exc_kt}); reintentando sin keyterm.")
-            response = _llamar(con_keyterms=False)
-    except Exception as exc:
-        raise RuntimeError(f"Error al conectar con Deepgram: {exc}") from exc
+            response = _llamar_con(lista)
+            if i > 0:
+                print(f"[DEEPGRAM] OK con {len(lista)} de {len(vocabulario)} términos de refuerzo")
+            break
+        except Exception as exc:
+            ultimo_error = exc
+            print(f"[DEEPGRAM] intento {i + 1} falló ({str(exc)[:120]}); se reduce el refuerzo")
+    if response is None:
+        raise RuntimeError(f"Error al conectar con Deepgram: {ultimo_error}") from ultimo_error
 
     try:
         transcript = response.results.channels[0].alternatives[0].transcript

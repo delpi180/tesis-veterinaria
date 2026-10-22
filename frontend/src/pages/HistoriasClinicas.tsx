@@ -25,7 +25,7 @@ import type { Resaltado } from '../components/consulta/campos'
 import type { MedicamentoInventario } from '../components/consulta/ListaTratamientos'
 import type { VacunaCatalogo } from '../components/consulta/ListaVacunas'
 import {
-  CAMPOS_FUERA_DE_VOLKI, FIELD_TO_SECTION, agregarSinUbicar, FORM_VACIO, SECCIONES,
+  DESTINO_VOLKI, FIELD_TO_SECTION, agregarSinUbicar, FORM_VACIO, SECCIONES,
   armarPayloadConsulta, claveBorrador, contarCamposLlenos,
   describirCuando, esReciente, fechaPeru, formFromHistoria, formularioVacio, hoyISOPeru,
   leerBorrador, mezclarDatosIA, ordenarHistorias,
@@ -357,25 +357,26 @@ export default function HistoriasClinicas() {
 
   // ── Volcar datos de IA al formulario
   const applyIA = (datos: DatosIA, inferencias: Record<string, string>, alertasRango: Record<string, unknown> = {}) => {
-    // En una consulta nueva la IA solo llena los campos del formulario que se ve;
-    // lo demás que haya entendido se ignora (y no se resalta).
+    // En una consulta nueva lo que Volki no tiene no se pierde: va, con su etiqueta,
+    // a la casilla que sí existe (ver DESTINO_VOLKI), y el resaltado va a esa casilla.
     const soloVolki = reducido
-    const fuera = (campo: string) => soloVolki && (CAMPOS_FUERA_DE_VOLKI as string[]).includes(campo)
+    const destino = (campo: string) => (soloVolki ? (DESTINO_VOLKI[campo] ?? campo) : campo)
 
     setForm(prev => mezclarDatosIA(prev, datos, medicamentos, soloVolki))
     setSenalIA(n => n + 1)
 
-    // Resaltados: "explicito" → "ok", "inferido" → "inferido"
+    // Resaltados: "explicito" → "ok", "inferido" → "inferido"; el más grave gana si
+    // varias partes caen en la misma casilla.
+    const orden: Record<Resaltado, number> = { ok: 1, inferido: 2, alerta: 3 }
     const hl: Record<string, Resaltado> = {}
-    for (const [campo, tipo] of Object.entries(inferencias)) {
-      if (fuera(campo)) continue
-      hl[campo] = tipo === 'inferido' ? 'inferido' : 'ok'
+    const poner = (campo: string, tipo: Resaltado) => {
+      const c = destino(campo)
+      if (!hl[c] || orden[tipo] > orden[hl[c]]) hl[c] = tipo
     }
+    for (const [campo, tipo] of Object.entries(inferencias))
+      poner(campo, tipo === 'inferido' ? 'inferido' : 'ok')
     // Las alertas de rango fisiológico tienen prioridad (rojo)
-    for (const campo of Object.keys(alertasRango || {})) {
-      if (fuera(campo)) continue
-      hl[campo] = 'alerta'
-    }
+    for (const campo of Object.keys(alertasRango || {})) poner(campo, 'alerta')
     setHighlights(hl)
 
     // Marcar las secciones con inferidos o alertas de rango y llevar al doctor
@@ -539,6 +540,7 @@ export default function HistoriasClinicas() {
               {/* Solo en «Dictar» (o al corregir una consulta). En «Escribir» no hay voz. */}
               {(modo === 'ia' || !reducido) && (
                 <VoiceTextProcessor
+                  soloVolki={reducido}
                   onResult={({ datos, inferencias, alertas_rango, transcripcion, sin_ubicar }: {
                     datos: DatosIA
                     inferencias: Record<string, string>
@@ -556,7 +558,7 @@ export default function HistoriasClinicas() {
                   resumirResultado={({ datos }: { datos: DatosIA }) => {
                     // Confirmar cuántos campos se completaron: sin esto el veterinario
                     // tiene que recorrer el formulario entero para saber qué entendió la IA.
-                    const n = contarCamposLlenos(datos, reducido)
+                    const n = contarCamposLlenos(datos)
                     return n ? `${n} campo${n > 1 ? 's' : ''} completado${n > 1 ? 's' : ''}` : 'No se detectaron datos'
                   }}
                 />
