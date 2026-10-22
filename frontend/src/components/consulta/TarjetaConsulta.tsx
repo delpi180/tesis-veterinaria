@@ -84,8 +84,10 @@ export default function TarjetaConsulta({ h, onEdit, onDelete }: Props) {
             </Tag>
           )}
           {/* Tamaño normal y separados: con el dedo, "Editar" y "Eliminar" pegados se confunden */}
-          <Button onClick={() => onEdit(h)}>Editar</Button>
-          <Button danger style={{ marginLeft: 8 }} onClick={() => onDelete(h)}>Eliminar</Button>
+          <Flex gap={16} wrap>
+            <Button size="large" onClick={() => onEdit(h)}>Editar</Button>
+            <Button size="large" danger onClick={() => onDelete(h)}>Eliminar</Button>
+          </Flex>
         </Flex>
       }
     >

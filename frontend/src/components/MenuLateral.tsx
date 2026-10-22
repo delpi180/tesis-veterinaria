@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Avatar, Badge, Button, Drawer, Grid, Layout, Menu, Tooltip, Typography } from 'antd'
+import { Avatar, Badge, Button, Drawer, Dropdown, Grid, Layout, Menu, Tooltip, Typography } from 'antd'
 import type { MenuProps } from 'antd'
 import {
   HomeOutlined, CustomerServiceOutlined, ProfileOutlined, TeamOutlined, CalendarOutlined,
   MedicineBoxOutlined, InboxOutlined, ToolOutlined, ShoppingCartOutlined, WalletOutlined,
   ExperimentOutlined, PieChartOutlined, ClockCircleOutlined, HistoryOutlined,
-  UserSwitchOutlined, BugOutlined, LogoutOutlined, MenuOutlined,
+  UserSwitchOutlined, BugOutlined, LogoutOutlined, MenuOutlined, DownOutlined,
 } from '@ant-design/icons'
+import { MEDIDAS } from '@src/core/medidas'
 import { api, getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
 import GlobalSearch from './GlobalSearch'
 import { useClinica } from '../services/clinica'
@@ -68,7 +69,7 @@ function claveActiva(pathname: string, items: Item[]): string[] {
 }
 
 /** Lo que va dentro del menú, igual en escritorio (Sider) y móvil (Drawer). */
-function Contenido({ onNavegar }: { onNavegar: () => void }) {
+function Contenido({ onNavegar, conUsuario = true }: { onNavegar: () => void; conUsuario?: boolean }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { clinica } = useClinica()
@@ -119,11 +120,11 @@ function Contenido({ onNavegar }: { onNavegar: () => void }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '22px 20px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: `1px solid ${BRAND.siderActive}` }}>
-        <span style={{ background: BRAND.primary, color: '#fff', borderRadius: 12, padding: 8, display: 'flex' }}>
-          <Huella />
+      <div style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: `1px solid ${BRAND.siderActive}` }}>
+        <span style={{ background: BRAND.primary, color: '#fff', borderRadius: 10, padding: 7, display: 'flex' }}>
+          <Huella size={20} />
         </span>
-        <Text strong style={{ color: '#fff', fontSize: 16, lineHeight: 1.2 }}>{clinica.nombre}</Text>
+        <Text strong style={{ color: '#fff', fontSize: 14, lineHeight: 1.2 }}>{clinica.nombre}</Text>
       </div>
 
       <div style={{ padding: '16px 12px 4px' }}>
@@ -143,18 +144,61 @@ function Contenido({ onNavegar }: { onNavegar: () => void }) {
         />
       </div>
 
-      <div style={{ padding: 16, borderTop: `1px solid ${BRAND.siderActive}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Avatar style={{ background: BRAND.primary, textTransform: 'uppercase' }}>{nombre.charAt(0)}</Avatar>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ color: '#fff', display: 'block', textTransform: 'capitalize' }} ellipsis>{nombre}</Text>
-          <Text style={{ color: '#5a9d88', fontSize: 13, textTransform: 'capitalize' }}>{rol}</Text>
+      {conUsuario && (
+        <div style={{ padding: 16, borderTop: `1px solid ${BRAND.siderActive}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Avatar style={{ background: BRAND.primary, textTransform: 'uppercase' }}>{nombre.charAt(0)}</Avatar>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ color: '#fff', display: 'block', textTransform: 'capitalize' }} ellipsis>{nombre}</Text>
+            <Text style={{ color: '#5a9d88', fontSize: 13, textTransform: 'capitalize' }}>{rol}</Text>
+          </div>
+          <Tooltip title="Cerrar sesión">
+            <Button type="text" onClick={salir} aria-label="Cerrar sesión"
+              icon={<LogoutOutlined style={{ color: '#b3d6c9' }} />} />
+          </Tooltip>
         </div>
-        <Tooltip title="Cerrar sesión">
-          <Button type="text" onClick={salir} aria-label="Cerrar sesión"
-            icon={<LogoutOutlined style={{ color: '#b3d6c9' }} />} />
-        </Tooltip>
-      </div>
+      )}
     </div>
+  )
+}
+
+/**
+ * Barra superior de escritorio, como la de Volki: 50 px de alto, el botón que
+ * abre y cierra el menú a la izquierda y el usuario a la derecha (nombre y
+ * rol, con «Cerrar sesión» en su menú). En el celular no se usa: ahí manda
+ * el encabezado móvil de `MenuLateral`.
+ */
+export function BarraSuperior({ onAlternarMenu }: { onAlternarMenu: () => void }) {
+  const navigate = useNavigate()
+  const nombre = getNombre() || 'Veterinario'
+  const rol = getRol() || 'veterinario'
+  const salir = () => {
+    cerrarSesion()
+    navigate('/login', { replace: true })
+  }
+  return (
+    <Header style={{
+      height: MEDIDAS.barraAlto, lineHeight: `${MEDIDAS.barraAlto}px`, padding: '0 16px', flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      background: BRAND.header, borderBottom: `1px solid ${BRAND.border}`,
+    }}>
+      <Button type="text" onClick={onAlternarMenu} aria-label="Mostrar u ocultar el menú"
+        icon={<MenuOutlined />} style={{ width: 40, height: 40 }} />
+      <Dropdown
+        trigger={['click']}
+        menu={{
+          items: [{ key: 'salir', icon: <LogoutOutlined />, label: 'Cerrar sesión', onClick: salir }],
+        }}
+      >
+        <Button type="text" aria-label={`Cuenta de ${nombre}`} style={{ height: 40, padding: '0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Avatar size={28} style={{ background: BRAND.primary, textTransform: 'uppercase' }}>{nombre.charAt(0)}</Avatar>
+          <span style={{ textTransform: 'capitalize', lineHeight: 1.1, textAlign: 'left' }}>
+            {nombre}
+            <span style={{ display: 'block', fontSize: 12, color: BRAND.textSecondary }}>{rol}</span>
+          </span>
+          <DownOutlined style={{ fontSize: 10 }} />
+        </Button>
+      </Dropdown>
+    </Header>
   )
 }
 
@@ -164,7 +208,7 @@ function Contenido({ onNavegar }: { onNavegar: () => void }) {
  * de Ant Design (como en CorAll) y en móvil un `Drawer` en lugar de un cajón
  * hecho a mano.
  */
-export default function MenuLateral() {
+export default function MenuLateral({ colapsado = false }: { colapsado?: boolean }) {
   const { clinica } = useClinica()
   const pantallas = Grid.useBreakpoint()
   const movil = !pantallas.md
@@ -207,8 +251,11 @@ export default function MenuLateral() {
   }
 
   return (
-    <Sider width={256} style={{ position: 'sticky', top: 0, height: '100vh', flex: '0 0 256px' }}>
-      <Contenido onNavegar={cerrar} />
+    <Sider
+      width={MEDIDAS.menuAncho} collapsedWidth={0} collapsed={colapsado} trigger={null}
+      style={{ position: 'sticky', top: 0, height: '100vh' }}
+    >
+      <Contenido onNavegar={cerrar} conUsuario={false} />
     </Sider>
   )
 }

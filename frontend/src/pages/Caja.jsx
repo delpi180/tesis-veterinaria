@@ -247,7 +247,7 @@ export default function Caja() {
         </div>
       </header>
 
-      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-8 pt-4 md:pt-4 pb-6 md:pb-8 flex flex-col gap-5 w-full">
         {loading ? (
           <Cargando texto="Cargando caja…" />
         ) : (

@@ -26,6 +26,13 @@ export interface ItemTratamiento {
   dicho?: string
 }
 
+/** Un producto usado en la consulta (jeringa, suero…), como en «Productos aplicados» de Volki. */
+export interface ItemProductoAplicado {
+  producto_id: number | null
+  nombre: string
+  cantidad: number
+}
+
 export interface ItemVacuna {
   vacuna: string
   lote?: string
@@ -37,7 +44,7 @@ export interface ItemVacuna {
 export const CAMPOS_TEXTO = [
   'fecha',
   'motivo_consulta', 'tiempo_evolucion', 'derivado_por',
-  'detalle', 'alimentacion_tipo', 'alimentacion_cantidad_gr',
+  'detalle', 'alimentacion_tipo', 'alimentacion_cantidad_gr', 'alimentacion_veces_dia',
   'antecedentes', 'tipo_consulta',
   'temperatura_c', 'peso_kg', 'frecuencia_cardiaca',
   'frecuencia_respiratoria', 'condicion_corporal',
@@ -46,7 +53,7 @@ export const CAMPOS_TEXTO = [
   'diagnostico_presuntivo', 'diagnosticos_diferenciales',
   'diagnostico_definitivo',
   'examenes_solicitados',
-  'indicaciones', 'pronostico', 'proxima_cita',
+  'indicaciones', 'observaciones', 'pronostico', 'proxima_cita',
 ] as const
 export type CampoTexto = typeof CAMPOS_TEXTO[number]
 
@@ -55,6 +62,9 @@ export type FormConsulta = Record<CampoTexto, string> & {
   examen_particular: Record<string, EstadoSistema>
   tratamiento_items: ItemTratamiento[]
   vacunas_items: ItemVacuna[]
+  /** «A libre demanda»: si está marcada, no hay cantidad ni veces al día. */
+  alimentacion_libre_demanda: boolean
+  productos_aplicados: ItemProductoAplicado[]
 }
 
 /** Lo que la IA devuelve al dictar: cualquier parte del formulario, a medias. */
@@ -73,9 +83,11 @@ export type Historia = Partial<Record<CampoTexto, string | number | null>> & {
   examen_particular?: Record<string, string | Partial<EstadoSistema> | null> | null
   tratamiento_items?: ItemTratamiento[] | null
   vacunas_items?: ItemVacuna[] | null
+  alimentacion_libre_demanda?: boolean | null
+  productos_aplicados?: ItemProductoAplicado[] | null
 }
 
-export interface BorradorGuardado { form: FormConsulta; guardadoEn: string | null }
+export interface BorradorGuardado { form: FormConsulta; guardadoEn: string | null; modo?: ModoRegistro | null }
 
 // ── Catálogos ───────────────────────────────────────────────────────────────
 
@@ -132,6 +144,14 @@ export const OPT: Record<string, OpcionCatalogo[]> = {
     { v: 'no_evaluado', l: 'No evaluado' },
   ],
 }
+
+/** Los mismos tres estados de cada sistema, con las palabras de Volki (botones de opción).
+ *  Los valores guardados no cambian: solo cómo se leen en el formulario de consulta nueva. */
+export const ESTADOS_SISTEMA_VOLKI: OpcionCatalogo[] = [
+  { v: 'normal', l: 'Normal' },
+  { v: 'alterado', l: 'Anormal' },
+  { v: 'no_evaluado', l: 'No explorado' },
+]
 
 export const getLabel = (field: string, value?: string | number | null) => {
   if (!value) return value
@@ -220,7 +240,7 @@ export const SECCIONES = [
 // Campo → sección (para saltar a lo que la IA dejó por revisar)
 export const FIELD_TO_SECTION: Record<string, string> = {
   motivo_consulta: 's1', tiempo_evolucion: 's1', derivado_por: 's1',
-  detalle: 's1', alimentacion_tipo: 's1', alimentacion_cantidad_gr: 's1',
+  detalle: 's1', alimentacion_tipo: 's1', alimentacion_cantidad_gr: 's1', alimentacion_veces_dia: 's1',
   antecedentes: 's1', tipo_consulta: 's1',
   temperatura_c: 's2', peso_kg: 's2', frecuencia_cardiaca: 's2',
   frecuencia_respiratoria: 's2', condicion_corporal: 's2',
@@ -228,7 +248,7 @@ export const FIELD_TO_SECTION: Record<string, string> = {
   pulso: 's2', linfonodulos: 's2',
   diagnostico_presuntivo: 's4', diagnosticos_diferenciales: 's4',
   diagnostico_definitivo: 's4',
-  examenes_solicitados: 's5', indicaciones: 's5', pronostico: 's5',
+  examenes_solicitados: 's5', indicaciones: 's5', observaciones: 's5', pronostico: 's5',
 }
 
 // ── Estado inicial ──────────────────────────────────────────────────────────
@@ -244,7 +264,8 @@ export const FORM_VACIO: FormConsulta = {
   // vieja de papel o para corregir la fecha de una ya registrada.
   fecha: '',
   motivo_consulta: '', tiempo_evolucion: '', derivado_por: '',
-  detalle: '', alimentacion_tipo: '', alimentacion_cantidad_gr: '',
+  detalle: '', alimentacion_tipo: '', alimentacion_cantidad_gr: '', alimentacion_veces_dia: '',
+  alimentacion_libre_demanda: false,
   antecedentes: '', tipo_consulta: '',
   temperatura_c: '', peso_kg: '', frecuencia_cardiaca: '',
   frecuencia_respiratoria: '', condicion_corporal: '',
@@ -256,12 +277,14 @@ export const FORM_VACIO: FormConsulta = {
   examenes_solicitados: '',
   tratamiento_items: [],
   vacunas_items: [],
-  indicaciones: '', pronostico: '', proxima_cita: '',
+  indicaciones: '', observaciones: '', pronostico: '', proxima_cita: '',
+  productos_aplicados: [],
 }
 
 const NUM_FIELDS = [
   'temperatura_c', 'peso_kg', 'frecuencia_cardiaca',
   'frecuencia_respiratoria', 'condicion_corporal', 'alimentacion_cantidad_gr',
+  'alimentacion_veces_dia',
 ]
 
 // Plantillas de consulta: pre-rellenan los campos típicos de cada tipo de visita
@@ -353,7 +376,8 @@ export function buildPayload(formCompleto: FormConsulta, soloVolki = false) {
   }
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(form)) {
-    if (['examen_particular', 'tratamiento_items', 'vacunas_items'].includes(k)) continue
+    if (['examen_particular', 'tratamiento_items', 'vacunas_items', 'productos_aplicados',
+         'alimentacion_libre_demanda'].includes(k)) continue
     if (v === '' || v === null || v === undefined) {
       out[k] = null
     } else if (NUM_FIELDS.includes(k)) {
@@ -389,6 +413,16 @@ export function buildPayload(formCompleto: FormConsulta, soloVolki = false) {
         // historia clínica de ese día y no se reescribe al editarla.
         duracion: i.duracion || null,
       }))
+    : null
+  // «A libre demanda» no tiene cantidad ni veces al día: no se guarda lo que haya quedado escrito
+  out.alimentacion_libre_demanda = form.alimentacion_libre_demanda ? true : null
+  if (form.alimentacion_libre_demanda) {
+    out.alimentacion_cantidad_gr = null
+    out.alimentacion_veces_dia = null
+  }
+  const pa = (form.productos_aplicados || []).filter(i => i.nombre?.trim() && Number(i.cantidad) > 0)
+  out.productos_aplicados = pa.length > 0
+    ? pa.map(i => ({ producto_id: i.producto_id ?? null, nombre: i.nombre.trim(), cantidad: Number(i.cantidad) }))
     : null
   const vx = (form.vacunas_items || []).filter(i => i.vacuna?.trim())
   out.vacunas_items = vx.length > 0
@@ -448,6 +482,11 @@ export function formFromHistoria(h: Historia): FormConsulta {
   f.vacunas_items = Array.isArray(h.vacunas_items)
     ? h.vacunas_items.map((i: ItemVacuna) => ({ vacuna: i.vacuna || '', lote: i.lote || '', proxima_dosis: i.proxima_dosis || '' }))
     : []
+  f.alimentacion_libre_demanda = !!h.alimentacion_libre_demanda
+  f.productos_aplicados = Array.isArray(h.productos_aplicados)
+    ? h.productos_aplicados.map((i: ItemProductoAplicado) => ({
+        producto_id: i.producto_id ?? null, nombre: i.nombre || '', cantidad: Number(i.cantidad) || 1 }))
+    : []
   return f
 }
 
@@ -457,7 +496,8 @@ export function formFromHistoria(h: Historia): FormConsulta {
 // consulta. Lo que se guarda ahora incluye CUÁNDO: antes el borrador volvía
 // solo, sin decir nada, y un texto empezado el lunes reaparecía el jueves
 // dentro de "Nueva consulta" listo para guardarse como el examen de ese día.
-export const claveBorrador = (id: string | number | undefined) => `draft_historia_${id}`
+export const claveBorrador = (id: string | number | undefined, editandoId?: number | null) =>
+  editandoId ? `draft_historia_${id}_editando_${editandoId}` : `draft_historia_${id}`
 
 /** ¿El formulario está intacto? Se usa para no guardar borradores vacíos y
  *  para saber si hay algo que perder al salir. */
@@ -491,6 +531,8 @@ export function normalizarBorrador(guardado?: Partial<FormConsulta> | null): For
     examen_particular: { ...eopVacio(), ...(guardado?.examen_particular ?? {}) },
     tratamiento_items: Array.isArray(guardado?.tratamiento_items) ? guardado.tratamiento_items : [],
     vacunas_items: Array.isArray(guardado?.vacunas_items) ? guardado.vacunas_items : [],
+    alimentacion_libre_demanda: !!guardado?.alimentacion_libre_demanda,
+    productos_aplicados: Array.isArray(guardado?.productos_aplicados) ? guardado.productos_aplicados : [],
   }
 }
 
@@ -503,7 +545,8 @@ export function leerBorrador(id: string | undefined): BorradorGuardado | null {
     // Formato viejo: el objeto ERA el formulario, sin fecha. Se trata como
     // antiguo (no se recupera solo) porque no hay forma de saber de cuándo es.
     if (!dato.form) return { form: normalizarBorrador(dato), guardadoEn: null }
-    return { form: normalizarBorrador(dato.form), guardadoEn: dato.guardadoEn ?? null }
+    const modo = dato.modo === 'manual' || dato.modo === 'ia' ? dato.modo : null
+    return { form: normalizarBorrador(dato.form), guardadoEn: dato.guardadoEn ?? null, modo }
   } catch (e) {
     console.error('No se pudo leer el borrador:', e)
     return null
@@ -532,6 +575,78 @@ export function describirCuando(guardadoEn?: string | null): string {
   })
   const dia = d.toLocaleDateString('es-PE', { day: 'numeric', month: 'long', timeZone: ZONA_PERU })
   return `del ${dia} a las ${hora}`
+}
+
+/** Lo mínimo que se necesita de un producto del inventario para avisar de su stock y vencimiento. */
+export interface MedicamentoParaAvisos {
+  id: number
+  nombre: string
+  stock?: number | null
+  unidad?: string | null
+  fecha_vencimiento?: string | null
+}
+
+/** Lo que hay que avisar de una línea de tratamiento: producto enlazado del
+ *  inventario, si está vencido o sin stock, y cuándo termina. «Hoy» es en hora
+ *  de Perú: con la fecha UTC, desde las 7 pm un lote que vence mañana se
+ *  mostraba como ya vencido. La fecha de fin se cuenta desde la fecha de la
+ *  consulta, no desde hoy: una consulta que se digitaliza días después no
+ *  reinicia el tratamiento. */
+export function avisosDeTratamiento(
+  item: ItemTratamiento, medicamentos: MedicamentoParaAvisos[], desde?: string,
+) {
+  const p = medicamentos.find(m => m.id === item.producto_id)
+  const vencido = !!p?.fecha_vencimiento && p.fecha_vencimiento <= hoyISOPeru()
+  const sinStock = !!p && (p.stock ?? 0) <= 0
+  const dias = Number(item.duracion_dias)
+  const termina = dias >= 1 ? fechaISOLegible(sumarDiasISO(fechaBaseISO(desde), dias - 1)) : null
+  return { p, vencido, sinStock, termina }
+}
+
+// ── Ficha del paciente (columna derecha de la consulta) ─────────────────────
+
+/** «2 años y 6 meses» a partir de la fecha de nacimiento; si no hay, la edad en años que se anotó. */
+export function edadLegible(
+  p: { fecha_nacimiento?: string | null; edad?: number | null }, hoy = hoyISOPeru(),
+): string | null {
+  if (p.fecha_nacimiento) {
+    const [a, m, d] = p.fecha_nacimiento.slice(0, 10).split('-').map(Number)
+    const [ha, hm, hd] = hoy.split('-').map(Number)
+    let meses = (ha - a) * 12 + (hm - m)
+    if (hd < d) meses -= 1
+    if (meses < 0) return null
+    const anios = Math.floor(meses / 12)
+    const resto = meses % 12
+    const partes = []
+    if (anios) partes.push(`${anios} ${anios === 1 ? 'año' : 'años'}`)
+    if (resto || !anios) partes.push(`${resto} ${resto === 1 ? 'mes' : 'meses'}`)
+    return partes.join(' y ')
+  }
+  return p.edad != null ? `${p.edad} ${p.edad === 1 ? 'año' : 'años'}` : null
+}
+
+/** Próximas dosis anotadas en las vacunas de las consultas (solo fechas completas, de hoy en adelante). */
+export function proximasDosis(historias: Historia[], hoy = hoyISOPeru()): { vacuna: string; fecha: string }[] {
+  const vistos = new Set<string>()
+  const salida: { vacuna: string; fecha: string }[] = []
+  for (const h of historias) {
+    for (const v of h.vacunas_items ?? []) {
+      const fecha = v.proxima_dosis
+      if (!fecha || !/^\d{4}-\d{2}-\d{2}$/.test(fecha) || fecha < hoy) continue
+      const clave = `${v.vacuna}|${fecha}`
+      if (vistos.has(clave)) continue
+      vistos.add(clave)
+      salida.push({ vacuna: v.vacuna, fecha })
+    }
+  }
+  return salida.sort((a, b) => a.fecha.localeCompare(b.fecha))
+}
+
+/** Peso de la consulta más reciente que lo tenga (las historias ya vienen de la más nueva a la más antigua). */
+export function ultimoPeso(historias: Historia[]): { kg: string; fecha: string } | null {
+  const h = historias.find(x => x.peso_kg !== null && x.peso_kg !== undefined && x.peso_kg !== '')
+  if (!h) return null
+  return { kg: String(h.peso_kg), fecha: fechaPeru((h.fecha || h.creado_en) as string) }
 }
 
 // ── Datos que devuelve la IA ────────────────────────────────────────────────
@@ -695,4 +810,20 @@ export function mezclarDatosIA(
   }
 
   return next
+}
+
+/**
+ * Pasa a «Observaciones» las palabras que la IA no ubicó en ningún campo, para
+ * que no se pierdan en silencio. No repite lo que ya está escrito ni deja
+ * términos duplicados.
+ */
+export function agregarSinUbicar(observaciones: string, terminos: string[]): string {
+  const actual = observaciones ?? ''
+  const nuevos = terminos.filter((t, i) =>
+    t.trim() !== '' &&
+    terminos.indexOf(t) === i &&
+    !actual.toLowerCase().includes(t.toLowerCase()))
+  if (nuevos.length === 0) return actual
+  const linea = `No ubicado por la IA: ${nuevos.join(', ')}.`
+  return actual.trim() === '' ? linea : `${actual.trim()}\n${linea}`
 }

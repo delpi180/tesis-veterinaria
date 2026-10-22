@@ -16,6 +16,7 @@
     "@ant-design/plots": "^2.6.8",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/nunito": "^5.3.0",
+    "@fontsource/roboto": "^5.3.0",
     "antd": "^6.6.5",
     "dayjs": "^1.11.23",
     "jspdf": "^4.2.1",
@@ -25,6 +26,7 @@
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.1",
     "recharts": "^3.8.1",
+    "write-excel-file": "^4.1.1",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

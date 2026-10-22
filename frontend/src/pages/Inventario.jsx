@@ -573,7 +573,7 @@ export default function Inventario() {
         </div>
       </header>
 
-      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-6xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-8 pt-4 md:pt-4 pb-6 md:pb-8 flex flex-col gap-5 w-full">
 
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">

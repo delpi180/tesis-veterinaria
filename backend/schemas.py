@@ -37,6 +37,8 @@ class HistoriaClinicaCreate(BaseModel):
     detalle:                  Optional[str] = None
     alimentacion_tipo:        Optional[str] = None
     alimentacion_cantidad_gr: Optional[int] = None
+    alimentacion_veces_dia:   Optional[int] = Field(None, ge=0, le=50)
+    alimentacion_libre_demanda: Optional[bool] = None
     antecedentes:             Optional[str] = None
     tipo_consulta: Optional[Literal[
         'primera_vez', 'control', 'urgencia', 'vacunacion'
@@ -76,6 +78,8 @@ class HistoriaClinicaCreate(BaseModel):
     tratamiento_items:    Optional[list] = None
     vacunas_items:        Optional[list] = None
     indicaciones:         Optional[str]  = None
+    observaciones:        Optional[str]  = None
+    productos_aplicados:  Optional[list] = None
     pronostico: Optional[Literal[
         'favorable', 'reservado', 'desfavorable', 'grave'
     ]] = None
@@ -126,6 +130,8 @@ class HistoriaClinicaOut(BaseModel):
     detalle:                  Optional[str] = None
     alimentacion_tipo:        Optional[str] = None
     alimentacion_cantidad_gr: Optional[int] = None
+    alimentacion_veces_dia:   Optional[int] = Field(None, ge=0, le=50)
+    alimentacion_libre_demanda: Optional[bool] = None
     antecedentes:             Optional[str] = None
     tipo_consulta:            Optional[str] = None
 
@@ -155,6 +161,8 @@ class HistoriaClinicaOut(BaseModel):
     tratamiento_items:    Optional[list] = None
     vacunas_items:        Optional[list] = None
     indicaciones:         Optional[str]  = None
+    observaciones:        Optional[str]  = None
+    productos_aplicados:  Optional[list] = None
     pronostico:           Optional[str]  = None
     proxima_cita:         Optional[datetime] = None
 
@@ -217,11 +225,15 @@ class PacienteUpdate(BaseModel):
     color:                Optional[str]  = None
     alergias:             Optional[str]  = None
     condiciones_cronicas: Optional[str]  = None
+    activo:               Optional[bool] = None
 
 
 class PacienteOut(PacienteBase):
     id:         int
     cliente_id: int
+    activo:         bool = True
+    creado_en:      Optional[datetime] = None
+    registrado_por: Optional[str] = None
     historias:  list[HistoriaClinicaResumen] = []   # ligero: solo id, fecha, motivo, dx
 
     model_config = ConfigDict(from_attributes=True)
@@ -231,6 +243,9 @@ class PacienteSummary(PacienteBase):
     """Versión sin historias, para listar dentro de un cliente."""
     id:         int
     cliente_id: int
+    activo:         bool = True
+    creado_en:      Optional[datetime] = None
+    registrado_por: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -266,9 +281,39 @@ class ClienteCreate(ClienteBase):
         return self
 
 
+class EtiquetaIn(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=40)
+    color:  Optional[str] = Field(None, max_length=20)
+
+    @field_validator("nombre")
+    @classmethod
+    def _limpiar_nombre(cls, v: str) -> str:
+        v = " ".join(v.split())
+        if not v:
+            raise ValueError("La etiqueta necesita un nombre")
+        return v
+
+
+class EtiquetaOut(BaseModel):
+    id:     int
+    nombre: str
+    color:  Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClienteEtiquetasIn(BaseModel):
+    etiqueta_ids: list[int] = []
+
+
+class CambiarResponsableIn(BaseModel):
+    cliente_id: int
+
+
 class ClienteOut(ClienteBase):
     id:        int
     pacientes: list[PacienteSummary] = []
+    etiquetas: list[EtiquetaOut] = []
 
     model_config = ConfigDict(from_attributes=True)
 

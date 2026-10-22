@@ -3,7 +3,9 @@
 /* Nunito, la misma tipografía que usan CorAll y trailers. Se sirve desde la
    propia app (no desde un CDN): funciona sin internet de terceros y no filtra
    a los usuarios a Google. */
-@import "@fontsource-variable/nunito";
+@import "@fontsource/roboto/300.css";
+@import "@fontsource/roboto/400.css";
+@import "@fontsource/roboto/500.css";
 
 /* ── Identidad ───────────────────────────────────────────────────────────────
    Antes toda la app era morado + degradados + tarjetas pastel: la receta por
@@ -15,8 +17,8 @@
    `brand` reemplaza a `purple`/`violet`: el renombrado se hizo en todo el
    código, así que no queda ningún "morado" que en realidad sea verde.        */
 @theme {
-  --font-sans: "Nunito Variable", "Nunito", system-ui, sans-serif;
-  --font-display: "Nunito Variable", "Nunito", system-ui, sans-serif;
+  --font-sans: "Roboto", system-ui, sans-serif;
+  --font-display: "Roboto", system-ui, sans-serif;
 
   --color-brand-50:  #eef6f3;
   --color-brand-100: #d9ebe4;
@@ -84,6 +86,9 @@
 body {
   margin: 0;
   font-family: var(--font-sans);
+  /* Medidas de Volki: Roboto 14 px con 20 px de interlínea (core/medidas.ts) */
+  font-size: 14px;
+  line-height: 20px;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   /* Las cifras con ancho variable hacen que los números "bailen" al
@@ -229,3 +234,57 @@ h1, h2 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Tabla en «píldoras» (listas de clientes, mascotas y ventas) ──────────────
+   Cada fila es una tira redondeada del color de panel, separada de la
+   siguiente. El color llega por la variable --fila-bg, puesta desde
+   `core/color.ts` en la pantalla; aquí no hay colores sueltos. */
+/* Como en Volki: un solo bloque redondeado con líneas finas entre filas */
+/* Medidas de Volki (core/medidas.ts): esquinas 16, cabecera 35, fila 49, celdas 24/8 izquierda y 16 derecha */
+.tabla-pildoras .ant-table { background: var(--fila-bg); border-radius: 16px; overflow: hidden; }
+.tabla-pildoras .ant-table-container table { border-collapse: collapse; }
+.tabla-pildoras .ant-table-thead > tr > th {
+  background: transparent;
+  font-weight: 500;
+  color: inherit;
+  height: 35px !important;
+  padding: 8px 16px 0 8px !important;
+  border-bottom: 1px solid var(--fila-bg-hover);
+}
+.tabla-pildoras .ant-table-thead > tr > th:first-child { padding-left: 24px !important; }
+.tabla-pildoras .ant-table-thead > tr > th::before { display: none; }
+.tabla-pildoras .ant-table-tbody > tr > td {
+  background: transparent;
+  border-bottom: 1px solid var(--fila-bg-hover);
+  height: 49px !important;
+  padding: 0 16px 0 8px !important;
+}
+.tabla-pildoras .ant-table-tbody > tr > td:first-child { padding-left: 24px !important; }
+/* Pestañas de 49 px de alto aunque lleven ícono o contador (Volki) */
+.ant-tabs-top > .ant-tabs-nav .ant-tabs-tab { height: 49px; padding-block: 0; align-items: center; }
+.ant-tabs-tab .ant-tag { line-height: 18px; }
+/* Contenido centrado en la fila: si una celda crece, las demás no quedan pegadas abajo */
+.ant-table-tbody > tr > td, .ant-table-thead > tr > th { vertical-align: middle; }
+/* Paginador de Volki: franja de 56 px con el texto de 12 px pegado a la derecha */
+.tabla-pildoras + .ant-pagination,
+.ant-table-wrapper .ant-table-pagination.ant-pagination { margin: 0 !important; min-height: 56px; align-items: center; }
+.tabla-pildoras .ant-table-tbody > tr:last-child > td { border-bottom: 0; }
+.tabla-pildoras .ant-table-tbody > tr.ant-table-row:hover > td { background: var(--fila-bg-hover); }
+.tabla-pildoras .ant-table-tbody > tr.fila-clic { cursor: pointer; }
+
+/* ── Tablas de las pantallas con Tailwind (Turnos, Ventas, Inventario, Reportes…) ──
+   Las mismas medidas de Volki que `.tabla-pildoras` (core/medidas.ts): cabecera de
+   35 px, fila de 49 px, letra de 14 px y bloque de esquinas de 16 px. Van con
+   !important porque cada tabla trae sus propias clases de relleno y tamaño. */
+main table { border-collapse: collapse; font-size: 14px !important; }
+main table thead th {
+  height: 35px; padding: 8px 16px 0 8px !important;
+  font-size: 14px !important; font-weight: 500 !important; vertical-align: middle;
+}
+main table thead th:first-child { padding-left: 24px !important; }
+main table tbody td {
+  height: 49px; padding: 0 16px 0 8px !important;
+  font-size: 14px !important; vertical-align: middle;
+}
+main table tbody td:first-child { padding-left: 24px !important; }
+main div:has(> table) { border-radius: 16px; overflow: hidden; }

@@ -1,32 +1,38 @@
 import { useState, useEffect } from 'react'
-import type { CSSProperties } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Alert, Badge, Button, Flex, Grid, Segmented, Select, Tabs, Typography, theme } from 'antd'
+import { Alert, Badge, Button, Flex, Grid, Segmented, Select, Skeleton, Tabs, Typography, theme } from 'antd'
 import {
-  ArrowLeftOutlined, CheckCircleFilled, CheckOutlined, DownloadOutlined,
+  CheckCircleFilled,
   FileTextOutlined, MedicineBoxOutlined, SaveOutlined,
 } from '@ant-design/icons'
 import { BRAND } from '@src/core/color'
 import { generarPDF } from '../utils/pdfGenerator'
 import { api, esVeterinario } from '../services/api'
 import { useConfirmar } from '../components/Confirmar'
+import { useToast } from '../components/Toast'
 import VoiceTextProcessor from '../components/VoiceTextProcessor'
 import DocumentosPaciente from '../components/DocumentosPaciente'
-import { CargandoPantalla } from '../components/Cargando'
 import SeccionesConsulta from '../components/consulta/Secciones'
+import FormularioVolki from '../components/consulta/FormularioVolki'
+import ColumnaPaciente from '../components/consulta/ColumnaPaciente'
+import Disposicion from '../components/consulta/Disposicion'
+import type { FichaPaciente, FichaResponsable, TurnoPaciente } from '../components/consulta/ColumnaPaciente'
+import type { ProductoInventario } from '../components/consulta/TablaProductos'
 import TarjetaConsulta from '../components/consulta/TarjetaConsulta'
 import EleccionModo from '../components/consulta/EleccionModo'
-import Cronometro, { formatoTiempo } from '../components/consulta/Cronometro'
+import Cronometro from '../components/consulta/Cronometro'
 import type { Resaltado } from '../components/consulta/campos'
 import type { MedicamentoInventario } from '../components/consulta/ListaTratamientos'
 import type { VacunaCatalogo } from '../components/consulta/ListaVacunas'
 import {
-  CAMPOS_FUERA_DE_VOLKI, FIELD_TO_SECTION, FORM_VACIO, SECCIONES,
+  CAMPOS_FUERA_DE_VOLKI, FIELD_TO_SECTION, agregarSinUbicar, FORM_VACIO, SECCIONES,
   armarPayloadConsulta, claveBorrador, contarCamposLlenos,
-  describirCuando, esReciente, fechaPeru, formFromHistoria, formularioVacio,
+  describirCuando, esReciente, fechaPeru, formFromHistoria, formularioVacio, hoyISOPeru,
   leerBorrador, mezclarDatosIA, ordenarHistorias,
 } from '@src/utils/historiaClinica'
-import type { CampoTexto, DatosIA, FormConsulta, Historia, ModoRegistro } from '@src/utils/historiaClinica'
+import type {
+  CampoTexto, DatosIA, FormConsulta, Historia, ItemProductoAplicado, ItemTratamiento, ModoRegistro,
+} from '@src/utils/historiaClinica'
 
 // Lo que decide qué se guarda vive en `utils/historiaClinica.ts`; se vuelve a
 // exportar aquí porque las pruebas (y quien ya importaba de la pantalla) lo piden de este archivo.
@@ -34,12 +40,7 @@ export {
   buildPayload, formularioVacio, normalizarBorrador, esReciente, ordenarHistorias,
 } from '@src/utils/historiaClinica'
 
-interface Paciente {
-  nombre: string
-  especie?: string
-  raza?: string
-  cliente?: { nombre: string }
-}
+type Paciente = FichaPaciente
 
 interface Doctor { id: number; nombre: string }
 
@@ -49,11 +50,10 @@ const mensajeDe = (e: unknown, defecto: string) =>
 
 interface AvisoBorrador { cuando: string; recuperado: boolean }
 
-/** Texto en una sola línea que termina en «…» si no cabe. */
-const CORTAR: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 
 export default function HistoriasClinicas() {
   const confirmar = useConfirmar()
+  const toast = useToast()
   const { pacienteId: id } = useParams()
   const navigate = useNavigate()
   const { state: navState } = useLocation()   // { citaId } cuando se viene de "Atender"
@@ -63,6 +63,9 @@ export default function HistoriasClinicas() {
 
   // ── Datos
   const [paciente, setPaciente] = useState<Paciente | null>(null)
+  // Columna derecha: quién es el responsable y los próximos turnos del paciente
+  const [responsable, setResponsable] = useState<FichaResponsable | null>(null)
+  const [turnos, setTurnos] = useState<TurnoPaciente[]>([])
   const [historias, setHistorias] = useState<Historia[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -84,16 +87,19 @@ export default function HistoriasClinicas() {
   )
   const [editandoId, setEditandoId] = useState<number | null>(null)
   const [guardando, setGuardando] = useState(false)
-  const [guardadoOk, setGuardadoOk] = useState(false)
   const [errForm, setErrForm] = useState<string | null>(null)
+  // «Atendió el doctor» falta: el aviso sale junto al selector, no al pie
+  const [errDoctor, setErrDoctor] = useState(false)
   const [seccionActiva, setSeccionActiva] = useState('s1')
   // Cómo se llena la consulta NUEVA: se elige antes de empezar (null = aún no
   // eligió) y de ahí salen el método guardado y el momento en que arranca el
   // cronómetro. El formulario es el mismo en los dos; solo cambia el método.
-  const [modo, setModo] = useState<ModoRegistro | null>(null)
-  const [inicioMs, setInicioMs] = useState<number | null>(null)
-  // Segundos de la última consulta guardada, para mostrarlos al volver a la elección
-  const [ultimoTiempo, setUltimoTiempo] = useState<number | null>(null)
+  const [modo, setModo] = useState<ModoRegistro | null>(
+    () => (borrador && esReciente(borrador.guardadoEn) ? (borrador.modo ?? 'manual') : null),
+  )
+  const [inicioMs, setInicioMs] = useState<number | null>(
+    () => (borrador && esReciente(borrador.guardadoEn) ? Date.now() : null),
+  )
   // Consulta nueva = formulario de una sola página con los campos de la
   // réplica; corregir una guardada muestra todos sus campos, por pestañas.
   const reducido = editandoId === null
@@ -105,6 +111,8 @@ export default function HistoriasClinicas() {
   // ── IA / voz
   const [transcripcionIA, setTranscripcionIA] = useState('')
   const [datosIA, setDatosIA] = useState<DatosIA | null>(null)
+  // Palabras del dictado que la IA no puso en ningún campo: se muestran para no perderlas en silencio
+  const [sinUbicar, setSinUbicar] = useState<string[]>([])
   const [inferenciasBrut, setInferenciasBrut] = useState<Record<string, string>>({})
   const [highlights, setHighlights] = useState<Record<string, Resaltado>>({})
 
@@ -115,6 +123,10 @@ export default function HistoriasClinicas() {
   const [vetId, setVetId] = useState('')
   const [catalogoVacunas, setCatalogoVacunas] = useState<VacunaCatalogo[]>([])
   const [medicamentos, setMedicamentos] = useState<MedicamentoInventario[]>([])
+  // Todo el inventario, para buscar en «Productos aplicados»
+  const [productos, setProductos] = useState<ProductoInventario[]>([])
+  // Sube cada vez que la IA llena el formulario: el formulario abre los paneles con datos
+  const [senalIA, setSenalIA] = useState(0)
   // Si no cargan los catálogos, los campos siguen siendo de texto libre pero hay que decirlo
   const [catalogosFallaron, setCatalogosFallaron] = useState(false)
 
@@ -131,6 +143,23 @@ export default function HistoriasClinicas() {
       .finally(() => setLoading(false))
   }, [id, intento])
 
+  // Responsable del paciente (la ficha del paciente solo trae su id)
+  useEffect(() => {
+    if (!paciente?.cliente_id) return
+    api.get(`/api/clientes/${paciente.cliente_id}`)
+      .then((c: FichaResponsable) => setResponsable({ id: c.id, nombre: c.nombre, telefono: c.telefono }))
+      .catch(() => setResponsable(null))
+  }, [paciente?.cliente_id])
+
+  // Próximos turnos. Se vuelven a pedir al guardar una consulta, porque un
+  // «próximo control» agenda un turno solo.
+  useEffect(() => {
+    api.get(`/api/citas/?paciente_id=${id}&desde=${hoyISOPeru()}`)
+      .then((c: TurnoPaciente[]) => setTurnos(
+        (Array.isArray(c) ? c : []).filter(t => t.estado === 'pendiente' || t.estado === 'confirmada')))
+      .catch(() => setTurnos([]))
+  }, [id, historias.length])
+
   // Catálogo de vacunas. Vive en el backend porque es el mismo que usa la
   // consolidación para agrupar; si falla, el desplegable queda vacío y la
   // vacuna se sigue pudiendo escribir a mano ("Otra").
@@ -143,6 +172,9 @@ export default function HistoriasClinicas() {
     api.get('/api/productos/?categoria=medicamento&limit=500')
       .then((p: MedicamentoInventario[]) => setMedicamentos(Array.isArray(p) ? p : []))
       .catch(() => { setMedicamentos([]); setCatalogosFallaron(true) })
+    api.get('/api/productos/?limit=2000')
+      .then((p: ProductoInventario[]) => setProductos(Array.isArray(p) ? p : []))
+      .catch(() => { setProductos([]); setCatalogosFallaron(true) })
   }, [])
 
   // ── Salir con la consulta a medio llenar ───────────────────────────────────
@@ -157,17 +189,21 @@ export default function HistoriasClinicas() {
     return () => window.removeEventListener('beforeunload', alSalir)
   }, [hayCambios])
 
-  /** Navegación interna: el aviso del navegador no cubre moverse dentro de la
-   *  aplicación, así que el botón de volver pregunta por su cuenta. */
-  const salir = async () => {
+  /** Ir a otra pantalla desde las migas o los botones: si hay consulta a medio llenar, se pregunta. */
+  const irConAviso = async (ruta: string) => {
     if (hayCambios && !await confirmar({
       titulo: 'Consulta sin guardar',
       mensaje: 'Tienes una consulta a medio llenar. Se guarda como borrador y podrás retomarla al volver a esta mascota, pero todavía no queda registrada en la historia clínica.',
       confirmarTexto: 'Salir igual',
       peligroso: false,
     })) return
-    navigate(-1)
+    navigate(ruta)
   }
+
+  /** Después de guardar o cancelar se vuelve a la ficha del paciente (su historial). */
+  const irAlHistorial = (estado?: Record<string, unknown>) =>
+    navigate(`/pacientes/${id}/historial`, estado ? { state: estado } : undefined)
+
 
   // La lista de doctores solo hace falta si la escribe la recepcionista
   useEffect(() => {
@@ -179,14 +215,15 @@ export default function HistoriasClinicas() {
 
   // ── Autoguardado del borrador en localStorage
   useEffect(() => {
+    const clave = claveBorrador(id, editandoId)
     if (formularioVacio(form)) {
-      localStorage.removeItem(claveBorrador(id))
+      localStorage.removeItem(clave)
     } else {
-      localStorage.setItem(claveBorrador(id), JSON.stringify({
-        form, guardadoEn: new Date().toISOString(),
+      localStorage.setItem(clave, JSON.stringify({
+        form, guardadoEn: new Date().toISOString(), modo,
       }))
     }
-  }, [form, id])
+  }, [form, id, editandoId, modo])
 
   // ── Setters que limpian su resaltado al editar
   const setCampo = (f: CampoTexto, valor: string) => {
@@ -200,6 +237,11 @@ export default function HistoriasClinicas() {
     }))
   const setLista = (campo: 'tratamiento_items' | 'vacunas_items', items: unknown[]) =>
     setForm(p => ({ ...p, [campo]: items }))
+  const setTratamientos = (items: ItemTratamiento[]) => setLista('tratamiento_items', items)
+  const setLibreDemanda = (valor: boolean) =>
+    setForm(p => ({ ...p, alimentacion_libre_demanda: valor }))
+  const setProductosAplicados = (items: ItemProductoAplicado[]) =>
+    setForm(p => ({ ...p, productos_aplicados: items }))
 
   // ── Resetear formulario + estado IA
   const resetForm = () => {
@@ -209,6 +251,7 @@ export default function HistoriasClinicas() {
     setHighlights({})
     setTranscripcionIA('')
     setDatosIA(null)
+    setSinUbicar([])
     setInferenciasBrut({})
     setSeccionActiva('s1')
     setSeccionesConAviso(new Set())
@@ -219,11 +262,26 @@ export default function HistoriasClinicas() {
     setInicioMs(null)
   }
 
+  // «Cancelar» al pie del formulario: si hay algo escrito, se confirma antes de vaciar
+  const cancelarConsulta = async () => {
+    if (hayCambios && !await confirmar({
+      titulo: 'Cancelar la consulta',
+      mensaje: 'Tienes una consulta a medio llenar. Si cancelas, se vacía el formulario y el tiempo se descarta.',
+      detalle: 'Lo que escribiste se perderá.',
+      confirmarTexto: 'Cancelar y vaciar',
+    })) return
+    localStorage.removeItem(claveBorrador(id))
+    resetForm()
+    irAlHistorial()
+  }
+
   // Traer un borrador viejo que se dejó sin tocar
   const recuperarBorrador = () => {
     if (!borrador) return
     setForm(borrador.form)
     setAvisoBorrador(a => (a ? { ...a, recuperado: true } : a))
+    // El formulario no se ve hasta elegir cómo se llena: se abre con el modo del borrador
+    if (modo === null) elegirModo(borrador.modo ?? 'manual')
   }
 
   const descartarBorrador = () => {
@@ -234,7 +292,6 @@ export default function HistoriasClinicas() {
 
   // Elegir cómo se llena la consulta nueva: aquí arranca el cronómetro.
   const elegirModo = (m: ModoRegistro) => {
-    setUltimoTiempo(null)
     setModo(m)
     setInicioMs(Date.now())
   }
@@ -266,6 +323,8 @@ export default function HistoriasClinicas() {
     setVetId(h.veterinario_id ? String(h.veterinario_id) : '')
     setHighlights({})
     setSeccionActiva('s1')
+    // El que se desplaza es el panel central de la disposición, no la página
+    document.querySelector('[data-disposicion="central"]')?.scrollTo({ top: 0, behavior: 'smooth' })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -304,6 +363,7 @@ export default function HistoriasClinicas() {
     const fuera = (campo: string) => soloVolki && (CAMPOS_FUERA_DE_VOLKI as string[]).includes(campo)
 
     setForm(prev => mezclarDatosIA(prev, datos, medicamentos, soloVolki))
+    setSenalIA(n => n + 1)
 
     // Resaltados: "explicito" → "ok", "inferido" → "inferido"
     const hl: Record<string, Resaltado> = {}
@@ -333,11 +393,20 @@ export default function HistoriasClinicas() {
 
   // ── Guardar
   const handleSave = async () => {
-    if (llenaRecepcion && !vetId) {
-      setErrForm('Indica qué veterinario atendió la consulta.')
+    if (reducido && !modo) return   // no se guarda una consulta nueva sin elegir cómo se llenó
+    // Una consulta nueva sin nada escrito no se guarda: quedaría con su tiempo y ensuciaría las mediciones
+    if (!editandoId && formularioVacio(form)) {
+      setErrForm('La consulta está vacía. Escribe o dicta algo antes de guardar.')
       return
     }
-    if (reducido && !modo) return   // no se guarda una consulta nueva sin elegir cómo se llenó
+    if (llenaRecepcion && !vetId) {
+      setErrDoctor(true)
+      setErrForm(null)
+      const selector = document.getElementById('vet-atendio')
+      selector?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      selector?.focus()
+      return
+    }
     setGuardando(true); setErrForm(null)
     try {
       // Consulta nueva: campos de Volki + tiempo y método elegidos. Corregir: todo, sin medir.
@@ -353,15 +422,21 @@ export default function HistoriasClinicas() {
       } else {
         const r = await api.post(`/api/pacientes/${id}/historias/`, payload)
         setHistorias(p => ordenarHistorias([r, ...p]))
-        if (typeof payload.segundos_registro === 'number') setUltimoTiempo(payload.segundos_registro)
         // Si se vino de "Atender" un turno, márcalo como atendido
         if (navState?.citaId) {
-          try { await api.put(`/api/citas/${navState.citaId}`, { estado: 'atendida' }) } catch { /* no crítico */ }
+          try {
+            await api.put(`/api/citas/${navState.citaId}`, { estado: 'atendida' })
+          } catch {
+            toast.error('La consulta quedó guardada, pero no se pudo marcar el turno como atendido. Márcalo desde Turnos.')
+          }
         }
       }
-      setGuardadoOk(true)
-      setTimeout(() => setGuardadoOk(false), 2500)
+      // Guardada: se limpia el borrador y se vuelve al historial, donde ya aparece la consulta
+      localStorage.removeItem(claveBorrador(id, editandoId))
+      const segundos = !editandoId && typeof payload.segundos_registro === 'number' ? payload.segundos_registro : null
+      const fueEdicion = !!editandoId
       resetForm()
+      irAlHistorial({ guardada: fueEdicion ? 'actualizada' : 'nueva', segundos })
     } catch (e) {
       setErrForm(mensajeDe(e, 'Error al guardar.'))
     } finally {
@@ -389,200 +464,246 @@ export default function HistoriasClinicas() {
   // ── Contador de inferidos pendientes
   const numInferidos = Object.values(highlights).filter(v => v === 'inferido').length
 
-  if (loading) return <CargandoPantalla />
-  if (error) return (
-    <Alert
-      type="error" showIcon title={error} style={{ margin: 24 }}
-      description="Revisa tu conexión. Si estás en el celular con poca señal, vuelve a intentarlo."
-      action={
-        <Flex gap={8} wrap>
-          <Button type="primary" onClick={() => setIntento(n => n + 1)}>Reintentar</Button>
-          <Button onClick={() => navigate(-1)}>Volver</Button>
-        </Flex>
-      }
-    />
+  // Cargando o con error, la pantalla conserva la misma disposición (menú, contenido y
+  // columna derecha), para que nada se mueva cuando llegan los datos.
+  if (loading) {
+    return (
+      <Disposicion lateral={<Skeleton active paragraph={{ rows: 8 }} />}>
+        <Skeleton active paragraph={{ rows: 10 }} />
+      </Disposicion>
+    )
+  }
+  if (error) {
+    return (
+      <Disposicion lateral={<span />}>
+        <Alert
+          type="error" showIcon title={error}
+          description="Revisa tu conexión. Si estás en el celular con poca señal, vuelve a intentarlo."
+          action={
+            <Flex gap={8} wrap>
+              <Button type="primary" onClick={() => setIntento(n => n + 1)}>Reintentar</Button>
+              <Button onClick={() => navigate(-1)}>Volver</Button>
+            </Flex>
+          }
+        />
+      </Disposicion>
+    )
+  }
+
+  // Botones del pie, iguales en consulta nueva y al corregir una guardada
+  const pie = (
+    <>
+      {errForm && <Alert type="error" showIcon title={errForm} />}
+      <Flex justify="flex-end" gap={8} wrap>
+        <Button size={movil ? 'large' : 'middle'} onClick={cancelarConsulta} style={movil ? { flex: 1 } : undefined}>
+          Cancelar
+        </Button>
+        <Button
+          type="primary" size={movil ? 'large' : 'middle'} loading={guardando} onClick={handleSave}
+          icon={<SaveOutlined />}
+          style={movil ? { flex: 2 } : { minWidth: 180 }}
+        >
+          {guardando ? 'Guardando…' : editandoId ? 'Actualizar consulta' : 'Guardar'}
+        </Button>
+      </Flex>
+    </>
   )
 
+  const migas = [
+    { title: <a href="/clientes" onClick={e => { e.preventDefault(); irConAviso('/clientes') }}>Clientes</a> },
+    {
+      title: responsable
+        ? <a href={`/clientes/${responsable.id}`} onClick={e => { e.preventDefault(); irConAviso(`/clientes/${responsable.id}`) }}>{responsable.nombre}</a>
+        : '…',
+    },
+    { title: <a href={`/pacientes/${id}/historial`} onClick={e => { e.preventDefault(); irConAviso(`/pacientes/${id}/historial`) }}>{paciente?.nombre}</a> },
+    { title: 'Consulta' },
+  ]
+
+
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: movil ? 12 : 20 }}>
+    <Disposicion
+      migas={migas}
+      lateral={paciente && (
+        <ColumnaPaciente
+          paciente={paciente} responsable={responsable}
+          historias={historias} turnos={turnos}
+          onDescargar={historias.length > 0 ? () => generarPDF(paciente, historias) : undefined}
+        />
+      )}
+    >
       <Flex vertical gap={16}>
+            <Flex vertical gap={16}>
 
-        {/* Encabezado */}
-        <Flex
-          align="center" justify="space-between" gap={8}
-          style={{ background: BRAND.primary, color: token.colorTextLightSolid, borderRadius: token.borderRadiusLG, padding: '10px 14px' }}
-        >
-          <Flex align="center" gap={10} style={{ minWidth: 0, flex: 1 }}>
-            <Button
-              type="text" aria-label="Volver" onClick={salir}
-              icon={<ArrowLeftOutlined />} style={{ color: token.colorTextLightSolid, flexShrink: 0 }}
-            />
-            {/* Un nombre o una raza largos se cortan con «…» en vez de empujar el botón PDF */}
-            <div style={{ minWidth: 0 }}>
-              <h1 style={{ margin: 0, fontSize: 17, lineHeight: 1.2, color: 'inherit', ...CORTAR }}>{paciente?.nombre}</h1>
-              <div
-                style={{ fontSize: 13, opacity: 0.85, ...CORTAR }}
-                title={[paciente?.especie, paciente?.raza, paciente?.cliente?.nombre].filter(Boolean).join(' · ')}
-              >
-                {paciente?.especie}{paciente?.raza ? ` · ${paciente.raza}` : ''}
-                {paciente?.cliente ? ` · ${paciente.cliente.nombre}` : ''}
-              </div>
-            </div>
-          </Flex>
-          <Button
-            style={{ flexShrink: 0 }}
-            icon={<DownloadOutlined />} disabled={historias.length === 0}
-            aria-label="Descargar historia clínica en PDF"
-            onClick={() => generarPDF(paciente, historias)}
-          >
-            {movil ? null : 'PDF'}
-          </Button>
-        </Flex>
-
-        {/* ── Panel IA / Voz ─────────────────────────────────────────────── */}
-        {/* Solo en «Dictar» (o al corregir una consulta). En «Escribir» no hay voz. */}
-        {(modo === 'ia' || !reducido) && (
-          <VoiceTextProcessor
-            onResult={({ datos, inferencias, alertas_rango, transcripcion }: {
-              datos: DatosIA
-              inferencias: Record<string, string>
-              alertas_rango: Record<string, unknown>
-              transcripcion: string
-            }) => {
-              // `applyIA` marca que este registro se asistió con IA
-              setTranscripcionIA(transcripcion)
-              setDatosIA(datos)
-              setInferenciasBrut(inferencias)
-              applyIA(datos, inferencias, alertas_rango)
-            }}
-            resumirResultado={({ datos }: { datos: DatosIA }) => {
-              // Confirmar cuántos campos se completaron: sin esto el veterinario
-              // tiene que recorrer el formulario entero para saber qué entendió la IA.
-              const n = contarCamposLlenos(datos, reducido)
-              return n ? `${n} campo${n > 1 ? 's' : ''} completado${n > 1 ? 's' : ''}` : 'No se detectaron datos'
-            }}
-          />
-        )}
-
-        {/* Badge de inferidos pendientes */}
-        {numInferidos > 0 && (
-          <Alert
-            type="warning" showIcon
-            title={`${numInferidos} campo${numInferidos > 1 ? 's' : ''} inferido${numInferidos > 1 ? 's' : ''} por revisar — resaltado${numInferidos > 1 ? 's' : ''} en amarillo abajo`}
-          />
-        )}
-
-        {/* ── Formulario ─────────────────────────────────────────────────── */}
-        <Flex vertical gap={12}>
-          <Flex align="center" justify="space-between" gap={8} wrap>
-            <Typography.Title level={5} style={{ margin: 0 }}>
-              {editandoId ? 'Editando consulta' : 'Nueva consulta'}
-            </Typography.Title>
-            {editandoId ? (
-              <Button type="link" onClick={resetForm}>Cancelar edición</Button>
-            ) : modo && inicioMs !== null && (
-              <Flex align="center" gap={12} wrap>
-                <Cronometro key={inicioMs} inicioMs={inicioMs} />
-                <Segmented<ModoRegistro>
-                  value={modo} onChange={cambiarModo} size={movil ? 'large' : 'middle'}
-                  options={[{ value: 'manual', label: 'Escribir' }, { value: 'ia', label: 'Dictar' }]}
+              {/* ── Panel IA / Voz ───────────────────────────────────────────── */}
+              {/* Solo en «Dictar» (o al corregir una consulta). En «Escribir» no hay voz. */}
+              {(modo === 'ia' || !reducido) && (
+                <VoiceTextProcessor
+                  onResult={({ datos, inferencias, alertas_rango, transcripcion, sin_ubicar }: {
+                    datos: DatosIA
+                    inferencias: Record<string, string>
+                    alertas_rango: Record<string, unknown>
+                    transcripcion: string
+                    sin_ubicar?: string[]
+                  }) => {
+                    setSinUbicar(Array.isArray(sin_ubicar) ? sin_ubicar : [])
+                    // `applyIA` marca que este registro se asistió con IA
+                    setTranscripcionIA(transcripcion)
+                    setDatosIA(datos)
+                    setInferenciasBrut(inferencias)
+                    applyIA(datos, inferencias, alertas_rango)
+                  }}
+                  resumirResultado={({ datos }: { datos: DatosIA }) => {
+                    // Confirmar cuántos campos se completaron: sin esto el veterinario
+                    // tiene que recorrer el formulario entero para saber qué entendió la IA.
+                    const n = contarCamposLlenos(datos, reducido)
+                    return n ? `${n} campo${n > 1 ? 's' : ''} completado${n > 1 ? 's' : ''}` : 'No se detectaron datos'
+                  }}
                 />
-              </Flex>
-            )}
-          </Flex>
-          {reducido && modo === null && ultimoTiempo !== null && (
-            <Alert
-              type="success" showIcon
-              title={`Consulta guardada. Tiempo de registro: ${formatoTiempo(ultimoTiempo)}.`}
-            />
-          )}
+              )}
 
-          {avisoBorrador && (
-            <Alert
-              type="warning" showIcon icon={<FileTextOutlined />}
-              title={avisoBorrador.recuperado
-                ? <>Se recuperó un borrador <strong>{avisoBorrador.cuando}</strong>. Revísalo antes de guardar.</>
-                : <>Hay un borrador sin guardar <strong>{avisoBorrador.cuando}</strong>.</>}
-              action={
-                <Flex gap={8}>
-                  {!avisoBorrador.recuperado && (
-                    <Button size="small" type="primary" onClick={recuperarBorrador}>Recuperarlo</Button>
+              {/* Lo que la IA no supo dónde poner: se ofrece pasarlo a Observaciones */}
+              {sinUbicar.length > 0 && (
+                <Alert
+                  type="info" showIcon
+                  title={`La IA no ubicó: ${sinUbicar.join(', ')}`}
+                  description="Revisa si falta algo en el formulario. Puedes pasarlas a Observaciones para no perderlas."
+                  action={
+                    <Flex gap={8} wrap>
+                      <Button
+                        size={movil ? 'middle' : 'small'} type="primary"
+                        onClick={() => {
+                          setForm(p => ({ ...p, observaciones: agregarSinUbicar(p.observaciones, sinUbicar) }))
+                          setSinUbicar([])
+                        }}
+                      >
+                        Pasar a Observaciones
+                      </Button>
+                      <Button size={movil ? 'middle' : 'small'} onClick={() => setSinUbicar([])}>Descartar</Button>
+                    </Flex>
+                  }
+                />
+              )}
+
+              {/* Badge de inferidos pendientes */}
+              {numInferidos > 0 && (
+                <Alert
+                  type="warning" showIcon
+                  title={`${numInferidos} campo${numInferidos > 1 ? 's' : ''} inferido${numInferidos > 1 ? 's' : ''} por revisar — resaltado${numInferidos > 1 ? 's' : ''} en amarillo abajo`}
+                />
+              )}
+
+              {/* ── Formulario ─────────────────────────────────────────────── */}
+              <Flex vertical gap={12}>
+                <Flex align="center" justify="space-between" gap={8} wrap>
+                  <Typography.Title level={5} style={{ margin: 0 }}>
+                    {editandoId ? 'Editando consulta' : 'Nueva consulta'}
+                  </Typography.Title>
+                  {editandoId ? (
+                    <Button type="link" onClick={cancelarConsulta}>Cancelar edición</Button>
+                  ) : modo && inicioMs !== null && (
+                    <Flex align="center" gap={12} wrap>
+                      <Cronometro key={inicioMs} inicioMs={inicioMs} />
+                      <Segmented<ModoRegistro>
+                        aria-label="Cómo se llena la consulta" value={modo} onChange={cambiarModo} size={movil ? 'large' : 'middle'}
+                        options={[{ value: 'manual', label: 'Escribir' }, { value: 'ia', label: 'Dictar' }]}
+                      />
+                    </Flex>
                   )}
-                  <Button size="small" onClick={descartarBorrador}>Descartar</Button>
                 </Flex>
-              }
-            />
-          )}
+                {avisoBorrador && (
+                  <Alert
+                    type="warning" showIcon icon={<FileTextOutlined />}
+                    title={avisoBorrador.recuperado
+                      ? <>Se recuperó un borrador <strong>{avisoBorrador.cuando}</strong>. Revísalo antes de guardar.</>
+                      : <>Hay un borrador sin guardar <strong>{avisoBorrador.cuando}</strong>.</>}
+                    action={
+                      <Flex gap={8}>
+                        {!avisoBorrador.recuperado && (
+                          <Button size="small" type="primary" onClick={recuperarBorrador}>Recuperarlo</Button>
+                        )}
+                        <Button size="small" onClick={descartarBorrador}>Descartar</Button>
+                      </Flex>
+                    }
+                  />
+                )}
 
-          {reducido && modo === null && <EleccionModo onElegir={elegirModo} />}
+                {reducido && modo === null && <EleccionModo onElegir={elegirModo} />}
 
-          {mostrarFormulario && llenaRecepcion && (
-            <Flex
-              wrap align="center" gap={8}
-              style={{ background: token.colorPrimaryBg, border: `1px solid ${token.colorPrimaryBorder}`, borderRadius: token.borderRadius, padding: '8px 12px' }}
-            >
-              <MedicineBoxOutlined style={{ color: BRAND.primary }} />
-              <label htmlFor="vet-atendio" style={{ fontWeight: 600 }}>Atendió el doctor:</label>
-              <Select
-                id="vet-atendio" value={vetId || undefined} placeholder="Selecciona…"
-                onChange={(v: string) => setVetId(v ?? '')}
-                options={doctores.map(d => ({ value: String(d.id), label: d.nombre }))}
-                style={{ minWidth: 220 }}
-              />
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                La consulta queda a su nombre; tu usuario queda registrado como quien la escribió.
-              </Typography.Text>
-            </Flex>
-          )}
-
-          {/* Pestañas: solo al corregir una consulta guardada (la nueva va en una página) */}
-          {!reducido && (
-            <Tabs
-              activeKey={seccionActiva} onChange={setSeccionActiva}
-              size={movil ? 'large' : 'middle'} style={{ marginBottom: -8 }}
-              items={SECCIONES.map(sec => ({
-                key: sec.id,
-                label: (
-                  <Flex align="center" gap={6}>
-                    <span>{sec.num}. {sec.corto}</span>
-                    {seccionesLlenas.has(sec.id) && <CheckCircleFilled style={{ color: BRAND.primary, fontSize: 12 }} />}
-                    {/* Punto de aviso: la IA dejó algo por revisar en esa sección */}
-                    {seccionesConAviso.has(sec.id) && <Badge status="warning" />}
+                {mostrarFormulario && llenaRecepcion && (
+                  <Flex
+                    wrap align="center" gap={8}
+                    style={{ background: token.colorPrimaryBg, border: `1px solid ${token.colorPrimaryBorder}`, borderRadius: token.borderRadius, padding: '8px 12px' }}
+                  >
+                    <MedicineBoxOutlined style={{ color: BRAND.primary }} />
+                    <label htmlFor="vet-atendio" style={{ fontWeight: 600 }}>Atendió el doctor:</label>
+                    <Select
+                      id="vet-atendio" value={vetId || undefined} placeholder="Selecciona…"
+                      status={errDoctor ? 'error' : undefined}
+                      onChange={(v: string) => { setVetId(v ?? ''); setErrDoctor(false) }}
+                      options={doctores.map(d => ({ value: String(d.id), label: d.nombre }))}
+                      style={{ minWidth: 220 }}
+                    />
+                    {errDoctor && (
+                      <Typography.Text type="danger" role="alert" style={{ fontSize: 13 }}>
+                        Indica qué veterinario atendió la consulta.
+                      </Typography.Text>
+                    )}
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      La consulta queda a su nombre; tu usuario queda registrado como quien la escribió.
+                    </Typography.Text>
                   </Flex>
-                ),
-              }))}
-            />
-          )}
+                )}
 
-          {mostrarFormulario && catalogosFallaron && (seccionVisible === 'todas' || seccionVisible === 's5') && (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              No se pudo cargar el inventario; escribe el nombre.
-            </Typography.Text>
-          )}
+                {mostrarFormulario && catalogosFallaron && (
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    No se pudo cargar el inventario; escribe el nombre.
+                  </Typography.Text>
+                )}
 
-          {mostrarFormulario && (
-            <>
-              <SeccionesConsulta
-                activa={seccionVisible} reducido={reducido} editando={!!editandoId}
-                form={form} resaltados={highlights}
-                set={setCampo} setEop={setEop} setLista={setLista}
-                medicamentos={medicamentos} catalogoVacunas={catalogoVacunas}
-                especie={paciente?.especie}
-              />
+                {/* Consulta nueva: el formulario de Volki, una sola página */}
+                {reducido && modo !== null && (
+                  <FormularioVolki
+                    form={form} resaltados={highlights}
+                    set={setCampo} setEop={setEop} setLibreDemanda={setLibreDemanda}
+                    setTratamientos={setTratamientos} setProductosAplicados={setProductosAplicados}
+                    medicamentos={medicamentos} productos={productos} senalIA={senalIA}
+                  >
+                    {pie}
+                  </FormularioVolki>
+                )}
 
-              {errForm && <Alert type="error" showIcon title={errForm} />}
-
-              <Button
-                type="primary" size="large" block loading={guardando} onClick={handleSave}
-                icon={guardadoOk ? <CheckOutlined /> : <SaveOutlined />}
-              >
-                {guardadoOk ? 'Guardado'
-                  : guardando ? 'Guardando…'
-                  : editandoId ? 'Actualizar consulta' : 'Guardar consulta'}
-              </Button>
-            </>
-          )}
-        </Flex>
+                {/* Corregir una consulta guardada: todos sus campos, por pestañas */}
+                {!reducido && (
+                  <>
+                    <Tabs
+                      activeKey={seccionActiva} onChange={setSeccionActiva}
+                      size={movil ? 'large' : 'middle'} style={{ marginBottom: -8 }}
+                      items={SECCIONES.map(sec => ({
+                        key: sec.id,
+                        label: (
+                          <Flex align="center" gap={6}>
+                            <span>{sec.num}. {sec.corto}</span>
+                            {seccionesLlenas.has(sec.id) && <CheckCircleFilled style={{ color: BRAND.primary, fontSize: 12 }} />}
+                            {/* Punto de aviso: la IA dejó algo por revisar en esa sección */}
+                            {seccionesConAviso.has(sec.id) && <Badge status="warning" />}
+                          </Flex>
+                        ),
+                      }))}
+                    />
+                    <SeccionesConsulta
+                      activa={seccionVisible}
+                      form={form} resaltados={highlights}
+                      set={setCampo} setEop={setEop} setLista={setLista}
+                      setLibreDemanda={setLibreDemanda} setProductosAplicados={setProductosAplicados}
+                      medicamentos={medicamentos} productos={productos} catalogoVacunas={catalogoVacunas}
+                      especie={paciente?.especie}
+                    />
+                    {pie}
+                  </>
+                )}
+              </Flex>
+            </Flex>
 
         {/* ── Documentos: si se está editando una consulta puntual, se acotan a
             ella (radiografía/análisis de ESA visita); si no, quedan a nivel
@@ -602,6 +723,6 @@ export default function HistoriasClinicas() {
         </Flex>
 
       </Flex>
-    </div>
+    </Disposicion>
   )
 }

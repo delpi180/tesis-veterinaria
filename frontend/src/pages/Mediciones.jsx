@@ -789,7 +789,7 @@ export default function Mediciones() {
         ))}
       </div>
 
-      <main className="flex-1 px-4 md:px-6 py-4 md:py-8 max-w-5xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-8 pt-4 md:pt-4 pb-6 md:pb-8 w-full">
 
         {/* ── Pestaña: Responder Encuestas ──────────────────────────────── */}
         {tabActiva === 'encuestas' && (

@@ -206,7 +206,7 @@ export default function Usuarios() {
         </button>
       </header>
 
-      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-8 pt-4 md:pt-4 pb-6 md:pb-8 flex flex-col gap-5 w-full">
         <div className="bg-sky-50 border border-sky-200 rounded-xl px-4 py-3 text-sm text-sky-800 flex items-start gap-2">
           <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />
           <p>La <strong>recepcionista</strong> es la administradora: gestiona usuarios, ventas, inventario, turnos y asistencia. El <strong>veterinario</strong> (doctor) atiende y llena las historias clínicas, que quedan firmadas con su nombre.</p>

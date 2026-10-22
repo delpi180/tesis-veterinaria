@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import MenuLateral from './components/MenuLateral'
+import { useState } from 'react'
+import { Grid } from 'antd'
+import MenuLateral, { BarraSuperior } from './components/MenuLateral'
 import { ToastProvider } from './components/Toast'
 import { ConfirmarProvider } from './components/Confirmar'
 import { CargandoPantalla } from './components/Cargando'
@@ -54,15 +56,28 @@ function Home() {
 }
 
 function AppProtegida() {
+  // Menú abierto o cerrado (botón de la barra superior de escritorio); se recuerda en este navegador
+  const [menuCerrado, setMenuCerrado] = useState(() => {
+    try { return localStorage.getItem('menu_cerrado') === '1' } catch { return false }
+  })
+  const alternarMenu = () => setMenuCerrado(c => {
+    try { localStorage.setItem('menu_cerrado', c ? '0' : '1') } catch { /* sin almacenamiento */ }
+    return !c
+  })
+  const movil = !Grid.useBreakpoint().md
   if (!getToken()) return <Navigate to="/login" replace />
   return (
     // `min-w-0`: sin esto el contenedor no baja de su ancho de contenido y una
     // tabla o barra de pestañas ancha estira TODA la aplicación de lado en
     // móvil, en vez de desplazarse dentro de su propia caja.
-    <div className="flex min-w-0 min-h-screen">
-      <MenuLateral />
+    // `flex-1 w-full`: #root es flex, y sin esto el shell se encoge al ancho de su
+    // contenido, así que el ancho de la pantalla (y la columna derecha) cambiaba
+    // de una ruta a otra en vez de llegar siempre al borde de la ventana.
+    <div className="flex flex-1 w-full min-w-0 min-h-screen">
+      <MenuLateral colapsado={menuCerrado} />
       {/* min-w-0 evita que gráficos/tablas anchos rompan el centrado del contenido */}
       <div className="flex-1 min-w-0 flex flex-col pt-12 md:pt-0">
+        {!movil && <BarraSuperior onAlternarMenu={alternarMenu} />}
         <Suspense fallback={<CargandoPantalla />}>
         <Routes>
           <Route path="/"                       element={<Home />} />

@@ -18,6 +18,7 @@ export const BRAND = {
   text: '#1f2a25',
   textSecondary: '#56655d', // ≥ 5.2:1 sobre blanco y crema
   border: '#e4dfd5',
+  panel: '#faf8f3',        // crema muy claro: cabeceras de tarjetas y paneles
   accent: '#c8623f',        // arcilla: el "hoy" de un gráfico, un dato destacado
   accentText: '#a94a29',    // 5.0:1 sobre blanco, para texto
 } as const

@@ -17,7 +17,7 @@ from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
     busqueda, inventario, asistencia, mi_panel, actividad, configuracion, errores,
-    respaldo, catalogos, tratamientos,
+    respaldo, catalogos, tratamientos, etiquetas,
 )
 from core import ratelimit
 from core.config import settings
@@ -300,6 +300,7 @@ app.include_router(auth.router)
 app.include_router(usuarios.router)
 app.include_router(dashboard.router)
 app.include_router(clientes.router)
+app.include_router(etiquetas.router)
 app.include_router(pacientes.router)
 app.include_router(citas.router)
 # Módulos de tesis: si están apagados ni siquiera se montan, así que sus rutas
@@ -414,6 +415,9 @@ class ProcessHistoriaResponse(BaseModel):
     datos:         dict
     inferencias:   dict
     alertas_rango: dict = {}
+    # Palabras clínicas del dictado que no quedaron en ningún campo (revisión
+    # determinista, sin IA). Opcional: un cliente antiguo la ignora sin romperse.
+    sin_ubicar:    list[str] = []
     transcripcion: str
 
 

@@ -8,6 +8,7 @@ import {
 import { api, getNombre, getUsuario } from '../services/api'
 import { waRecordatorio } from '../utils/citas'
 import { BRAND } from '@src/core/color'
+import { MEDIDAS } from '@src/core/medidas'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -54,9 +55,9 @@ interface Resumen {
 }
 
 const fmtMoneda = (n?: number) =>
-  `S/ ${Number(n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  `S/ ${Number(n ?? 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtHora = (iso: string) =>
-  new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+  new Date(iso).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })
 
 const HOY_IDX = (new Date().getDay() + 6) % 7
 
@@ -137,8 +138,8 @@ export default function Inicio() {
     }
   }
 
-  const hoyTexto = new Date().toLocaleDateString('es-MX', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  const hoyTexto = new Date().toLocaleDateString('es-PE', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Lima',
   })
   // Solo la primera letra en mayúscula: con `capitalize` de CSS salía "Setiembre De 2026".
   const hoy = hoyTexto.charAt(0).toUpperCase() + hoyTexto.slice(1)
@@ -160,13 +161,13 @@ export default function Inicio() {
   const plural = (n: number, uno: string, varios: string) => (n === 1 ? uno : varios)
 
   return (
-    <div className="animar" style={{ flex: 1, minWidth: 0, padding: '32px 24px 40px', maxWidth: 1080, width: '100%', margin: '0 auto' }}>
+    <div className="animar" style={{ flex: 1, minWidth: 0, padding: '16px 32px 32px', width: '100%' }}>
 
       {/* Encabezado: qué día es y qué hay que hacer hoy. */}
       <Row justify="space-between" align="bottom" gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col flex="auto">
           <Text type="secondary">{hoy}</Text>
-          <Title level={2} style={{ margin: '4px 0 8px' }}>
+          <Title level={2} style={{ margin: '4px 0 8px', fontSize: MEDIDAS.tituloSeccion, fontWeight: 500, lineHeight: '32px' }}>
             {saludo()}, {usuario}
           </Title>
           <Paragraph type="secondary" style={{ margin: 0 }}>

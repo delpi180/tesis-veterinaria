@@ -1,21 +1,23 @@
 /**
- * Las cinco partes del formulario de consulta (anamnesis, EOG, EOP, diagnóstico
- * y plan). En una consulta nueva (`reducido`) se muestran todas juntas y solo
- * con los campos del formulario de Volki; al corregir una consulta guardada se
- * muestran todos sus campos, una sección a la vez.
+ * Las cinco partes del formulario COMPLETO de consulta (anamnesis, EOG, EOP,
+ * diagnóstico y plan), una sección a la vez. Se usa solo al corregir una
+ * consulta ya guardada, para que nunca quede un dato clínico oculto. La
+ * consulta nueva usa `FormularioVolki`.
  */
 import type { CSSProperties, ReactNode } from 'react'
-import { Card, Flex, Typography } from 'antd'
+import { Card, Checkbox, Flex, Typography } from 'antd'
 import { Campo, AreaTexto, EntradaFecha, EntradaNumero, EntradaTexto, Selector } from './campos'
 import type { Resaltado } from './campos'
 import ListaTratamientos from './ListaTratamientos'
 import type { MedicamentoInventario } from './ListaTratamientos'
+import TablaProductos from './TablaProductos'
+import type { ProductoInventario } from './TablaProductos'
 import ListaVacunas from './ListaVacunas'
 import type { VacunaCatalogo } from './ListaVacunas'
 import {
   OPT, SECCIONES, SISTEMAS_EOP, SISTEMA_LABELS, toLocalDatetimeString,
 } from '@src/utils/historiaClinica'
-import type { CampoTexto, FormConsulta, ItemTratamiento, ItemVacuna } from '@src/utils/historiaClinica'
+import type { CampoTexto, FormConsulta, ItemProductoAplicado, ItemTratamiento, ItemVacuna } from '@src/utils/historiaClinica'
 
 /** Una celda que se acomoda sola: crece hasta llenar la fila y baja de línea en el celular. */
 function Celda({ children, min = 170, grow = 1 }: { children: ReactNode; min?: number; grow?: number }) {
@@ -39,22 +41,22 @@ function Panel({ id, children }: { id: string; children: ReactNode }) {
 interface Props {
   /** «s1»…«s5», o «todas» para mostrarlas juntas. */
   activa: string
-  /** Consulta nueva: solo los campos de Volki. */
-  reducido: boolean
-  editando: boolean
   form: FormConsulta
   resaltados: Record<string, Resaltado>
   set: (campo: CampoTexto, valor: string) => void
   setEop: (sistema: string, campo: 'estado' | 'detalle', valor: string) => void
   setLista: (campo: 'tratamiento_items' | 'vacunas_items', items: ItemTratamiento[] | ItemVacuna[]) => void
+  setLibreDemanda: (valor: boolean) => void
+  setProductosAplicados: (items: ItemProductoAplicado[]) => void
   medicamentos: MedicamentoInventario[]
+  productos: ProductoInventario[]
   catalogoVacunas: VacunaCatalogo[]
   especie?: string
 }
 
 export default function SeccionesConsulta({
-  activa, reducido, editando, form, resaltados: hl, set, setEop, setLista,
-  medicamentos, catalogoVacunas, especie,
+  activa, form, resaltados: hl, set, setEop, setLista, setLibreDemanda, setProductosAplicados,
+  medicamentos, productos, catalogoVacunas, especie,
 }: Props) {
   const ve = (id: string) => activa === 'todas' || activa === id
   // «datetime-local» pide hora local sin zona; no se puede registrar una consulta del futuro
@@ -73,26 +75,20 @@ export default function SeccionesConsulta({
                   max={maxFecha}
                 />
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {editando
-                    ? 'Cámbiala solo si la consulta fue otro día; así queda ordenada en su lugar del historial.'
-                    : 'Déjala vacía si la atiendes ahora. Si pasas una consulta de papel, pon el día y la hora en que se atendió: así queda en su lugar del historial.'}
+                  Cámbiala solo si la consulta fue otro día; así queda ordenada en su lugar del historial.
                 </Typography.Text>
               </Campo>
             </Celda>
-            {!reducido && (
-              <Celda>
-                <Campo label="Tipo de consulta" hl={hl.tipo_consulta}>
-                  <Selector value={form.tipo_consulta} onChange={v => set('tipo_consulta', v)} opciones={OPT.tipo_consulta} hl={hl.tipo_consulta} />
-                </Campo>
-              </Celda>
-            )}
-            {!reducido && (
-              <Celda>
-                <Campo label="Tiempo de evolución" hl={hl.tiempo_evolucion}>
-                  <EntradaTexto value={form.tiempo_evolucion} onChange={v => set('tiempo_evolucion', v)} placeholder="Ej: 3 días" hl={hl.tiempo_evolucion} />
-                </Campo>
-              </Celda>
-            )}
+            <Celda>
+              <Campo label="Tipo de consulta" hl={hl.tipo_consulta}>
+                <Selector value={form.tipo_consulta} onChange={v => set('tipo_consulta', v)} opciones={OPT.tipo_consulta} hl={hl.tipo_consulta} />
+              </Campo>
+            </Celda>
+            <Celda>
+              <Campo label="Tiempo de evolución" hl={hl.tiempo_evolucion}>
+                <EntradaTexto value={form.tiempo_evolucion} onChange={v => set('tiempo_evolucion', v)} placeholder="Ej: 3 días" hl={hl.tiempo_evolucion} />
+              </Campo>
+            </Celda>
             <Celda>
               <Campo label="Derivado por" hl={hl.derivado_por}>
                 <EntradaTexto value={form.derivado_por} onChange={v => set('derivado_por', v)} placeholder="Colega / clínica" hl={hl.derivado_por} />
@@ -105,7 +101,7 @@ export default function SeccionesConsulta({
               placeholder="Descripción del motivo principal de la consulta" hl={hl.motivo_consulta}
             />
           </Campo>
-          <Campo label={reducido ? 'Anamnesis' : 'Detalle de la enfermedad actual'} hl={hl.detalle}>
+          <Campo label="Detalle de la enfermedad actual" hl={hl.detalle}>
             <AreaTexto value={form.detalle} onChange={v => set('detalle', v)} filas={3} hl={hl.detalle} />
           </Campo>
           <Fila>
@@ -114,21 +110,35 @@ export default function SeccionesConsulta({
                 <EntradaTexto value={form.alimentacion_tipo} onChange={v => set('alimentacion_tipo', v)} placeholder="Balanceado / BARF / mixto" hl={hl.alimentacion_tipo} />
               </Campo>
             </Celda>
-            <Celda min={220}>
+            <Celda min={160}>
               <Campo label="Cantidad diaria (g)" hl={hl.alimentacion_cantidad_gr}>
-                <EntradaNumero value={form.alimentacion_cantidad_gr} onChange={v => set('alimentacion_cantidad_gr', v)} placeholder="200" hl={hl.alimentacion_cantidad_gr} step="1" />
+                <EntradaNumero
+                  value={form.alimentacion_libre_demanda ? '' : form.alimentacion_cantidad_gr}
+                  onChange={v => set('alimentacion_cantidad_gr', v)} placeholder="200"
+                  hl={hl.alimentacion_cantidad_gr} step="1" disabled={form.alimentacion_libre_demanda}
+                />
+              </Campo>
+            </Celda>
+            <Celda min={140}>
+              <Campo label="Veces al día" hl={hl.alimentacion_veces_dia}>
+                <EntradaNumero
+                  value={form.alimentacion_libre_demanda ? '' : form.alimentacion_veces_dia}
+                  onChange={v => set('alimentacion_veces_dia', v)} placeholder="2"
+                  hl={hl.alimentacion_veces_dia} step="1" min={1} max={50} disabled={form.alimentacion_libre_demanda}
+                />
               </Campo>
             </Celda>
           </Fila>
-          {!reducido && (
-            <Campo label="Antecedentes" hl={hl.antecedentes}>
-              <AreaTexto
-                value={form.antecedentes} onChange={v => set('antecedentes', v)} filas={3}
-                placeholder="Vacunas previas: polivalente (ene-2026), antirrábica (mar-2026). Desparasitaciones, cirugías, enfermedades anteriores…"
-                hl={hl.antecedentes}
-              />
-            </Campo>
-          )}
+          <Checkbox checked={form.alimentacion_libre_demanda} onChange={e => setLibreDemanda(e.target.checked)}>
+            A libre demanda
+          </Checkbox>
+          <Campo label="Antecedentes" hl={hl.antecedentes}>
+            <AreaTexto
+              value={form.antecedentes} onChange={v => set('antecedentes', v)} filas={3}
+              placeholder="Vacunas previas: polivalente (ene-2026), antirrábica (mar-2026). Desparasitaciones, cirugías, enfermedades anteriores…"
+              hl={hl.antecedentes}
+            />
+          </Campo>
         </Panel>
       )}
 
@@ -143,7 +153,7 @@ export default function SeccionesConsulta({
               ['frecuencia_respiratoria', 'FR (rpm)', '22', '1'],
               ['condicion_corporal', 'CC (1–9)', '5', '1'],
             ] as const)
-              .filter(([f]) => !reducido || !['frecuencia_cardiaca', 'frecuencia_respiratoria'].includes(f))
+              
               .map(([f, label, ph, step]) => (
                 <Celda key={f} min={130}>
                   <Campo label={label} hl={hl[f]}>
@@ -160,7 +170,7 @@ export default function SeccionesConsulta({
               ['hidratacion', 'Hidratación'],
               ['pulso', 'Pulso'],
             ] as const)
-              .filter(([f]) => !reducido || !['tllc', 'pulso'].includes(f))
+              
               .map(([f, label]) => (
                 <Celda key={f}>
                   <Campo label={label} hl={hl[f]}>
@@ -168,13 +178,11 @@ export default function SeccionesConsulta({
                   </Campo>
                 </Celda>
               ))}
-            {!reducido && (
-              <Celda>
-                <Campo label="Linfonódulos" hl={hl.linfonodulos}>
-                  <EntradaTexto value={form.linfonodulos} onChange={v => set('linfonodulos', v)} placeholder="No reactivos" hl={hl.linfonodulos} />
-                </Campo>
-              </Celda>
-            )}
+            <Celda>
+              <Campo label="Linfonódulos" hl={hl.linfonodulos}>
+                <EntradaTexto value={form.linfonodulos} onChange={v => set('linfonodulos', v)} placeholder="No reactivos" hl={hl.linfonodulos} />
+              </Campo>
+            </Celda>
           </Fila>
         </Panel>
       )}
@@ -206,20 +214,16 @@ export default function SeccionesConsulta({
       {/* S4 — Diagnóstico */}
       {ve('s4') && (
         <Panel id="s4">
-          {!reducido && (
-            <Campo label="Diagnóstico presuntivo" hl={hl.diagnostico_presuntivo}>
-              <AreaTexto value={form.diagnostico_presuntivo} onChange={v => set('diagnostico_presuntivo', v)} filas={2} hl={hl.diagnostico_presuntivo} />
-            </Campo>
-          )}
-          {!reducido && (
-            <Campo label="Diagnósticos diferenciales" hl={hl.diagnosticos_diferenciales}>
-              <AreaTexto
-                value={form.diagnosticos_diferenciales} onChange={v => set('diagnosticos_diferenciales', v)}
-                filas={2} placeholder="Separados por coma" hl={hl.diagnosticos_diferenciales}
-              />
-            </Campo>
-          )}
-          <Campo label={reducido ? 'Diagnóstico' : 'Diagnóstico definitivo'} hl={hl.diagnostico_definitivo}>
+          <Campo label="Diagnóstico presuntivo" hl={hl.diagnostico_presuntivo}>
+            <AreaTexto value={form.diagnostico_presuntivo} onChange={v => set('diagnostico_presuntivo', v)} filas={2} hl={hl.diagnostico_presuntivo} />
+          </Campo>
+          <Campo label="Diagnósticos diferenciales" hl={hl.diagnosticos_diferenciales}>
+            <AreaTexto
+              value={form.diagnosticos_diferenciales} onChange={v => set('diagnosticos_diferenciales', v)}
+              filas={2} placeholder="Separados por coma" hl={hl.diagnosticos_diferenciales}
+            />
+          </Campo>
+          <Campo label="Diagnóstico definitivo" hl={hl.diagnostico_definitivo}>
             <AreaTexto value={form.diagnostico_definitivo} onChange={v => set('diagnostico_definitivo', v)} filas={2} hl={hl.diagnostico_definitivo} />
           </Campo>
         </Panel>
@@ -228,11 +232,9 @@ export default function SeccionesConsulta({
       {/* S5 — Plan */}
       {ve('s5') && (
         <Panel id="s5">
-          {!reducido && (
-            <Campo label="Exámenes solicitados" hl={hl.examenes_solicitados}>
-              <AreaTexto value={form.examenes_solicitados} onChange={v => set('examenes_solicitados', v)} filas={2} hl={hl.examenes_solicitados} />
-            </Campo>
-          )}
+          <Campo label="Exámenes solicitados" hl={hl.examenes_solicitados}>
+            <AreaTexto value={form.examenes_solicitados} onChange={v => set('examenes_solicitados', v)} filas={2} hl={hl.examenes_solicitados} />
+          </Campo>
           <Flex vertical gap={6}>
             <Typography.Text strong>Medicamentos</Typography.Text>
             <ListaTratamientos
@@ -241,16 +243,14 @@ export default function SeccionesConsulta({
               onChange={v => setLista('tratamiento_items', v)}
             />
           </Flex>
-          {!reducido && (
-            <Flex vertical gap={6}>
-              <Typography.Text strong>Vacunas aplicadas</Typography.Text>
-              <ListaVacunas
-                items={form.vacunas_items} catalogo={catalogoVacunas}
-                especie={especie} desde={form.fecha || undefined}
-                onChange={v => setLista('vacunas_items', v)}
-              />
-            </Flex>
-          )}
+          <Flex vertical gap={6}>
+            <Typography.Text strong>Vacunas aplicadas</Typography.Text>
+            <ListaVacunas
+              items={form.vacunas_items} catalogo={catalogoVacunas}
+              especie={especie} desde={form.fecha || undefined}
+              onChange={v => setLista('vacunas_items', v)}
+            />
+          </Flex>
           <Campo label="Indicaciones al propietario" hl={hl.indicaciones}>
             <AreaTexto
               value={form.indicaciones} onChange={v => set('indicaciones', v)} filas={2}
@@ -258,16 +258,21 @@ export default function SeccionesConsulta({
               hl={hl.indicaciones}
             />
           </Campo>
+          <Campo label="Observaciones" hl={hl.observaciones}>
+            <AreaTexto value={form.observaciones} onChange={v => set('observaciones', v)} filas={2} hl={hl.observaciones} />
+          </Campo>
+          <Flex vertical gap={6}>
+            <Typography.Text strong>Productos aplicados</Typography.Text>
+            <TablaProductos items={form.productos_aplicados} onChange={setProductosAplicados} productos={productos} />
+          </Flex>
           <Fila>
-            {!reducido && (
-              <Celda>
-                <Campo label="Pronóstico" hl={hl.pronostico}>
-                  <Selector value={form.pronostico} onChange={v => set('pronostico', v)} opciones={OPT.pronostico} hl={hl.pronostico} />
-                </Campo>
-              </Celda>
-            )}
             <Celda>
-              <Campo label={reducido ? 'Próximo control' : 'Próxima cita'}>
+              <Campo label="Pronóstico" hl={hl.pronostico}>
+                <Selector value={form.pronostico} onChange={v => set('pronostico', v)} opciones={OPT.pronostico} hl={hl.pronostico} />
+              </Campo>
+            </Celda>
+            <Celda>
+              <Campo label="Próxima cita">
                 <EntradaFecha value={form.proxima_cita} onChange={v => set('proxima_cita', v)} />
               </Campo>
             </Celda>

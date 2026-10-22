@@ -198,7 +198,7 @@ export default function Asistencia() {
         </button>
       </header>
 
-      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 flex flex-col gap-6 max-w-5xl w-full mx-auto">
+      <main className="flex-1 px-4 md:px-8 pt-4 md:pt-4 pb-6 md:pb-8 flex flex-col gap-6 w-full">
 
         {/* ── Marcación rápida del día ──────────────────────────────── */}
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

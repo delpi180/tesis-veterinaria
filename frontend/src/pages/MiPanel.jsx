@@ -103,7 +103,7 @@ export default function MiPanel() {
         </div>
       </header>
 
-      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
+      <main className="flex-1 px-4 md:px-8 pt-4 md:pt-4 pb-6 md:pb-8 w-full flex flex-col gap-5">
         {loading ? (
           <>
             <SkeletonTarjetas cantidad={3} className="grid grid-cols-1 md:grid-cols-3 gap-4" />
@@ -226,7 +226,7 @@ export default function MiPanel() {
                         </button>
                         {t.paciente_id && (
                           <button
-                            onClick={() => navigate(`/consultas/${t.paciente_id}`, { state: { citaId: t.id } })}
+                            onClick={() => navigate(`/pacientes/${t.paciente_id}/historial`, { state: { citaId: t.id } })}
                             className="shrink-0 px-3 py-1.5 text-xs font-semibold text-white bg-brand-700 hover:bg-brand-600 rounded-lg transition">
                             Atender
                           </button>

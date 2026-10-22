@@ -68,7 +68,7 @@ export default function PanelRecepcion() {
         </button>
       </header>
 
-      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
+      <main className="flex-1 px-4 md:px-8 pt-4 md:pt-4 pb-6 md:pb-8 w-full flex flex-col gap-5">
         {error && <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">{error}</div>}
 
         {loading ? (

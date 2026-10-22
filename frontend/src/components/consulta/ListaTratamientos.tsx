@@ -1,9 +1,7 @@
 import { AutoComplete, Alert, Button, Card, Col, Flex, Row, Typography } from 'antd'
 import { AudioOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { Campo, ConCampo, EntradaNumero, EntradaTexto } from './campos'
-import {
-  TX_EMPTY, fechaBaseISO, fechaISOLegible, fechaISOCorta, hoyISOPeru, sumarDiasISO,
-} from '@src/utils/historiaClinica'
+import { TX_EMPTY, avisosDeTratamiento, fechaISOCorta } from '@src/utils/historiaClinica'
 import type { ItemTratamiento } from '@src/utils/historiaClinica'
 
 export interface MedicamentoInventario {
@@ -60,25 +58,10 @@ export default function ListaTratamientos({ items, onChange, desde, medicamentos
     n[i] = { ...n[i], medicamento: texto, producto_id: encontrado ? encontrado.id : null }
     onChange(n)
   }
-  const producto = (item: ItemTratamiento) => medicamentos.find(p => p.id === item.producto_id)
-  // «Hoy» en hora de Perú: con la fecha UTC, desde las 7 pm un lote que vence
-  // mañana se mostraba como ya vencido.
-  const hoyISO = hoyISOPeru()
-  // Fecha de fin: se calcula desde la fecha de la consulta, no desde hoy —
-  // una consulta que se digitaliza días después no reinicia el tratamiento.
-  const fin = (item: ItemTratamiento) => {
-    const dias = Number(item.duracion_dias)
-    if (!dias || dias < 1) return null
-    return fechaISOLegible(sumarDiasISO(fechaBaseISO(desde), dias - 1))
-  }
-
   return (
     <Flex vertical gap={8}>
       {items.map((item, i) => {
-        const p = producto(item)
-        const vencido = !!p?.fecha_vencimiento && p.fecha_vencimiento <= hoyISO
-        const sinStock = !!p && (p.stock ?? 0) <= 0
-        const termina = fin(item)
+        const { p, vencido, sinStock, termina } = avisosDeTratamiento(item, medicamentos, desde)
         const fila = `medicamento ${i + 1}`
         return (
           <Card key={i} size="small">

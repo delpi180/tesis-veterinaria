@@ -101,7 +101,7 @@ interface EntradaProps {
 export function EntradaTexto({ value, onChange, placeholder, hl, ariaLabel }: EntradaProps) {
   const r = useResaltado(hl)
   return (
-    <Input
+    <Input size="large"
       value={value} placeholder={placeholder} {...useAccesible(ariaLabel)}
       onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
       {...r}
@@ -113,13 +113,14 @@ interface EntradaNumeroProps extends EntradaProps {
   step?: string
   min?: number
   max?: number
+  disabled?: boolean
 }
 
-export function EntradaNumero({ value, onChange, placeholder, hl, step = 'any', min, max, ariaLabel }: EntradaNumeroProps) {
+export function EntradaNumero({ value, onChange, placeholder, hl, step = 'any', min, max, ariaLabel, disabled }: EntradaNumeroProps) {
   const r = useResaltado(hl)
   return (
-    <Input
-      type="number" inputMode="decimal" step={step} min={min} max={max}
+    <Input size="large"
+      type="number" inputMode="decimal" step={step} min={min} max={max} disabled={disabled}
       value={value} placeholder={placeholder} {...useAccesible(ariaLabel)}
       onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
       {...r}
@@ -136,7 +137,7 @@ export function EntradaFecha({ value, onChange, tipo = 'datetime-local', max, ar
   ariaLabel?: string
 }) {
   return (
-    <Input
+    <Input size="large"
       type={tipo} value={value} max={max} {...useAccesible(ariaLabel)}
       onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
     />
@@ -147,7 +148,7 @@ interface AreaProps extends EntradaProps {
   filas?: number
 }
 
-export function AreaTexto({ value, onChange, filas = 3, placeholder, hl, ariaLabel }: AreaProps) {
+export function AreaTexto({ value, onChange, filas = 4, placeholder, hl, ariaLabel }: AreaProps) {
   const r = useResaltado(hl)
   return (
     <Input.TextArea
@@ -168,7 +169,7 @@ export function Selector({ value, onChange, opciones, hl, ariaLabel }: {
 }) {
   const r = useResaltado(hl)
   return (
-    <Select
+    <Select size="large"
       value={value || undefined} placeholder="—" allowClear {...useAccesible(ariaLabel)}
       status={r.status}
       options={opciones.map(({ v, l }) => ({ value: v, label: l }))}

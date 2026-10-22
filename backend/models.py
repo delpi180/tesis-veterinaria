@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import Column, Boolean, Date, Float, Integer, LargeBinary, Numeric, String, Text, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Boolean, Date, Float, Integer, LargeBinary, Numeric, String, Table, Text, DateTime, ForeignKey, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from database import Base
@@ -26,6 +26,24 @@ class Usuario(Base):
     dias_laborales = Column(String(40))   # CSV de días: "lun,mar,mie,jue,vie"
 
 
+# Etiquetas de clientes (como en Volki): un cliente puede tener varias y una
+# etiqueta sirve a muchos clientes. Al borrar cualquiera de los dos se borra
+# solo el vínculo, nunca el otro lado.
+cliente_etiquetas = Table(
+    "cliente_etiquetas", Base.metadata,
+    Column("cliente_id",  Integer, ForeignKey("clientes.id",  ondelete="CASCADE"), primary_key=True),
+    Column("etiqueta_id", Integer, ForeignKey("etiquetas.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class Etiqueta(Base):
+    __tablename__ = "etiquetas"
+
+    id     = Column(Integer, primary_key=True)
+    nombre = Column(String(40), unique=True, nullable=False)
+    color  = Column(String(20))    # opcional, ej. "#2f6b4f"
+
+
 class Cliente(Base):
     __tablename__ = "clientes"
 
@@ -39,6 +57,10 @@ class Cliente(Base):
         "Paciente",
         back_populates="cliente",
         cascade="all, delete-orphan",
+    )
+    etiquetas = relationship(
+        "Etiqueta", secondary=cliente_etiquetas, order_by="Etiqueta.nombre",
+        passive_deletes=True,
     )
 
 
@@ -60,6 +82,13 @@ class Paciente(Base):
     color               = Column(String(60))
     alergias            = Column(Text)          # alertas clínicas destacadas
     condiciones_cronicas = Column(Text)
+
+    # Estado de la mascota: activa o ya no se atiende (lo cambia una persona,
+    # el sistema no marca a nadie por su cuenta).
+    activo = Column(Boolean, nullable=False, default=True, server_default=text("true"))
+    # Quién y cuándo la registró. Nulo en las anteriores a este campo.
+    creado_en      = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    registrado_por = Column(String(100))
 
     cliente  = relationship("Cliente", back_populates="pacientes")
     historias = relationship(
@@ -273,6 +302,8 @@ class HistoriaClinica(Base):
     detalle                  = Column(Text)
     alimentacion_tipo        = Column(String(150))
     alimentacion_cantidad_gr = Column(Integer)
+    alimentacion_veces_dia   = Column(Integer)
+    alimentacion_libre_demanda = Column(Boolean)
     antecedentes             = Column(Text)
     tipo_consulta            = Column(String(50))
 
@@ -302,8 +333,11 @@ class HistoriaClinica(Base):
     tratamiento_items    = Column(JSONB)
     vacunas_items        = Column(JSONB)
     indicaciones         = Column(Text)
+    observaciones        = Column(Text)
     pronostico           = Column(String(50))
     proxima_cita         = Column(DateTime(timezone=True))
+    # [{producto_id, nombre, cantidad}] — lo aplicado en la consulta (como en Volki)
+    productos_aplicados  = Column(JSONB)
 
     # Pipeline IA / auditoría
     transcripcion = Column(Text)

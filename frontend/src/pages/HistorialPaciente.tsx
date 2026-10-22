@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { Avatar, Button, Card, Col, Flex, Row, Space, Statistic, Tabs, Tag, Typography } from 'antd'
-import { LeftOutlined, DownloadOutlined, MedicineBoxOutlined } from '@ant-design/icons'
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Alert, Button, Card, Col, Drawer, Empty, Flex, Row, Skeleton as EsqueletoAntd, Statistic, Table, Tabs, Tag, Typography } from 'antd'
+import { ArrowRightOutlined, MedicineBoxOutlined } from '@ant-design/icons'
 import { BRAND, PDF_MARCA } from '@src/core/color'
 import { Download, FileText, Weight, ClipboardList, TrendingUp, Pencil, Trash2, Syringe, LayoutDashboard, Bug, Scissors, Microscope, Pill } from 'lucide-react'
 import {
@@ -15,11 +15,17 @@ import autoTable from 'jspdf-autotable'
 const _ultimaTabla = (d: jsPDF) => (d as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
 import { api, esVeterinario } from '../services/api'
 import { useConfirmar } from '../components/Confirmar'
-import { Skeleton, SkeletonFilas, SkeletonTexto } from '../components/Skeleton'
 import { useToast } from '../components/Toast'
 import RegistrosPaciente from '../components/RegistrosPaciente'
 import RecetasPaciente from '../components/RecetasPaciente'
 import { clinicaActual } from '../services/clinica'
+import Disposicion from '../components/consulta/Disposicion'
+import ColumnaPaciente from '../components/consulta/ColumnaPaciente'
+import MascotaModal from '../components/cliente/MascotaModal'
+import CitaModal from '../components/cliente/CitaModal'
+import CambiarResponsable from '../components/cliente/CambiarResponsable'
+import { formatoTiempo } from '../components/consulta/Cronometro'
+import { hoyISOPeru } from '@src/utils/historiaClinica'
 
 // ── Catálogos de etiquetas (solo lectura) ───────────────────────────────────
 const SISTEMAS_EOP = [
@@ -46,10 +52,16 @@ const OPT = {
 }
 const getLabel = (field, value) => (value ? (OPT[field]?.[value] ?? value) : value)
 
+/** Variables de la clase .tabla-pildoras (index.css); los colores salen de core/color.ts. */
+const estiloPildoras = {
+  '--fila-bg': BRAND.panel,
+  '--fila-bg-hover': BRAND.border,
+} as React.CSSProperties
+
 const fmtFechaHora = (iso) =>
-  new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  new Date(iso).toLocaleString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Lima' })
 const fmtFecha = (iso) =>
-  new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' })
+  new Date(iso).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Lima' })
 
 
 // ── Tarjeta de consulta (solo lectura) ──────────────────────────────────────
@@ -429,7 +441,17 @@ export default function HistorialPaciente() {
   const [historias, setHistorias] = useState([])
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
-  const [tab, setTab]             = useState('resumen')
+  const [tab, setTab]             = useState('historia')
+  const [turnos, setTurnos]       = useState([])
+  // Línea de tiempo: la consulta abierta a la derecha, la ficha en edición y el turno nuevo
+  const [detalle, setDetalle]     = useState(null)
+  const [editandoFicha, setEditandoFicha] = useState(false)
+  const [agendando, setAgendando] = useState(false)
+  const [cambiandoResponsable, setCambiandoResponsable] = useState(false)
+  const [refrescoTurnos, setRefrescoTurnos] = useState(0)
+  // Avisos que trae la navegación: viene de guardar una consulta o de «Atender» un turno
+  const [avisoCerrado, setAvisoCerrado] = useState(false)
+  const citaId = state?.citaId ?? null
 
   const handleEdit = (h) => {
     navigate(`/consultas/${pacienteId}`, {
@@ -439,7 +461,7 @@ export default function HistorialPaciente() {
 
   const handleDelete = async (h) => {
     const fecha = new Date(h.fecha || h.creado_en).toLocaleDateString('es-PE', {
-      day: '2-digit', month: 'short', year: 'numeric',
+      day: '2-digit', month: 'short', year: 'numeric', timeZone: 'America/Lima',
     })
     if (!await confirmar({
       titulo: 'Eliminar consulta',
@@ -455,6 +477,13 @@ export default function HistorialPaciente() {
       toast.error(e.message ?? 'No se pudo eliminar la consulta.')
     }
   }
+
+  // Próximos turnos del paciente, para el módulo de recordatorios de la derecha
+  useEffect(() => {
+    api.get(`/api/citas/?paciente_id=${pacienteId}&desde=${hoyISOPeru()}`)
+      .then(c => setTurnos((Array.isArray(c) ? c : []).filter(t => t.estado === 'pendiente' || t.estado === 'confirmada')))
+      .catch(() => setTurnos([]))
+  }, [pacienteId, historias.length, refrescoTurnos])
 
   useEffect(() => {
     const cargar = async () => {
@@ -500,69 +529,81 @@ export default function HistorialPaciente() {
   const pesos = ordenadas.filter(h => h.peso_kg != null)
     .map(h => ({ fecha: h.fecha || h.creado_en, peso: Number(h.peso_kg) }))
 
+  // Línea de tiempo (pestaña «Historia»): consultas y vacunas aplicadas, lo más reciente primero
+  const eventos = [
+    ...ordenadas.map(h => ({
+      clave: `c${h.id}`, tipo: 'Consulta', fecha: h.fecha || h.creado_en,
+      detalle: `Motivo: ${h.motivo_consulta || '(sin motivo)'}`, consulta: h,
+    })),
+    ...vacunas.map((v, i) => ({
+      clave: `v${i}`, tipo: 'Vacuna', fecha: v.fecha,
+      detalle: `Vacuna: ${v.vacuna}${v.lote ? ` · lote ${v.lote}` : ''}`, consulta: null,
+    })),
+  ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+
   const TABS = [
-    { id: 'resumen',    label: 'Resumen',    Icon: LayoutDashboard, count: null },
+    // El mismo orden que Volki; «Resumen» y «Recetas» son nuestras y van al final
+    { id: 'historia',   label: 'Historia',   Icon: FileText,        count: null },
     { id: 'consultas',  label: 'Consultas',  Icon: ClipboardList,   count: historias.length },
-    { id: 'recetas',    label: 'Recetas',    Icon: Pill,            count: null },
     { id: 'complementarios', label: 'M. Complementarios', Icon: Microscope, count: null },
     { id: 'vacunas',    label: 'Vacunas',    Icon: Syringe,         count: vacunas.length },
     { id: 'antiparasitarios', label: 'Antiparasitarios', Icon: Bug, count: null },
     { id: 'estetica',   label: 'Estética',   Icon: Scissors,        count: null },
     { id: 'peso',       label: 'Peso',       Icon: Weight,          count: pesos.length },
+    { id: 'resumen',    label: 'Resumen',    Icon: LayoutDashboard, count: null },
+    { id: 'recetas',    label: 'Recetas',    Icon: Pill,            count: null },
   ]
 
-  return (
-    <div className="flex-1 min-w-0 flex flex-col min-h-screen">
-      <main className="flex-1 min-w-0 px-4 md:px-8 pt-6 md:pt-8 pb-8 flex flex-col gap-5 max-w-4xl w-full mx-auto animar">
+  const responsable = cliente ? { id: cliente.id, nombre: cliente.nombre, telefono: cliente.telefono } : null
 
-        {/* Identidad del paciente. Antes era una barra blanca fija con
-            "Historial — Nombre" y una línea de datos en gris claro; ahora lo
-            primero que se ve es QUIÉN es el paciente, que es lo que se
-            necesita confirmar antes de tocar su historia. */}
-        <div>
-          <Button type="link" icon={<LeftOutlined />} onClick={() => navigate(-1)}
-            style={{ padding: 0, height: 'auto', marginBottom: 12 }}>
-            Volver
-          </Button>
-          <Flex justify="space-between" align="flex-start" wrap gap={16}>
-            <Flex gap={16} align="center" style={{ minWidth: 0 }}>
-              <Avatar size={64} style={{ background: BRAND.primary, fontSize: 28, fontWeight: 700, flexShrink: 0 }}>
-                {(paciente?.nombre ?? '?').charAt(0).toUpperCase()}
-              </Avatar>
-              <div style={{ minWidth: 0 }}>
-                <Typography.Title level={2} ellipsis style={{ margin: 0 }}>
-                  {paciente?.nombre ?? `Paciente #${pacienteId}`}
-                </Typography.Title>
-                {paciente && (
-                  <Space wrap size={[6, 6]} style={{ marginTop: 6 }}>
-                    {paciente.especie && <Tag color="green" variant="filled">{paciente.especie}</Tag>}
-                    {paciente.raza && <Tag>{paciente.raza}</Tag>}
-                    {paciente.edad != null && <Tag>{paciente.edad} año{paciente.edad !== 1 ? 's' : ''}</Tag>}
-                  </Space>
-                )}
-                {cliente?.nombre && (
-                  <div style={{ marginTop: 6 }}>
-                    <Typography.Text type="secondary">Dueño: </Typography.Text>
-                    <Typography.Text strong>{cliente.nombre}</Typography.Text>
-                  </div>
-                )}
-              </div>
-            </Flex>
-            <Space wrap>
-              <Button icon={<DownloadOutlined />} disabled={ordenadas.length === 0}
-                onClick={() => generarPDF(paciente, cliente, ordenadas)}>
-                PDF
-              </Button>
-              <Button type="primary" icon={<MedicineBoxOutlined />}
-                onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente } })}>
-                Atender / Nueva consulta
-              </Button>
-            </Space>
-          </Flex>
-        </div>
+  const migas = [
+    { title: <Link to="/clientes">Clientes</Link> },
+    { title: responsable ? <Link to={`/clientes/${responsable.id}`}>{responsable.nombre}</Link> : '…' },
+    { title: paciente?.nombre ?? `Paciente #${pacienteId}` },
+  ]
+
+  // Como en Volki, la fila de pestañas lleva la acción principal a la derecha; el nombre y el PDF
+  // están en la columna derecha y las migas arriba, así que no hay una fila de título aparte.
+  const atender = (
+    <Button type="primary" icon={<MedicineBoxOutlined />}
+      onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente, citaId } })}>
+      Atender / Nueva consulta
+    </Button>
+  )
+
+  return (
+    <Disposicion
+      migas={migas}
+      lateral={!paciente ? <EsqueletoAntd active paragraph={{ rows: 8 }} /> : (
+        <ColumnaPaciente
+          paciente={paciente} responsable={responsable}
+          historias={historias} turnos={turnos}
+          onDescargar={ordenadas.length > 0 ? () => generarPDF(paciente, cliente, ordenadas) : undefined}
+          onEditar={() => setEditandoFicha(true)}
+          onNuevoRecordatorio={() => setAgendando(true)}
+          onCambiarResponsable={() => setCambiandoResponsable(true)}
+        />
+      )}
+    >
+      <Flex vertical gap={16} className="animar">
+
+        {!avisoCerrado && state?.guardada && (
+          <Alert
+            type="success" showIcon closable onClose={() => setAvisoCerrado(true)}
+            title={state.guardada === 'actualizada'
+              ? 'Consulta actualizada.'
+              : `Consulta guardada.${typeof state.segundos === 'number' ? ` Tiempo de registro: ${formatoTiempo(state.segundos)}.` : ''}`}
+          />
+        )}
+        {!avisoCerrado && !state?.guardada && citaId && (
+          <Alert
+            type="info" showIcon closable onClose={() => setAvisoCerrado(true)}
+            title="Turno por atender. Pulsa «Atender / Nueva consulta» para empezar; al guardar, el turno queda atendido."
+          />
+        )}
 
         {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm px-4 py-3 rounded-lg">⚠ {error}</div>
+          <Alert type="error" showIcon title={error} />
         )}
 
         {/* Pestañas (estilo ficha del paciente). Ahora son el Tabs de Ant Design:
@@ -571,6 +612,7 @@ export default function HistorialPaciente() {
         <Tabs
           activeKey={tab}
           onChange={setTab}
+          tabBarExtraContent={atender}
           style={{ minWidth: 0 }}
           items={TABS.map(({ id, label, Icon, count }) => ({
             key: id,
@@ -585,20 +627,53 @@ export default function HistorialPaciente() {
         />
 
         {loading ? (
-          <>
-            <div className="panel p-5 space-y-3">
-              <Skeleton className="h-4 w-1/3" />
-              <SkeletonTexto lineas={3} />
-            </div>
-            <div className="panel overflow-hidden">
-              <SkeletonFilas filas={4} conAvatar={false} />
-            </div>
-          </>
+          <EsqueletoAntd active paragraph={{ rows: 6 }} />
         ) : (
           <>
+            {/* ── HISTORIA: línea de tiempo, como en Volki ────────────────── */}
+            {tab === 'historia' && (
+              eventos.length === 0 ? (
+                <Empty
+                  description="Aún no se han registrado atenciones para el paciente."
+                  styles={{ root: { padding: '32px 0' } }}
+                >
+                  <Typography.Text type="secondary">Registra una nueva atención y comienza a construir su historial clínico.</Typography.Text>
+                </Empty>
+              ) : (
+                <Flex vertical gap={14}>
+                  {eventos.map(ev => (
+                    <Flex key={ev.clave} vertical gap={6}>
+                      <Tag
+                        color={ev.tipo === 'Consulta' ? 'green' : 'blue'}
+                        icon={ev.tipo === 'Consulta' ? <MedicineBoxOutlined /> : <Syringe size={12} style={{ marginRight: 4 }} />}
+                        style={{ alignSelf: 'flex-start', margin: 0 }}
+                      >
+                        {ev.tipo}
+                      </Tag>
+                      <Flex
+                        justify="space-between" align="center" gap={12}
+                        style={{ background: BRAND.panel, borderRadius: 8, padding: '10px 14px', marginLeft: 12 }}
+                      >
+                        <Flex vertical style={{ minWidth: 0 }}>
+                          <Typography.Text><strong>Fecha:</strong> {fmtFecha(ev.fecha)}</Typography.Text>
+                          <Typography.Text ellipsis>{ev.detalle}</Typography.Text>
+                        </Flex>
+                        {ev.consulta && (
+                          <Button
+                            type="text" aria-label="Abrir la consulta" icon={<ArrowRightOutlined />}
+                            onClick={() => setDetalle(ev.consulta)}
+                          />
+                        )}
+                      </Flex>
+                    </Flex>
+                  ))}
+                </Flex>
+              )
+            )}
+
             {/* ── RESUMEN ─────────────────────────────────────────────────── */}
             {tab === 'resumen' && (
-              <div className="flex flex-col gap-5">
+              <Flex vertical gap={20}>
                 <Row gutter={[12, 12]}>
                   {[
                     { titulo: 'Consultas', valor: historias.length },
@@ -614,18 +689,19 @@ export default function HistorialPaciente() {
                   ))}
                 </Row>
                 {historias.length > 0 && <GraficoEvolucion historias={historias} />}
-              </div>
+              </Flex>
             )}
 
             {/* ── CONSULTAS ───────────────────────────────────────────────── */}
             {tab === 'consultas' && (
-              <section className="flex flex-col gap-3">
+              <Flex vertical gap={12}>
                 {ordenadas.length === 0 ? (
-                  <div className="bg-white rounded-xl border border-dashed border-slate-200 flex flex-col items-center justify-center py-16 text-slate-400">
-                    <FileText className="w-8 h-8 mb-2 opacity-40" />
-                    <p className="text-sm font-medium text-slate-500">Aún no hay consultas registradas</p>
-                    <p className="text-xs mt-1">Usa "Atender / Nueva consulta" para registrar la primera.</p>
-                  </div>
+                  <Empty
+                    description="Aún no hay consultas registradas"
+                    styles={{ root: { padding: '32px 0' } }}
+                  >
+                    <Typography.Text type="secondary">Usa «Atender / Nueva consulta» para registrar la primera.</Typography.Text>
+                  </Empty>
                 ) : (
                   ordenadas.map((h, i) => (
                     <HistoriaCard
@@ -639,72 +715,41 @@ export default function HistorialPaciente() {
                     />
                   ))
                 )}
-              </section>
+              </Flex>
             )}
 
             {/* ── VACUNAS ─────────────────────────────────────────────────── */}
             {tab === 'vacunas' && (
-              <section className="panel overflow-hidden">
-                {vacunas.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                    <Syringe className="w-7 h-7 mb-2 opacity-40" />
-                    <p className="text-sm">Sin vacunas registradas en las consultas</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto"><table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 bg-slate-50">
-                        <th className="text-left px-5 py-3 font-semibold">Fecha</th>
-                        <th className="text-left px-5 py-3 font-semibold">Vacuna</th>
-                        <th className="text-left px-5 py-3 font-semibold">Lote</th>
-                        <th className="text-left px-5 py-3 font-semibold">Próxima dosis</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vacunas.map((v, i) => (
-                        <tr key={i} className="border-b border-slate-50">
-                          <td className="px-5 py-3 text-slate-500">{fmtFecha(v.fecha)}</td>
-                          <td className="px-5 py-3 font-medium text-slate-800">{v.vacuna}</td>
-                          <td className="px-5 py-3 text-slate-500">{v.lote || '—'}</td>
-                          <td className="px-5 py-3 text-slate-500">{v.proxima_dosis || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table></div>
-                )}
-              </section>
+              <div style={estiloPildoras}>
+                <Table
+                  className="tabla-pildoras" rowKey={(_, i) => String(i)} size="middle" pagination={false}
+                  scroll={{ x: 'max-content' }} dataSource={vacunas}
+                  locale={{ emptyText: 'Sin vacunas registradas en las consultas' }}
+                  columns={[
+                    { title: 'Fecha', key: 'fecha', render: (_: unknown, v: { fecha: string }) => fmtFecha(v.fecha) },
+                    { title: 'Vacuna', dataIndex: 'vacuna', key: 'vacuna', render: (v: string) => <Typography.Text strong>{v}</Typography.Text> },
+                    { title: 'Lote', dataIndex: 'lote', key: 'lote', render: (v: string) => v || '—' },
+                    { title: 'Próxima dosis', dataIndex: 'proxima_dosis', key: 'proxima', render: (v: string) => v || '—' },
+                  ]}
+                />
+              </div>
             )}
 
             {/* ── PESO ────────────────────────────────────────────────────── */}
             {tab === 'peso' && (
-              <div className="flex flex-col gap-5">
+              <Flex vertical gap={16}>
                 {historias.length > 0 && <GraficoEvolucion historias={historias} />}
-                <section className="panel overflow-hidden">
-                  {pesos.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                      <Weight className="w-7 h-7 mb-2 opacity-40" />
-                      <p className="text-sm">Sin registros de peso</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto"><table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100 bg-slate-50">
-                          <th className="text-left px-5 py-3 font-semibold">Fecha</th>
-                          <th className="text-right px-5 py-3 font-semibold">Peso</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pesos.map((p, i) => (
-                          <tr key={i} className="border-b border-slate-50">
-                            <td className="px-5 py-3 text-slate-500">{fmtFecha(p.fecha)}</td>
-                            <td className="px-5 py-3 text-right font-medium text-slate-800">{p.peso} kg</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table></div>
-                  )}
-                </section>
-              </div>
+                <div style={estiloPildoras}>
+                  <Table<{ fecha: string; peso: number }>
+                    className="tabla-pildoras" rowKey={(_, i) => String(i)} size="middle" pagination={false}
+                    dataSource={pesos} locale={{ emptyText: 'Sin registros de peso' }}
+                    columns={[
+                      { title: 'Fecha', key: 'fecha', render: (_: unknown, p) => fmtFecha(p.fecha) },
+                      { title: 'Peso', key: 'peso', align: 'right' as const, render: (_: unknown, p) => <Typography.Text strong>{p.peso} kg</Typography.Text> },
+                    ]}
+                  />
+                </div>
+              </Flex>
             )}
 
             {/* ── RECETAS ─────────────────────────────────────────────────── */}
@@ -730,7 +775,45 @@ export default function HistorialPaciente() {
           </>
         )}
 
-      </main>
-    </div>
+      </Flex>
+
+      {/* Consulta abierta desde la línea de tiempo: la misma tarjeta con PDF, editar y eliminar */}
+      <Drawer
+        open={!!detalle} onClose={() => setDetalle(null)} size="large" destroyOnHidden
+        title={detalle ? `Consulta del ${fmtFecha(detalle.fecha || detalle.creado_en)}` : ''}
+      >
+        {detalle && (
+          <HistoriaCard
+            h={detalle} paciente={paciente} cliente={cliente} defaultOpen
+            onEdit={handleEdit}
+            onDelete={h => { setDetalle(null); handleDelete(h) }}
+          />
+        )}
+      </Drawer>
+
+      <MascotaModal
+        abierto={editandoFicha} mascota={paciente}
+        onCerrar={() => setEditandoFicha(false)}
+        onGuardado={act => { setPaciente(prev => ({ ...prev, ...act })); setEditandoFicha(false) }}
+      />
+      {paciente && (
+        <CambiarResponsable
+          abierto={cambiandoResponsable} pacienteId={Number(pacienteId)} pacienteNombre={paciente.nombre}
+          clienteActualId={cliente?.id} onCerrar={() => setCambiandoResponsable(false)}
+          onCambiado={nuevo => {
+            setCliente(nuevo)
+            setPaciente(prev => ({ ...prev, cliente_id: nuevo.id }))
+            setCambiandoResponsable(false)
+            toast.success('Responsable cambiado.')
+          }}
+        />
+      )}
+      <CitaModal
+        abierto={agendando}
+        paciente={paciente ? { id: Number(pacienteId), nombre: paciente.nombre } : null}
+        onCerrar={() => setAgendando(false)}
+        onCreada={() => { setAgendando(false); setRefrescoTurnos(n => n + 1); toast.success('Turno agendado.') }}
+      />
+    </Disposicion>
   )
 }

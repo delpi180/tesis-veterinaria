@@ -11,8 +11,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Cita, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Receta, Usuario
+from models import Cita, Cliente, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Receta, Usuario
 from schemas import (
+    CambiarResponsableIn,
     PacienteOut, PacienteUpdate,
     HistoriaClinicaCreate, HistoriaClinicaOut,
     DocumentoOut,
@@ -147,6 +148,99 @@ def buscar_pacientes(
     ]
 
 
+# ── Listado de pacientes (pestaña «Pacientes» de Clientes) ───────────────────
+# Va ANTES de /{paciente_id}, igual que /buscar.
+
+@router.get("/")
+def listar_pacientes(
+    q: Optional[str] = Query(None, description="Nombre o microchip de la mascota, o nombre/DNI del responsable"),
+    estado: str = Query("activo", pattern="^(activo|inactivo|todos)$"),
+    especie: Optional[str] = Query(None),
+    raza: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    """Pacientes con su responsable y su próximo turno, paginados.
+
+    Devuelve {"total": N, "items": [...]}: el total sirve para la paginación
+    («1 – 10 de 3414») y respeta los mismos filtros que la lista.
+    """
+    query = db.query(Paciente).join(Cliente, Cliente.id == Paciente.cliente_id)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        query = query.filter(
+            Paciente.nombre.ilike(like)
+            | Paciente.microchip.ilike(like)
+            | Cliente.nombre.ilike(like)
+            | Cliente.dni.ilike(like)
+        )
+    if estado != "todos":
+        query = query.filter(Paciente.activo.is_(estado == "activo"))
+    if especie:
+        query = query.filter(func.lower(Paciente.especie) == especie.strip().lower())
+    if raza:
+        query = query.filter(func.lower(Paciente.raza) == raza.strip().lower())
+
+    total = query.count()
+    filas = (
+        query.options(joinedload(Paciente.cliente))
+        .order_by(func.lower(Paciente.nombre), Paciente.id)
+        .offset(skip).limit(limit).all()
+    )
+
+    # Próximo turno de cada fila, en una sola consulta extra
+    proximos: dict[int, datetime] = {}
+    if filas:
+        proximos = dict(
+            db.query(Cita.paciente_id, func.min(Cita.fecha_hora))
+            .filter(
+                Cita.paciente_id.in_([p.id for p in filas]),
+                Cita.fecha_hora >= datetime.now(timezone.utc),
+                Cita.estado.in_(("pendiente", "confirmada")),
+            )
+            .group_by(Cita.paciente_id)
+            .all()
+        )
+
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": p.id,
+                "nombre": p.nombre,
+                "especie": p.especie,
+                "raza": p.raza,
+                "edad": p.edad,
+                "sexo": p.sexo,
+                "microchip": p.microchip,
+                "activo": p.activo,
+                "cliente_id": p.cliente_id,
+                "responsable": p.cliente.nombre if p.cliente else None,
+                "proximo_turno": proximos[p.id].isoformat() if proximos.get(p.id) else None,
+            }
+            for p in filas
+        ],
+    }
+
+
+@router.get("/opciones")
+def opciones_filtro(especie: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    """Especies y razas que existen, para los desplegables de filtro.
+
+    Las razas se acotan a la especie elegida (sin especie no se ofrecen razas).
+    """
+    especies = [e for (e,) in db.query(Paciente.especie).distinct().order_by(Paciente.especie).all() if e]
+    razas: list[str] = []
+    if especie:
+        razas = [
+            r for (r,) in db.query(Paciente.raza)
+            .filter(func.lower(Paciente.especie) == especie.strip().lower(), Paciente.raza.isnot(None), Paciente.raza != "")
+            .distinct().order_by(Paciente.raza).all()
+        ]
+    return {"especies": especies, "razas": razas}
+
+
 @router.get("/{paciente_id}", response_model=PacienteOut)
 def obtener_paciente(paciente_id: int, db: Session = Depends(get_db)):
     paciente = db.get(Paciente, paciente_id)
@@ -166,6 +260,31 @@ def actualizar_paciente(
         setattr(paciente, campo, valor)
     db.commit()
     db.refresh(paciente)
+    return paciente
+
+
+@router.put("/{paciente_id}/responsable", response_model=PacienteOut)
+def cambiar_responsable(
+    paciente_id: int, payload: CambiarResponsableIn, request: Request,
+    db: Session = Depends(get_db),
+):
+    """Pasa la mascota a otro dueño. Recepción y veterinario pueden hacerlo.
+
+    Las citas, historias y recetas siguen con la mascota. Las ventas ya hechas
+    se quedan con quien las pagó.
+    """
+    paciente = db.get(Paciente, paciente_id)
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    nuevo = db.get(Cliente, payload.cliente_id)
+    if not nuevo:
+        raise HTTPException(status_code=404, detail="El cliente nuevo no existe")
+    if nuevo.id != paciente.cliente_id:
+        anterior = paciente.cliente.nombre if paciente.cliente else f"#{paciente.cliente_id}"
+        request.state.actividad_detalle = f"{paciente.nombre}: {anterior} → {nuevo.nombre}"
+        paciente.cliente_id = nuevo.id
+        db.commit()
+        db.refresh(paciente)
     return paciente
 
 

@@ -70,3 +70,17 @@ export function exportarCSV(titulo, columnas, filas) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Exporta datos a Excel (.xlsx). La librería se carga solo al exportar, para
+ * no engordar la carga inicial de la app.
+ * @param {string} titulo - Nombre del archivo
+ * @param {string[]} columnas - Headers
+ * @param {any[][]} filas - Filas de datos
+ */
+export async function exportarXLSX(titulo, columnas, filas) {
+  const { default: escribirExcel } = await import('write-excel-file/browser');
+  const cabecera = columnas.map(c => ({ value: c, fontWeight: 'bold' }));
+  const cuerpo = filas.map(fila => fila.map(celda => ({ value: celda == null ? '' : String(celda) })));
+  await escribirExcel([cabecera, ...cuerpo]).toFile(`${titulo.replace(/\s+/g, '_').toLowerCase()}.xlsx`);
+}

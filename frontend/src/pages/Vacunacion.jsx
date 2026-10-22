@@ -132,7 +132,7 @@ export default function Vacunacion() {
         </div>
       </header>
 
-      <main className="flex-1 px-4 md:px-6 py-4 md:py-6 max-w-5xl w-full mx-auto flex flex-col gap-5">
+      <main className="flex-1 px-4 md:px-8 pt-4 md:pt-4 pb-6 md:pb-8 w-full flex flex-col gap-5">
         {/* Resumen */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div className={`rounded-xl border px-5 py-4 ${vencidas ? 'bg-rose-50 border-rose-200' : 'bg-white border-slate-200'}`}>
