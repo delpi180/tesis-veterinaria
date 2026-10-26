@@ -213,6 +213,44 @@ h1, h2 {
 }
 .animar { animation: subir 0.3s ease both; }
 
+/* Tarjetas y filas con vida: se elevan al pasar el mouse y las filas
+   clicables se desplazan un poco. Solo transform/sombra (baratas de animar). */
+.tarjeta-viva { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.tarjeta-viva:hover { transform: translateY(-2px); box-shadow: var(--shadow-card); }
+.fila-hover { transition: background-color 0.2s ease, padding-left 0.2s ease; }
+.fila-hover:hover { background: var(--bg-primary); padding-left: 26px !important; }
+
+/* Botones de antd: se hunden un poco al presionarlos; el menú lateral se corre. */
+.ant-btn { transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s, border-color 0.2s, color 0.2s; }
+.ant-btn:not(:disabled):active { transform: scale(0.97); }
+.ant-menu-item { transition: background-color 0.2s, transform 0.2s !important; }
+.ant-menu-item:hover { transform: translateX(3px); }
+
+/* Pulso del micrófono mientras se graba (historia por voz). */
+@keyframes pulso-mic {
+  0%   { box-shadow: 0 0 0 0 rgba(200, 98, 63, 0.5); }
+  70%  { box-shadow: 0 0 0 18px rgba(200, 98, 63, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(200, 98, 63, 0); }
+}
+.grabando { animation: pulso-mic 1.8s ease-out infinite; }
+
+/* Titular del Ingreso: entra deslizándose desde la izquierda. */
+@keyframes entra-izq { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+.entra-izq { animation: entra-izq 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both 0.1s; }
+
+/* Barras de sonido mientras se graba: son decorativas (no miden el volumen). */
+@keyframes onda { 0%, 100% { transform: scaleY(0.3); } 50% { transform: scaleY(1); } }
+.ondas { display: inline-flex; align-items: center; gap: 3px; height: 24px; }
+.ondas i { width: 4px; height: 100%; border-radius: 2px; background: var(--color-brand-600); animation: onda 1s ease-in-out infinite; }
+.ondas i:nth-child(3n)   { animation-delay: -0.3s; }
+.ondas i:nth-child(3n+1) { animation-delay: -0.6s; }
+.ondas i:nth-child(3n+2) { animation-delay: -0.9s; }
+.ondas i:nth-child(4n)   { animation-duration: 0.75s; }
+
+/* Campos que la IA acaba de llenar: un destello verde que se apaga. */
+@keyframes destello-ia { from { box-shadow: 0 0 0 3px rgba(55, 119, 106, 0.35); } to { box-shadow: 0 0 0 0 rgba(55, 119, 106, 0); } }
+.campo-ia { animation: destello-ia 1.2s ease-out both; }
+
 /* En el celular, ningún campo por debajo de 16px.
  *
  * Safari y Chrome de Android hacen zoom sobre cualquier campo con letra más
@@ -288,3 +326,6 @@ main table tbody td {
 }
 main table tbody td:first-child { padding-left: 24px !important; }
 main div:has(> table) { border-radius: 16px; overflow: hidden; }
+
+/* Productos o filas desactivadas: se ven atenuadas pero legibles. */
+.fila-inactiva td { opacity: 0.55; }

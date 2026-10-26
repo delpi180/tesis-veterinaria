@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Col, Empty, Row, Skeleton, Space, Statistic, Tag, Tooltip, Typography } from 'antd'
 import {
@@ -9,6 +9,7 @@ import { api, getNombre, getUsuario } from '../services/api'
 import { waRecordatorio } from '../utils/citas'
 import { BRAND } from '@src/core/color'
 import { MEDIDAS } from '@src/core/medidas'
+import { Fila, Panel } from '../components/PanelLista'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -72,38 +73,6 @@ const COLOR_ESTADO: Record<string, string> = {
   pendiente: 'gold', confirmada: 'green', atendida: 'blue', cancelada: 'red',
 }
 const etiquetaEstado = (e?: string) => (e ? e.charAt(0).toUpperCase() + e.slice(1) : '—')
-
-/** Un panel con título y un enlace opcional a la derecha. */
-function Panel({ titulo, icono, accion, children }: {
-  titulo: string
-  icono?: ReactNode
-  accion?: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <Card
-      title={<Space>{icono}{titulo}</Space>}
-      extra={accion}
-      styles={{ body: { padding: 0 } }}
-      style={{ height: '100%' }}
-    >
-      {children}
-    </Card>
-  )
-}
-
-/** Una fila dentro de un panel: contenido a la izquierda, acciones a la derecha. */
-const Fila = ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => (
-  <div
-    onClick={onClick}
-    style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px',
-      borderTop: `1px solid ${BRAND.border}`, cursor: onClick ? 'pointer' : 'default',
-    }}
-  >
-    {children}
-  </div>
-)
 
 export default function Inicio() {
   const navigate = useNavigate()
@@ -211,8 +180,7 @@ export default function Inicio() {
       )}
 
       {/* Cifras del día: cuatro números, sin iconos ni fondos de colores. */}
-      <Card styles={{ body: { padding: 0 } }} style={{ marginBottom: 16 }}>
-        <Row>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
           {[
             { titulo: 'Consultas hoy', valor: data?.consultas_hoy ?? '—', sub: `${totalSemana} esta semana` },
             { titulo: 'Ingresos del día', valor: fmtMoneda(data?.ingresos_dia), sub: `${fmtMoneda(data?.ingresos_mes)} en el mes` },
@@ -224,11 +192,12 @@ export default function Inicio() {
                 : porVencer.length ? 'Productos por vencer' : 'Productos con stock bajo',
             },
           ].map(({ titulo, valor, sub, alerta }, i) => (
-            <Col key={titulo} xs={12} md={6} style={{
-              padding: '18px clamp(14px, 4vw, 24px)',
-              borderLeft: i % 2 === 1 ? `1px solid ${BRAND.border}` : undefined,
-              borderTop: i >= 2 ? `1px solid ${BRAND.border}` : undefined,
-            }}>
+            <Col key={titulo} xs={12} md={6}>
+              <Card
+                className="tarjeta-viva animar"
+                style={{ animationDelay: `${i * 70}ms`, height: '100%' }}
+                styles={{ body: { padding: '18px clamp(14px, 4vw, 24px)' } }}
+              >
               {cargando ? <Skeleton active paragraph={{ rows: 1 }} title={false} /> : (
                 <>
                   <Statistic
@@ -240,10 +209,10 @@ export default function Inicio() {
                   <Text type="secondary" style={{ fontSize: 13 }}>{sub}</Text>
                 </>
               )}
+              </Card>
             </Col>
           ))}
-        </Row>
-      </Card>
+      </Row>
 
       <Row gutter={[16, 16]}>
         {/* Consultas por día */}

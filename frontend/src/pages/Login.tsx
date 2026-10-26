@@ -83,12 +83,12 @@ export default function Login() {
         </div>
 
         <div style={{ position: 'relative', maxWidth: 440 }}>
-          <Title level={1} style={{ color: '#fff', fontSize: 38, lineHeight: 1.15, marginTop: 0 }}>
+          <Title level={1} className="entra-izq" style={{ color: '#fff', fontSize: 38, lineHeight: 1.15, marginTop: 0 }}>
             Cada paciente, su historia completa.
           </Title>
           <ul style={{ listStyle: 'none', padding: 0, margin: '36px 0 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {PUNTOS.map(({ icono, texto }) => (
-              <li key={texto} style={{ display: 'flex', gap: 12, color: '#b3d6c9' }}>
+            {PUNTOS.map(({ icono, texto }, i) => (
+              <li key={texto} className="animar" style={{ display: 'flex', gap: 12, color: '#b3d6c9', animationDelay: `${300 + i * 120}ms` }}>
                 <span style={{ color: '#5a9d88', fontSize: 18 }}>{icono}</span>
                 <span>{texto}</span>
               </li>
@@ -106,7 +106,7 @@ export default function Login() {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 24, background: BRAND.body,
       }}>
-        <div style={{ width: '100%', maxWidth: 380 }}>
+        <div className="animar" style={{ width: '100%', maxWidth: 380 }}>
           {/* Marca solo en móvil (en escritorio ya está en el panel) */}
           {!pantallas.md && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 40 }}>

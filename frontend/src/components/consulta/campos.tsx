@@ -33,7 +33,7 @@ function AvisoResaltado({ hl }: { hl: Resaltado }) {
         <WarningOutlined /> La IA lo supuso, confirma
       </Typography.Text>
     )
-  if (hl === 'ok') return <Typography.Text type="success"><CheckOutlined style={{ fontSize: 11 }} /></Typography.Text>
+  if (hl === 'ok') return <Typography.Text type="success" style={{ fontSize: 11 }}><CheckOutlined /> Completado por la IA</Typography.Text>
   return null
 }
 
@@ -70,7 +70,7 @@ export function Campo({ label, hl, children, style, fila }: CampoProps) {
   const id = useId()
   const { token } = theme.useToken()
   return (
-    <Flex vertical gap={4} style={style}>
+    <Flex vertical gap={4} style={{ borderRadius: 8, ...style }} className={hl ? 'campo-ia' : undefined}>
       <Flex align="center" gap={6} wrap>
         <label
           htmlFor={id}

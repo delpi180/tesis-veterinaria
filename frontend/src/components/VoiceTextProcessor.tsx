@@ -277,18 +277,33 @@ export default function VoiceTextProcessor({
         {!modoTexto ? (
           /* MODO VOZ */
           <Flex vertical gap={8}>
-            <Flex align="center" gap={12} wrap>
+            <Flex align="center" gap={16} wrap>
+              {/* Micrófono grande: pulsa mientras graba, para que se note que está escuchando */}
               <Button
                 type="primary"
                 danger={isRecording}
-                size={movil ? 'large' : 'middle'}
-                block={movil}
+                shape="circle"
+                className={isRecording ? 'grabando' : undefined}
+                style={{ width: 64, height: 64, fontSize: 26, flexShrink: 0 }}
                 icon={isRecording ? <StopOutlined /> : <AudioOutlined />}
                 onClick={handleGrabar}
                 disabled={enEspera}
-              >
-                {isRecording ? `Detener (${fmtSec(seconds)})` : labelGrabar}
-              </Button>
+                aria-label={isRecording ? `Detener grabación (${fmtSec(seconds)})` : labelGrabar}
+              />
+              <Flex vertical gap={4} style={{ minWidth: 0 }}>
+                <Typography.Text strong>
+                  {isRecording ? `Grabando… ${fmtSec(seconds)}` : labelGrabar}
+                </Typography.Text>
+                {isRecording ? (
+                  <span className="ondas" aria-hidden>
+                    {Array.from({ length: 16 }, (_, i) => <i key={i} />)}
+                  </span>
+                ) : (
+                  <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                    Pulsa el micrófono y habla con normalidad.
+                  </Typography.Text>
+                )}
+              </Flex>
               {confirmacion}
             </Flex>
 
