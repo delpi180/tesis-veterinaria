@@ -6,7 +6,7 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/es'
 import './index.css'
 import App from './App.jsx'
-import { ErrorBoundary } from './components/ErrorBoundary.jsx'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { instalarCapturaGlobal } from './services/reportarError.js'
 import { temaClinica } from './core/tema'
 
