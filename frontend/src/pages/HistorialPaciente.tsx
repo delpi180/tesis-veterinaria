@@ -18,6 +18,7 @@ import { useConfirmar } from '../components/Confirmar'
 import { useToast } from '../components/Toast'
 import RegistrosPaciente from '../components/RegistrosPaciente'
 import RecetasPaciente from '../components/RecetasPaciente'
+import ResumenPrevio from '../components/ResumenPrevio'
 import { clinicaActual } from '../services/clinica'
 import Disposicion from '../components/consulta/Disposicion'
 import ColumnaPaciente from '../components/consulta/ColumnaPaciente'
@@ -674,6 +675,7 @@ export default function HistorialPaciente() {
             {/* ── RESUMEN ─────────────────────────────────────────────────── */}
             {tab === 'resumen' && (
               <Flex vertical gap={20}>
+                {esVeterinario() && <ResumenPrevio pacienteId={pacienteId} />}
                 <Row gutter={[12, 12]}>
                   {[
                     { titulo: 'Consultas', valor: historias.length },

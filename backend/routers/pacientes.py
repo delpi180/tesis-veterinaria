@@ -22,6 +22,7 @@ from schemas import (
 )
 from core.deps import usuario_actual
 from services.tratamientos import sincronizar_desde_historia as sincronizar_tratamientos
+from services.resumen_previo import armar_resumen_previo
 
 router = APIRouter(prefix="/api/pacientes", tags=["Pacientes"])
 logger = logging.getLogger("vetlospinos")
@@ -369,6 +370,15 @@ def crear_historia(
         # volcar datos clínicos del paciente en los logs).
         logger.exception("Fallo al guardar historia clínica (paciente_id=%s)", paciente_id)
         raise HTTPException(status_code=500, detail="No se pudo guardar la historia clínica.")
+
+
+@router.get("/{paciente_id}/resumen-previo")
+def resumen_previo(paciente_id: int, db: Session = Depends(get_db)):
+    """Lo que conviene leer antes de entrar a la consulta, sin IA (ver el servicio)."""
+    paciente = db.get(Paciente, paciente_id)
+    if not paciente:
+        raise HTTPException(status_code=404, detail="Paciente no encontrado")
+    return armar_resumen_previo(db, paciente)
 
 
 @router.get("/{paciente_id}/historias/", response_model=list[HistoriaClinicaOut])
