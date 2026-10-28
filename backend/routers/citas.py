@@ -255,6 +255,9 @@ def actualizar_cita(
         _verificar_choque(db, nuevo_vet, nueva_fecha, excluir_id=cita.id)
 
     estado_anterior = cita.estado
+    if "fecha_hora" in datos and datos["fecha_hora"] != cita.fecha_hora:
+        cita.recordado_en = None
+        cita.recordado_por = None
     for campo, valor in datos.items():
         setattr(cita, campo, valor)
     cita.actualizado_por = usuario.usuario if usuario else None
@@ -269,6 +272,37 @@ def actualizar_cita(
     else:
         request.state.actividad_detalle = nombre
     manager.broadcast("citas_updated")
+    return cita
+
+
+@router.post("/{cita_id}/recordado", response_model=CitaResponse)
+def marcar_recordada(
+    cita_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(usuario_actual),
+):
+    """Anota que ya se le recordó la cita al dueño, para no avisarle dos veces."""
+    cita = db.get(Cita, cita_id)
+    if not cita:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    if cita.recordado_en is None:
+        cita.recordado_en = datetime.now(timezone.utc)
+        cita.recordado_por = usuario.usuario if usuario else None
+        db.commit()
+        db.refresh(cita)
+    return cita
+
+
+@router.delete("/{cita_id}/recordado", response_model=CitaResponse)
+def deshacer_recordada(cita_id: int, db: Session = Depends(get_db)):
+    """Deshace el aviso, por si se marcó por error."""
+    cita = db.get(Cita, cita_id)
+    if not cita:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    cita.recordado_en = None
+    cita.recordado_por = None
+    db.commit()
+    db.refresh(cita)
     return cita
 
 

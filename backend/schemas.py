@@ -353,6 +353,7 @@ class CitaResponse(CitaBase):
     creado_por:         Optional[str] = None
     actualizado_por:    Optional[str] = None
     actualizado_en:     Optional[datetime] = None
+    recordado_en:       Optional[datetime] = None
     veterinario_id:     Optional[int] = None
     veterinario_nombre: Optional[str] = None
     paciente_nombre:    Optional[str] = None

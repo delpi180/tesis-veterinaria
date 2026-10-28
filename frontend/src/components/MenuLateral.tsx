@@ -6,7 +6,7 @@ import {
   HomeOutlined, CustomerServiceOutlined, ProfileOutlined, TeamOutlined, CalendarOutlined,
   MedicineBoxOutlined, InboxOutlined, ToolOutlined, ShoppingCartOutlined, WalletOutlined,
   ExperimentOutlined, PieChartOutlined, ClockCircleOutlined, HistoryOutlined,
-  UserSwitchOutlined, BugOutlined, LogoutOutlined, MenuOutlined, DownOutlined,
+  UserSwitchOutlined, BugOutlined, BellOutlined, LogoutOutlined, MenuOutlined, DownOutlined,
 } from '@ant-design/icons'
 import { MEDIDAS } from '@src/core/medidas'
 import { api, getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
@@ -49,6 +49,7 @@ const SECCION_ADMIN: Item[] = [
   { label: 'Servicios',  to: '/servicios',  icon: <ToolOutlined />,         admin: true },
   { label: 'Ventas',     to: '/ventas',     icon: <ShoppingCartOutlined />, admin: true },
   { label: 'Caja',       to: '/caja',       icon: <WalletOutlined />,       admin: true },
+  { label: 'Recordatorios', to: '/recordatorios', icon: <BellOutlined />,    admin: true },
   { label: 'Vacunación', to: '/vacunacion', icon: <ExperimentOutlined />,   admin: true },
   { label: 'Reportes',   to: '/reportes',   icon: <PieChartOutlined />,     admin: true },
   { label: 'Asistencia', to: '/asistencia', icon: <ClockCircleOutlined />,  admin: true },

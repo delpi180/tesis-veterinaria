@@ -383,6 +383,11 @@ class Cita(Base):
     # Doctor veterinario asignado al turno (opcional)
     veterinario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
 
+    # Cuándo se le recordó la cita al dueño (WhatsApp). Si la cita se reprograma
+    # se borra: es otro recordatorio.
+    recordado_en   = Column(DateTime(timezone=True))
+    recordado_por  = Column(String(50))
+
     paciente    = relationship("Paciente", back_populates="citas")
     veterinario = relationship("Usuario")
 
