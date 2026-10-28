@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Cita, Cliente, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Receta, Usuario
+from models import Cita, Cliente, DocumentoPaciente, Paciente, HistoriaClinica, RegistroClinico, Receta, Usuario, VacunaAvisada
 from schemas import (
     CambiarResponsableIn,
     PacienteOut, PacienteUpdate,
@@ -23,7 +23,7 @@ from schemas import (
 from core.deps import usuario_actual
 from services.tratamientos import sincronizar_desde_historia as sincronizar_tratamientos
 from services.resumen_previo import armar_resumen_previo
-from core.tiempo import hoy_peru
+from core.tiempo import PERU_TZ, hoy_peru
 
 router = APIRouter(prefix="/api/pacientes", tags=["Pacientes"])
 logger = logging.getLogger("vetlospinos")
@@ -224,6 +224,57 @@ def listar_pacientes(
             for p in filas
         ],
     }
+
+
+@router.get("/inactivos")
+def pacientes_que_no_vuelven(
+    meses: int = Query(12, ge=3, le=60, description="Sin consulta ni cita desde hace al menos tantos meses"),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    """Mascotas activas que vinieron alguna vez y llevan meses sin volver.
+
+    Para recuperarlas: las que se perdieron hace poco son las más fáciles de
+    traer de vuelta, así que van primero. Quedan fuera las que tienen una cita
+    reciente o próxima (ya están volviendo) y las que nunca se atendieron.
+    """
+    corte = datetime.now(timezone.utc) - timedelta(days=30 * meses)
+    ultima = func.max(HistoriaClinica.fecha)
+    reciente = (
+        db.query(Cita.id)
+        .filter(Cita.paciente_id == Paciente.id, Cita.estado != "cancelada", Cita.fecha_hora >= corte)
+        .exists()
+    )
+    filas = (
+        db.query(Paciente, Cliente, ultima)
+        .join(Cliente, Paciente.cliente_id == Cliente.id)
+        .join(HistoriaClinica, HistoriaClinica.paciente_id == Paciente.id)
+        .filter(Paciente.activo.is_(True), ~reciente)
+        .group_by(Paciente.id, Cliente.id)
+        .having(ultima < corte)
+        .order_by(ultima.desc())
+        .limit(500)
+        .all()
+    )
+    # Ya avisadas: la clave es la fecha de la última visita, así que si vuelve y
+    # se pierde otra vez, es otro caso y reaparece.
+    avisadas = {
+        (a.paciente_id, a.proxima_dosis)
+        for a in db.query(VacunaAvisada).filter(VacunaAvisada.tipo == "reactivacion").all()
+    }
+    hoy = hoy_peru()
+    salida = []
+    for p, c, ult in filas:
+        dia = ult.astimezone(PERU_TZ).date()
+        if (p.id, dia.isoformat()) in avisadas:
+            continue
+        salida.append({
+            "paciente_id": p.id, "paciente": p.nombre, "especie": p.especie,
+            "cliente_id": c.id, "propietario": c.nombre, "telefono": c.telefono,
+            "ultima_visita": dia.isoformat(),
+            "meses": (hoy - dia).days // 30,
+        })
+    return salida[:limit]
 
 
 @router.get("/opciones")

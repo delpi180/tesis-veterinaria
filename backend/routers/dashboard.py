@@ -667,7 +667,8 @@ def marcar_vacuna_avisada(
         paciente_id=payload.paciente_id,
         vacuna=payload.vacuna.strip(),
         proxima_dosis=payload.proxima_dosis,
-        tipo=payload.tipo if payload.tipo in ("vacuna", "antiparasitario") else "vacuna",
+        # 'reactivacion': se le escribió a quien dejó de venir (ver /api/pacientes/inactivos)
+        tipo=payload.tipo if payload.tipo in ("vacuna", "antiparasitario", "reactivacion") else "vacuna",
         avisado_por=usuario.usuario if usuario else None,
     )
     db.add(aviso)

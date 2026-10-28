@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, Empty, Flex, Skeleton, Space, Tag, Tooltip, Typography } from 'antd'
-import { CalendarOutlined, CheckOutlined, ExperimentOutlined, MedicineBoxOutlined, ReloadOutlined, UndoOutlined, WhatsAppOutlined } from '@ant-design/icons'
+import { CalendarOutlined, CheckOutlined, ExperimentOutlined, HeartOutlined, MedicineBoxOutlined, ReloadOutlined, UndoOutlined, WhatsAppOutlined } from '@ant-design/icons'
 import { api } from '../services/api'
 import { waRecordatorio } from '../utils/citas'
 import { clinicaActual } from '../services/clinica'
@@ -24,7 +24,12 @@ interface Tratamiento {
   medicamento: string; fin?: string | null; sin_control: boolean
 }
 
-const DIAS_ADELANTE = 7   // vacunas y desparasitaciones: lo vencido y lo que toca esta semana
+interface Inactiva {
+  paciente_id: number; paciente: string; propietario: string; telefono?: string | null; ultima_visita: string; meses: number
+}
+
+const MESES_SIN_VOLVER = 12
+const DIAS_ADELANTE = 7  // vacunas y desparasitaciones: lo vencido y lo que toca esta semana
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 const sumarDias = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
@@ -56,17 +61,21 @@ export default function Recordatorios() {
   const [citas, setCitas] = useState<Cita[]>([])
   const [pendientes, setPendientes] = useState<Pendiente[]>([])
   const [sinControl, setSinControl] = useState<Tratamiento[]>([])
+  const [inactivas, setInactivas] = useState<Inactiva[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const cargar = useCallback(async () => {
     const hoy = new Date()
     try {
-      const [c, r, t] = await Promise.all([
+      const [c, r, t, i] = await Promise.all([
         api.get(`/api/citas/?desde=${iso(hoy)}&hasta=${iso(sumarDias(hoy, 1))}`),
         api.get('/api/dashboard/resumen'),
         api.get('/api/tratamientos/?estado=terminado'),
+        // Extra: si falla, el resto de la bandeja sigue sirviendo
+        api.get(`/api/pacientes/inactivos?meses=${MESES_SIN_VOLVER}&limit=50`).catch(() => []),
       ])
+      setInactivas(i as Inactiva[])
       const limite = iso(sumarDias(hoy, DIAS_ADELANTE))
       // Solo las que aún no pasaron: recordar una cita de hace horas no sirve
       setCitas((c as Cita[]).filter(x => (x.estado === 'pendiente' || x.estado === 'confirmada') && new Date(x.fecha_hora) > hoy))
@@ -93,6 +102,17 @@ export default function Recordatorios() {
     }
   }
 
+  const marcarInactiva = async (m: Inactiva) => {
+    setInactivas(prev => prev.filter(x => x.paciente_id !== m.paciente_id))
+    try {
+      // La clave del aviso es la fecha de la última visita: si vuelve y se pierde otra vez, reaparece
+      await api.post('/api/dashboard/vacunas/avisar', { paciente_id: m.paciente_id, vacuna: 'Reactivación', proxima_dosis: m.ultima_visita, tipo: 'reactivacion' })
+    } catch (e) {
+      setInactivas(prev => [...prev, m].sort((a, b) => b.ultima_visita.localeCompare(a.ultima_visita)))
+      toast.error(mensajeDe(e))
+    }
+  }
+
   const marcarPendiente = async (p: Pendiente) => {
     const igual = (x: Pendiente) => x.paciente_id === p.paciente_id && x.vacuna === p.vacuna && x.proxima_dosis === p.proxima_dosis && x.tipo === p.tipo
     setPendientes(prev => prev.filter(x => !igual(x)))
@@ -105,6 +125,7 @@ export default function Recordatorios() {
   }
 
   const sinAvisar = citas.filter(c => !c.recordado_en).length
+  // Los que dejaron de venir no cuentan en el "por enviar" del día: son una tarea de fondo, no un aviso urgente
   const total = sinAvisar + pendientes.length + sinControl.length
   const hoyIso = iso(new Date())
   const clinica = clinicaActual().nombre
@@ -168,6 +189,20 @@ export default function Recordatorios() {
                   {t.fin && <Tag style={{ margin: 0 }}>terminó el {fmtFecha(t.fin)}</Tag>}
                   <BotonWhatsApp sinTelefono={!t.telefono} href={wa(t.telefono,
                     `Hola ${t.propietario || ''}, ${t.paciente || 'su mascota'} terminó su tratamiento con *${t.medicamento}*${t.fin ? ` el ${fmtFecha(t.fin)}` : ''}. ¿Cómo sigue? En ${clinica} quedamos atentos para el control.`)} />
+                </Fila>
+              ))}
+            </Panel>
+
+            <Panel titulo={`Hace más de ${MESES_SIN_VOLVER} meses que no vienen (${inactivas.length})`} icono={<HeartOutlined />}>
+              {inactivas.length === 0 ? <Vacio texto="Nadie lleva más de un año sin volver" /> : inactivas.map(m => (
+                <Fila key={m.paciente_id}>
+                  <Text style={{ flex: 1, minWidth: 0 }} ellipsis>
+                    <b>{m.paciente}</b> · {m.propietario}
+                  </Text>
+                  <Tag style={{ margin: 0 }}>última visita {fmtFecha(m.ultima_visita)} · {m.meses} meses</Tag>
+                  <Tooltip title="Marcar como ya escrito"><Button size="small" icon={<CheckOutlined />} aria-label="Marcar como ya escrito" onClick={() => marcarInactiva(m)} /></Tooltip>
+                  <BotonWhatsApp sinTelefono={!m.telefono} href={wa(m.telefono,
+                    `Hola ${m.propietario || ''}, hace tiempo que no vemos a ${m.paciente || 'su mascota'} en ${clinica}. ¿Cómo está? Si desea, le agendamos un control. ¡Lo esperamos!`)} />
                 </Fila>
               ))}
             </Panel>
