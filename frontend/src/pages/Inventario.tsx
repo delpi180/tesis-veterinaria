@@ -3,7 +3,7 @@ import { Alert, Button, Card, Col, Empty, Flex, Input, Row, Select, Skeleton, Sp
 import type { TableColumnsType } from 'antd'
 import {
   CalendarOutlined, DeleteOutlined, DollarOutlined, DownloadOutlined, EditOutlined, InboxOutlined,
-  PlusOutlined, SearchOutlined, SwapOutlined, ThunderboltOutlined, WarningOutlined,
+  PlusOutlined, SearchOutlined, ShoppingCartOutlined, SwapOutlined, ThunderboltOutlined, WarningOutlined,
 } from '@ant-design/icons'
 import { api } from '../services/api'
 import { useToast } from '../components/Toast'
@@ -20,6 +20,11 @@ import { BRAND, ESTADO } from '@src/core/color'
 import { MEDIDAS } from '@src/core/medidas'
 
 const { Title, Text } = Typography
+
+interface Reposicion {
+  id: number; codigo?: string | null; nombre: string; proveedor?: string | null; unidad?: string | null
+  stock: number; consumo_diario: number; dias_restantes: number; sugerido: number; urgente: boolean
+}
 
 /** Aviso de caducidad. No muestra nada si el producto no lleva fecha o le falta
  *  más de un mes: avisar de todo es lo mismo que no avisar de nada. */
@@ -42,6 +47,7 @@ export default function Inventario() {
   const confirmar = useConfirmar()
   const toast = useToast()
   const [productos, setProductos] = useState<Producto[]>([])
+  const [reposicion, setReposicion] = useState<Reposicion[]>([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -61,6 +67,8 @@ export default function Inventario() {
       // solo_activos=false → mostramos también los desactivados en el catálogo
       const data = await api.get('/api/productos/?solo_activos=false')
       setProductos(Array.isArray(data) ? data : [])
+      // La predicción es un extra: si falla, el catálogo sigue funcionando
+      api.get('/api/productos/reposicion').then(r => setReposicion(Array.isArray(r) ? r : [])).catch(() => setReposicion([]))
     } catch (e) {
       setError(mensajeDe(e))
     } finally {
@@ -98,6 +106,14 @@ export default function Inventario() {
       ]),
     )
     toast.success(`${filtrados.length} producto(s) exportado(s).`)
+  }
+
+  // Pedido listo para mandar: agrupado por proveedor, para llamar a cada uno una sola vez
+  const exportarPedido = () => {
+    const filas = [...reposicion].sort((a, b) => (a.proveedor ?? 'zzz').localeCompare(b.proveedor ?? 'zzz'))
+    exportarCSV('Pedido sugerido', ['Proveedor', 'Código', 'Producto', 'Stock', 'Se vende por día', 'Alcanza (días)', 'Pedir'],
+      filas.map(r => [r.proveedor ?? 'Sin proveedor', r.codigo ?? '', r.nombre, r.stock, r.consumo_diario, r.dias_restantes, r.sugerido]))
+    toast.success(`Pedido de ${filas.length} producto(s) exportado.`)
   }
 
   // Indicadores (datos reales)
@@ -241,6 +257,21 @@ export default function Inventario() {
             </Col>
           ))}
         </Row>
+
+        {reposicion.length > 0 && (
+          <Panel titulo={`Para pedir al proveedor (${reposicion.length})`} icono={<ShoppingCartOutlined style={{ color: ESTADO.atencion }} />}
+            accion={<Button size="small" icon={<DownloadOutlined />} onClick={exportarPedido}>Pedido</Button>}>
+            <Table<Reposicion> rowKey="id" size="small" pagination={false} dataSource={reposicion.slice(0, 8)}
+              columns={[
+                { title: 'Producto', dataIndex: 'nombre', render: (n: string, r) => <><Text strong>{n}</Text> <Text type="secondary" style={{ fontSize: 12 }}>{r.proveedor ?? ''}</Text></> },
+                { title: 'Stock', dataIndex: 'stock', width: 80, align: 'right' },
+                { title: 'Se vende', dataIndex: 'consumo_diario', width: 110, align: 'right', render: (c: number) => `${c} por día` },
+                { title: 'Alcanza', dataIndex: 'dias_restantes', width: 110, render: (d: number, r) => <Tag color={r.urgente ? 'error' : 'warning'} style={{ margin: 0 }}>{d < 1 ? 'se acaba hoy' : `${Math.floor(d)} día${Math.floor(d) === 1 ? '' : 's'}`}</Tag> },
+                { title: 'Pedir', dataIndex: 'sugerido', width: 80, align: 'right', render: (n: number) => <Text strong>{n}</Text> },
+              ]} />
+            {reposicion.length > 8 && <div style={{ padding: '8px 20px' }}><Text type="secondary">y {reposicion.length - 8} más en el pedido exportado</Text></div>}
+          </Panel>
+        )}
 
         <Panel titulo="Catálogo" icono={<InboxOutlined />}
           accion={<Tag>{filtrados.length}{hayFiltros ? ` de ${productos.length}` : ''}</Tag>}>

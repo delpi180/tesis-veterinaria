@@ -1,8 +1,9 @@
-from datetime import date, timedelta
+import math
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -118,6 +119,53 @@ def productos_por_vencer(
         .order_by(Producto.fecha_vencimiento)
         .all()
     )
+
+
+@router.get("/reposicion")
+def reposicion_sugerida(
+    historial: int = Query(30, ge=7, le=180, description="Días de ventas que se miran para medir el consumo"),
+    cubrir: int = Query(30, ge=7, le=180, description="Para cuántos días se quiere tener stock"),
+    db: Session = Depends(get_db),
+):
+    """Qué pedir al proveedor, según lo que de verdad se consume y no solo el mínimo fijo.
+
+    Consumo = salidas del kardex en la ventana, menos lo devuelto por anulaciones.
+    Las entradas de compra no cuentan. Un producto sin consumo no aparece: sin
+    demanda no hay nada que predecir, y lo agotado sin ventas no es urgente.
+    """
+    desde = datetime.now(timezone.utc) - timedelta(days=historial)
+    consumido = func.coalesce(func.sum(case(
+        (MovimientoInventario.tipo == "salida", -MovimientoInventario.cantidad),
+        (and_(MovimientoInventario.tipo == "entrada",
+              MovimientoInventario.motivo.like("Devolución por anulación%")), -MovimientoInventario.cantidad),
+        else_=0,
+    )), 0)
+    filas = (
+        db.query(Producto, consumido)
+        .join(MovimientoInventario, MovimientoInventario.producto_id == Producto.id)
+        .filter(Producto.activo.is_(True), MovimientoInventario.fecha >= desde)
+        .group_by(Producto.id)
+        .all()
+    )
+    salida = []
+    for p, total in filas:
+        total = int(total)
+        if total <= 0:
+            continue
+        diario = total / historial
+        dias = p.stock / diario
+        if dias >= cubrir:
+            continue
+        salida.append({
+            "id": p.id, "codigo": p.codigo, "nombre": p.nombre, "proveedor": p.proveedor,
+            "categoria": p.categoria, "unidad": p.unidad, "stock": p.stock,
+            "consumo_diario": round(diario, 2),
+            "dias_restantes": round(dias, 1),
+            "sugerido": max(1, math.ceil(diario * cubrir - p.stock)),
+            "urgente": dias <= 7,
+        })
+    salida.sort(key=lambda x: x["dias_restantes"])
+    return salida
 
 
 @router.get("/{producto_id}", response_model=ProductoOut)
