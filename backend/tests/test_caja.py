@@ -8,6 +8,7 @@ anulado y que el cierre no se pueda tocar dos veces.
     python -m pytest tests/test_caja.py -v
 """
 import uuid
+from core.tiempo import hoy_peru
 from datetime import date, timedelta
 
 import pytest
@@ -165,7 +166,7 @@ def test_lo_anulado_no_suma_en_los_totales(client, admin, producto):
 
 def test_cierre_de_caja_registra_la_diferencia(client, admin):
     """El arqueo compara lo contado contra lo esperado y guarda la diferencia."""
-    ayer = date.today() - timedelta(days=1)
+    ayer = hoy_peru() - timedelta(days=1)
     _limpiar_cierre(ayer)
     try:
         r = client.post("/api/dashboard/cierre-caja", json={
@@ -187,7 +188,7 @@ def test_cierre_de_caja_registra_la_diferencia(client, admin):
 
 def test_la_caja_se_cierra_una_sola_vez(client, admin):
     """Si se pudiera cerrar dos veces dejaría de ser una constancia."""
-    ayer = date.today() - timedelta(days=1)
+    ayer = hoy_peru() - timedelta(days=1)
     _limpiar_cierre(ayer)
     try:
         assert client.post("/api/dashboard/cierre-caja",
@@ -207,7 +208,7 @@ def test_cerrar_caja_es_solo_de_la_administradora(client, doctor):
 
 def test_no_se_anula_una_venta_de_un_dia_ya_cerrado(client, admin, producto):
     """Anular después del cierre cambiaría un arqueo ya firmado."""
-    hoy = date.today()
+    hoy = hoy_peru()
     _limpiar_cierre(hoy)
     p = producto
     venta = _crear_venta(client, admin, p, cantidad=1)

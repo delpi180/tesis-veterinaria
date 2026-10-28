@@ -3,6 +3,7 @@ from sqlalchemy import Column, Boolean, Date, Float, Integer, LargeBinary, Numer
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from database import Base
+from core.tiempo import PERU_TZ, hoy_peru
 
 
 class Usuario(Base):
@@ -198,7 +199,7 @@ class Tratamiento(Base):
             return self.estado
         if self.fin is None:
             return "sin_duracion"
-        return "terminado" if self.fin < datetime.now(timezone.utc).date() else "en_curso"
+        return "terminado" if self.fin < hoy_peru() else "en_curso"
 
 
 class DocumentoPaciente(Base):
@@ -242,7 +243,7 @@ class RegistroClinico(Base):
     id          = Column(Integer, primary_key=True)
     paciente_id = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
     tipo        = Column(String(20), nullable=False)   # antiparasitario | estetica | complementario
-    fecha       = Column(Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
+    fecha       = Column(Date, nullable=False, default=lambda: hoy_peru())
     # Cuándo toca la siguiente. Desparasitar es lo más recurrente de una
     # clínica y era lo único del sistema sin fecha de vencimiento: quedaba
     # anotado que se hizo, y nadie se enteraba cuando tocaba repetirlo.
@@ -266,7 +267,7 @@ class Receta(Base):
 
     id           = Column(Integer, primary_key=True)
     paciente_id  = Column(Integer, ForeignKey("pacientes.id"), nullable=False)
-    fecha        = Column(Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
+    fecha        = Column(Date, nullable=False, default=lambda: hoy_peru())
     diagnostico  = Column(Text)          # motivo / diagnóstico que sustenta el tratamiento
     indicaciones = Column(Text)          # indicaciones generales para el propietario
     items        = Column(JSONB)         # [{medicamento, dosis, via, frecuencia, duracion}]
@@ -471,7 +472,6 @@ def calcular_tardanza_min(hora_ingreso, hora_entrada_perfil):
     except (ValueError, AttributeError):
         return None
 
-    PERU_TZ = timezone(timedelta(hours=-5))
     local_dt = hora_ingreso
     if local_dt.tzinfo is None:
         local_dt = local_dt.replace(tzinfo=timezone.utc)
@@ -487,7 +487,7 @@ class Asistencia(Base):
 
     id            = Column(Integer, primary_key=True)
     usuario_id    = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
-    fecha         = Column(Date, nullable=False, default=lambda: datetime.now(timezone.utc).date())
+    fecha         = Column(Date, nullable=False, default=lambda: hoy_peru())
     hora_ingreso  = Column(DateTime(timezone=True))
     hora_salida   = Column(DateTime(timezone=True), nullable=True)  # null mientras esté "en turno"
     notas         = Column(String(200))

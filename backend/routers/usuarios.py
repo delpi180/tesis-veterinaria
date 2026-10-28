@@ -8,10 +8,10 @@ from models import Usuario, Asistencia, Cita, HistoriaClinica, Paciente, Receta
 from schemas import UsuarioCreate, UsuarioUpdate, UsuarioOut, DoctorOut
 from core.security import hash_password
 from core.deps import solo_admin, usuario_actual
+from core.tiempo import PERU_TZ
 
 router = APIRouter(prefix="/api/usuarios", tags=["Usuarios"])
 
-PERU_TZ = timezone(timedelta(hours=-5))
 
 
 @router.get("/doctores", response_model=list[DoctorOut])

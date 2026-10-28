@@ -12,6 +12,7 @@ cuenta y termine descuadrando el inventario contra la caja.
     cd backend
     python -m pytest tests/test_tratamiento_inventario.py -v
 """
+from core.tiempo import hoy_peru
 from datetime import date, timedelta
 
 import pytest
@@ -148,7 +149,7 @@ def test_una_venta_vieja_no_cuenta_como_entrega_del_tratamiento_de_hoy(client, a
     try:
         db.execute(
             text("UPDATE ventas SET fecha = :f WHERE cliente_id = :c"),
-            {"f": f"{(date.today() - timedelta(days=30)).isoformat()} 10:00:00+00",
+            {"f": f"{(hoy_peru() - timedelta(days=30)).isoformat()} 10:00:00+00",
              "c": escenario["cliente_id"]},
         )
         db.commit()

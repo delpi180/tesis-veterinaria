@@ -13,12 +13,12 @@ from database import get_db
 from models import Asistencia, Usuario
 from schemas import AsistenciaIngresoReq, AsistenciaOut, AsistenciaUpdate
 from core.deps import solo_admin
+from core.tiempo import PERU_TZ
 
 router = APIRouter(prefix="/api/asistencia", tags=["Asistencia"])
 
 # Perú usa UTC-5; calculamos la "fecha laboral" en hora local para que una
 # marcación nocturna no se cuente en el día siguiente (UTC).
-PERU_TZ = timezone(timedelta(hours=-5))
 
 
 def _ahora_local() -> datetime:

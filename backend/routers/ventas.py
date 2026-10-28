@@ -12,6 +12,7 @@ from models import (
 )
 from schemas import VentaAnular, VentaCreate, VentaOut
 from core.deps import usuario_actual, solo_admin
+from core.tiempo import PERU_TZ, hoy_peru
 
 router = APIRouter(prefix="/api/ventas", tags=["Ventas"])
 
@@ -113,7 +114,7 @@ def crear_venta(payload: VentaCreate, db: Session = Depends(get_db)):
     # Vencidos: entregar un medicamento caducado es un problema sanitario, no
     # de inventario. Se bloquea la venta y se dice qué hacer si la fecha está
     # mal cargada, para que nadie quede trabado sin salida.
-    hoy = date.today()
+    hoy = hoy_peru()
     vencidos = [
         f"'{p.nombre}' venció el {p.fecha_vencimiento.strftime('%d/%m/%Y')}"
         for p in productos.values()
@@ -245,7 +246,7 @@ def anular_venta(
     # por día UTC. Con la hora de Lima (UTC-5) toda venta posterior a las 19:00
     # cae en el día UTC siguiente: comparar en UTC dejaba anular ventas de un
     # día ya cerrado justamente en el horario de cierre.
-    tz_local = datetime.now().astimezone().tzinfo
+    tz_local = PERU_TZ
     dia_venta = venta.fecha.astimezone(tz_local).date() if venta.fecha else None
     if dia_venta and db.query(CierreCaja).filter(CierreCaja.fecha == dia_venta).first():
         raise HTTPException(
@@ -306,7 +307,7 @@ def listar_ventas(
     q = _loader(db.query(Venta)).order_by(Venta.fecha.desc())
     if cliente_id is not None:
         q = q.filter(Venta.cliente_id == cliente_id)
-    tz = datetime.now().astimezone().tzinfo
+    tz = PERU_TZ
     if desde is not None:
         q = q.filter(Venta.fecha >= datetime.combine(desde, time.min).replace(tzinfo=tz))
     if hasta is not None:

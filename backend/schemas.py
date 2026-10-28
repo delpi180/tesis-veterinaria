@@ -5,6 +5,7 @@ from pydantic import (
 )
 
 from models import calcular_tardanza_min
+from core.tiempo import hoy_peru
 
 
 # ---------------------------------------------------------------------------
@@ -512,7 +513,7 @@ class ProductoOut(BaseModel):
         """Negativo si ya venció; null si el producto no lleva fecha."""
         if not self.fecha_vencimiento:
             return None
-        return (self.fecha_vencimiento - date.today()).days
+        return (self.fecha_vencimiento - hoy_peru()).days
 
     @computed_field
     @property

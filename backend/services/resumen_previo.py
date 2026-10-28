@@ -12,10 +12,11 @@ from sqlalchemy.orm import Session
 from core.vacunas import normalizar as normalizar_vacuna
 from models import Cita, HistoriaClinica, Paciente, RegistroClinico, Tratamiento
 from routers.dashboard import _parse_fecha_libre
+from core.tiempo import PERU_TZ, hoy_peru
 
 
 def _fecha_local(dt: datetime | None) -> str | None:
-    return dt.astimezone().date().isoformat() if dt else None
+    return dt.astimezone(PERU_TZ).date().isoformat() if dt else None
 
 
 def _peso(h: HistoriaClinica) -> float | None:
@@ -23,7 +24,7 @@ def _peso(h: HistoriaClinica) -> float | None:
 
 
 def armar_resumen_previo(db: Session, paciente: Paciente, hoy: date | None = None) -> dict:
-    hoy = hoy or date.today()
+    hoy = hoy or hoy_peru()
 
     historias = (
         db.query(HistoriaClinica)

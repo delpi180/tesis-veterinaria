@@ -102,9 +102,9 @@ def test_historia_puede_registrarse_con_fecha_pasada(client, admin, duenos_con_p
     }, headers=admin)
     assert r.status_code == 201, r.text
     h = r.json()
-    assert datetime.fromisoformat(h["fecha"]).date() == hace_un_mes.date()
+    assert datetime.fromisoformat(h["fecha"]).astimezone(timezone.utc).date() == hace_un_mes.date()
     # La fecha de tecleo queda aparte: son dos datos distintos del registro
-    assert datetime.fromisoformat(h["creado_en"]).date() != hace_un_mes.date()
+    assert datetime.fromisoformat(h["creado_en"]).astimezone(timezone.utc).date() != hace_un_mes.date()
 
     # Y se puede corregir después
     nueva = hace_un_mes - timedelta(days=5)
@@ -112,7 +112,7 @@ def test_historia_puede_registrarse_con_fecha_pasada(client, admin, duenos_con_p
         "fecha": nueva.isoformat(),
     }, headers=admin)
     assert r2.status_code == 200, r2.text
-    assert datetime.fromisoformat(r2.json()["fecha"]).date() == nueva.date()
+    assert datetime.fromisoformat(r2.json()["fecha"]).astimezone(timezone.utc).date() == nueva.date()
 
 
 def test_una_historia_sin_fecha_queda_con_la_de_hoy(client, admin, duenos_con_pepita):

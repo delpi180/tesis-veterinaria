@@ -9,6 +9,7 @@ import io
 import uuid
 
 import pytest
+from core.tiempo import hoy_peru
 from sqlalchemy import text
 
 from database import SessionLocal
@@ -562,7 +563,7 @@ def test_actividad_solo_admin(client, doctor):
 def test_actividad_filtros(client, admin):
     """Los filtros por fecha y usuario no deben romper (regresión del 500)."""
     from datetime import date
-    hoy = date.today().isoformat()
+    hoy = hoy_peru().isoformat()
     r = client.get(f"/api/actividad/?desde={hoy}&hasta={hoy}", headers=admin)
     assert r.status_code == 200 and isinstance(r.json(), list)
     r2 = client.get("/api/actividad/?usuario=qa_admin", headers=admin)

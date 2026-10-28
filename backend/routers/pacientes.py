@@ -23,6 +23,7 @@ from schemas import (
 from core.deps import usuario_actual
 from services.tratamientos import sincronizar_desde_historia as sincronizar_tratamientos
 from services.resumen_previo import armar_resumen_previo
+from core.tiempo import hoy_peru
 
 router = APIRouter(prefix="/api/pacientes", tags=["Pacientes"])
 logger = logging.getLogger("vetlospinos")
@@ -640,7 +641,7 @@ def crear_registro(
         registrado_por=usuario.usuario if usuario else None,
     )
     if reg.fecha is None:
-        reg.fecha = datetime.now(timezone.utc).date()
+        reg.fecha = hoy_peru()
     db.add(reg)
     request.state.actividad_detalle = f"{paciente.nombre} — {payload.tipo}"
     db.commit()

@@ -10,6 +10,7 @@ importante: lo que una persona ya cerró o suspendió no se pisa. Corregir una
 falta de ortografía en la indicación no puede revivir un tratamiento que el
 doctor cortó ayer.
 """
+from core.tiempo import PERU_TZ, hoy_peru
 from datetime import date, timedelta
 from typing import Optional
 
@@ -63,7 +64,8 @@ def sincronizar_desde_historia(db: Session, historia: HistoriaClinica) -> None:
         if t.estado not in ("terminado", "suspendido"):
             db.delete(t)
 
-    inicio = (historia.fecha or historia.creado_en).date() if (historia.fecha or historia.creado_en) else date.today()
+    momento = historia.fecha or historia.creado_en
+    inicio = momento.astimezone(PERU_TZ).date() if momento else hoy_peru()
 
     vistos: set[str] = set()
     for item in (historia.tratamiento_items or []):

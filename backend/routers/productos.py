@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import MovimientoInventario, Producto, VentaItem
 from schemas import ProductoCreate, ProductoUpdate, ProductoOut, AjusteStock, MovimientoOut
+from core.tiempo import hoy_peru
 
 router = APIRouter(prefix="/api/productos", tags=["Productos"])
 
@@ -104,7 +105,7 @@ def productos_por_vencer(
 
     Los productos sin fecha quedan fuera: NULL es "no aplica", no "vencido".
     """
-    limite = date.today() + timedelta(days=dias)
+    limite = hoy_peru() + timedelta(days=dias)
     return (
         db.query(Producto)
         .filter(

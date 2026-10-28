@@ -14,6 +14,7 @@ from models import (
 )
 from core.deps import usuario_actual, solo_admin
 from core.vacunas import normalizar as normalizar_vacuna
+from core.tiempo import PERU_TZ, hoy_peru
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 
@@ -85,14 +86,14 @@ def _parse_fecha_libre(s: str | None) -> date | None:
 
 def _rango_local(d: date) -> tuple[datetime, datetime]:
     """Inicio/fin de un día calendario local, como datetimes con tz (para comparar con la BD)."""
-    tz = datetime.now().astimezone().tzinfo
+    tz = PERU_TZ
     inicio = datetime.combine(d, time.min).replace(tzinfo=tz)
     return inicio, inicio + timedelta(days=1)
 
 
 @router.get("/resumen")
 def resumen_dashboard(db: Session = Depends(get_db)):
-    hoy = date.today()
+    hoy = hoy_peru()
     hoy_ini, hoy_fin = _rango_local(hoy)
     mes_ini, _ = _rango_local(hoy.replace(day=1))
 
@@ -169,7 +170,7 @@ def resumen_dashboard(db: Session = Depends(get_db)):
     conteo = [0] * 7
     for (f,) in historias_semana:
         if f is not None:
-            conteo[f.astimezone().weekday()] += 1
+            conteo[f.astimezone(PERU_TZ).weekday()] += 1
     consultas_semana = [{"dia": DIAS[i], "consultas": conteo[i]} for i in range(7)]
     consultas_hoy = conteo[hoy.weekday()]
 
@@ -379,7 +380,7 @@ def cierre_caja(
     de la vista, quien revisa la caja no entendería por qué falta un número de
     comprobante.
     """
-    dia = fecha or date.today()
+    dia = fecha or hoy_peru()
     ini, fin = _rango_local(dia)
 
     todas = (
@@ -458,9 +459,9 @@ def registrar_cierre_caja(
     esa constancia protege tanto a la dueña como a quien cerró la caja.
     """
     solo_admin(request)
-    dia = payload.fecha or date.today()
+    dia = payload.fecha or hoy_peru()
 
-    if dia > date.today():
+    if dia > hoy_peru():
         raise HTTPException(status_code=422, detail="No se puede cerrar la caja de un día futuro.")
     if db.query(CierreCaja).filter(CierreCaja.fecha == dia).first():
         raise HTTPException(
@@ -512,7 +513,7 @@ def reportes(
     db: Session = Depends(get_db),
 ):
     """Reportes para la administradora: top productos/servicios y atenciones por doctor."""
-    hoy = date.today()
+    hoy = hoy_peru()
     d_desde = desde or hoy.replace(day=1)
     d_hasta = hasta or hoy
     ini, _ = _rango_local(d_desde)
@@ -576,7 +577,7 @@ def reportes(
 def vacunas(db: Session = Depends(get_db)):
     """Consolidado de vacunación por paciente: última de cada vacuna, con su
     próxima dosis y estado (vencida / próxima / programada)."""
-    hoy = date.today()
+    hoy = hoy_peru()
     pronto = hoy + timedelta(days=30)
     historias = (
         db.query(HistoriaClinica)

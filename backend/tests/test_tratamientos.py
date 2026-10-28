@@ -8,6 +8,7 @@ sillas en una clínica.
     cd backend
     python -m pytest tests/test_tratamientos.py -v
 """
+from core.tiempo import hoy_peru
 from datetime import date, timedelta
 
 import pytest
@@ -71,7 +72,7 @@ def test_guardar_la_consulta_crea_los_tratamientos(client, admin, paciente):
     assert metro["estado"] == "en_curso"
     assert metro["dias"] == 5
     # El último día cuenta: 5 días desde hoy terminan dentro de 4.
-    assert metro["fin"] == (date.today() + timedelta(days=4)).isoformat()
+    assert metro["fin"] == (hoy_peru() + timedelta(days=4)).isoformat()
     assert metro["dias_restantes"] == 4
     assert metro["telefono"], "recepción necesita a quién llamar"
 
@@ -83,7 +84,7 @@ def test_guardar_la_consulta_crea_los_tratamientos(client, admin, paciente):
 
 def test_la_fecha_de_fin_se_cuenta_desde_la_atencion_no_desde_hoy(client, admin, paciente):
     """Digitalizar una consulta vieja no reinicia el tratamiento."""
-    hace_diez = date.today() - timedelta(days=10)
+    hace_diez = hoy_peru() - timedelta(days=10)
     r = client.post(f"/api/pacientes/{paciente}/historias/", json={
         "fecha": hace_diez.isoformat(),
         "veterinario_id": _vet(client, admin),
@@ -110,7 +111,7 @@ def test_el_que_termino_y_no_volvio_queda_marcado(client, admin, paciente):
     assert p.status_code == 201, p.text
     otro = p.json()["id"]
     try:
-        hace_veinte = date.today() - timedelta(days=20)
+        hace_veinte = hoy_peru() - timedelta(days=20)
         r = client.post(f"/api/pacientes/{otro}/historias/", json={
             "fecha": hace_veinte.isoformat(),
             "veterinario_id": _vet(client, admin),
@@ -125,7 +126,7 @@ def test_el_que_termino_y_no_volvio_queda_marcado(client, admin, paciente):
         # En cuanto se le agenda un control, deja de estar en la lista de llamadas
         cita = client.post("/api/citas/", json={
             "paciente_id": otro,
-            "fecha_hora": f"{(date.today() + timedelta(days=1)).isoformat()}T10:00:00",
+            "fecha_hora": f"{(hoy_peru() + timedelta(days=1)).isoformat()}T10:00:00",
             "motivo": "Control QA",
         }, headers=admin)
         assert cita.status_code == 201, cita.text
@@ -146,7 +147,7 @@ def test_suspender_exige_motivo_y_corta_hoy(client, admin, paciente):
     }, headers=admin)
     assert r.status_code == 200, r.text
     assert r.json()["estado"] == "suspendido"
-    assert r.json()["fin"] == date.today().isoformat(), "un tratamiento cortado termina hoy"
+    assert r.json()["fin"] == hoy_peru().isoformat(), "un tratamiento cortado termina hoy"
     assert r.json()["motivo_corte"] == "Vómitos tras la primera dosis"
 
 

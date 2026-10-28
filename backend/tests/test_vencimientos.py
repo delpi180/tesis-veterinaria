@@ -8,6 +8,7 @@ bloqueo se prueba contra el endpoint real de ventas.
     python -m pytest tests/test_vencimientos.py -v
 """
 import uuid
+from core.tiempo import hoy_peru
 from datetime import date, timedelta
 
 
@@ -48,9 +49,9 @@ def test_producto_sin_fecha_no_reporta_vencimiento(client, admin):
 
 def test_estado_distingue_vigente_por_vencer_y_vencido(client, admin):
     casos = [
-        (date.today() + timedelta(days=200), "vigente"),
-        (date.today() + timedelta(days=10),  "por_vencer"),
-        (date.today() - timedelta(days=1),   "vencido"),
+        (hoy_peru() + timedelta(days=200), "vigente"),
+        (hoy_peru() + timedelta(days=10),  "por_vencer"),
+        (hoy_peru() - timedelta(days=1),   "vencido"),
     ]
     for fecha, esperado in casos:
         p = _crear_producto(client, admin, fecha_vencimiento=fecha.isoformat(), lote="L-QA")
@@ -63,7 +64,7 @@ def test_estado_distingue_vigente_por_vencer_y_vencido(client, admin):
 
 def test_no_se_puede_vender_un_producto_vencido(client, admin):
     """El caso que motiva toda la funcionalidad."""
-    p = _crear_producto(client, admin, fecha_vencimiento=(date.today() - timedelta(days=3)).isoformat())
+    p = _crear_producto(client, admin, fecha_vencimiento=(hoy_peru() - timedelta(days=3)).isoformat())
     try:
         cliente = client.get("/api/clientes/?limit=1", headers=admin).json()[0]
         r = client.post("/api/ventas/", json={
@@ -85,7 +86,7 @@ def test_no_se_puede_vender_un_producto_vencido(client, admin):
 def test_uno_vencido_bloquea_la_venta_completa(client, admin):
     """Media venta cobrada sería peor que ninguna: es todo o nada."""
     bueno = _crear_producto(client, admin)
-    malo  = _crear_producto(client, admin, fecha_vencimiento=(date.today() - timedelta(days=1)).isoformat())
+    malo  = _crear_producto(client, admin, fecha_vencimiento=(hoy_peru() - timedelta(days=1)).isoformat())
     try:
         cliente = client.get("/api/clientes/?limit=1", headers=admin).json()[0]
         r = client.post("/api/ventas/", json={
@@ -103,7 +104,7 @@ def test_uno_vencido_bloquea_la_venta_completa(client, admin):
 def test_vender_lo_que_esta_por_vencer_sigue_permitido(client, admin):
     """Avisar no es prohibir: lo que vence en tres semanas se vende igual, y de
     hecho conviene sacarlo antes."""
-    p = _crear_producto(client, admin, fecha_vencimiento=(date.today() + timedelta(days=20)).isoformat())
+    p = _crear_producto(client, admin, fecha_vencimiento=(hoy_peru() + timedelta(days=20)).isoformat())
     venta = None
     try:
         cliente = client.get("/api/clientes/?limit=1", headers=admin).json()[0]
@@ -122,10 +123,10 @@ def test_vender_lo_que_esta_por_vencer_sigue_permitido(client, admin):
 
 def test_listado_por_vencer_solo_trae_lo_accionable(client, admin):
     """Sin stock no hay nada que retirar; sin fecha no hay nada que avisar."""
-    vence   = _crear_producto(client, admin, fecha_vencimiento=(date.today() + timedelta(days=5)).isoformat())
+    vence   = _crear_producto(client, admin, fecha_vencimiento=(hoy_peru() + timedelta(days=5)).isoformat())
     agotado = _crear_producto(client, admin, stock=0,
-                              fecha_vencimiento=(date.today() + timedelta(days=5)).isoformat())
-    lejano  = _crear_producto(client, admin, fecha_vencimiento=(date.today() + timedelta(days=300)).isoformat())
+                              fecha_vencimiento=(hoy_peru() + timedelta(days=5)).isoformat())
+    lejano  = _crear_producto(client, admin, fecha_vencimiento=(hoy_peru() + timedelta(days=300)).isoformat())
     sin_fecha = _crear_producto(client, admin)
     try:
         ids = {p["id"] for p in client.get("/api/productos/por-vencer", headers=admin).json()}
@@ -139,7 +140,7 @@ def test_listado_por_vencer_solo_trae_lo_accionable(client, admin):
 
 
 def test_el_panel_de_inicio_avisa_lo_que_esta_por_vencer(client, admin):
-    p = _crear_producto(client, admin, fecha_vencimiento=(date.today() + timedelta(days=7)).isoformat(),
+    p = _crear_producto(client, admin, fecha_vencimiento=(hoy_peru() + timedelta(days=7)).isoformat(),
                         lote="L-PANEL")
     try:
         resumen = client.get("/api/dashboard/resumen", headers=admin).json()

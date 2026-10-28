@@ -13,6 +13,7 @@ Lo que se prueba acá salió de mirar los datos reales de la clínica:
     cd backend
     python -m pytest tests/test_seguimiento.py -v
 """
+from core.tiempo import hoy_peru
 from datetime import date, timedelta
 
 import pytest
@@ -98,7 +99,7 @@ def test_dos_grafias_de_la_misma_vacuna_son_una_sola_fila(client, admin, pacient
     """Antes, "triple" y "Triple felina" eran dos vacunas distintas: la mascota
     aparecía con una pendiente aunque acabara de recibir la dosis."""
     vet = _vet(client, admin)
-    hoy = date.today()
+    hoy = hoy_peru()
     for nombre, aplicada in (("triple", hoy - timedelta(days=60)), ("Triple felina", hoy - timedelta(days=10))):
         r = client.post(f"/api/pacientes/{paciente}/historias/", json={
             "fecha": aplicada.isoformat(),
@@ -120,7 +121,7 @@ def test_dos_grafias_de_la_misma_vacuna_son_una_sola_fila(client, admin, pacient
 # ── Desparasitación ──────────────────────────────────────────────────────────
 
 def test_la_desparasitacion_entra_en_la_misma_bandeja(client, admin, paciente):
-    vencida = date.today() - timedelta(days=3)
+    vencida = hoy_peru() - timedelta(days=3)
     r = client.post(f"/api/pacientes/{paciente}/registros/", json={
         "tipo": "antiparasitario",
         "fecha": (vencida - timedelta(days=90)).isoformat(),

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from models import Cita, HistoriaClinica, Paciente, Tratamiento, Usuario, Venta, VentaItem
 from core.deps import usuario_actual
+from core.tiempo import hoy_peru
 
 router = APIRouter(prefix="/api/tratamientos", tags=["Tratamientos"])
 
@@ -134,7 +135,7 @@ def listar(
     dias: int = Query(90, ge=1, le=365, description="Ventana hacia atrás, en días"),
     db: Session = Depends(get_db),
 ):
-    hoy = datetime.now(timezone.utc).date()
+    hoy = hoy_peru()
     desde = hoy - timedelta(days=dias)
 
     q = (
@@ -162,7 +163,7 @@ def listar(
 @router.get("/resumen")
 def resumen(db: Session = Depends(get_db)):
     """Los tres números de la pantalla, para no traerse la lista entera."""
-    hoy = datetime.now(timezone.utc).date()
+    hoy = hoy_peru()
     filas = (
         db.query(Tratamiento)
         .filter(Tratamiento.inicio >= hoy - timedelta(days=90))
@@ -217,10 +218,10 @@ def cerrar(
     t.cerrado_en = datetime.now(timezone.utc)
     # Un tratamiento cortado terminó hoy, no el día que estaba previsto.
     if payload.estado == "suspendido":
-        t.fin = datetime.now(timezone.utc).date()
+        t.fin = hoy_peru()
     db.commit()
     db.refresh(t)
-    hoy = datetime.now(timezone.utc).date()
+    hoy = hoy_peru()
     return _salida(t, hoy, set())
 
 
@@ -240,4 +241,4 @@ def reabrir(
     t.cerrado_en = None
     db.commit()
     db.refresh(t)
-    return _salida(t, datetime.now(timezone.utc).date(), set())
+    return _salida(t, hoy_peru(), set())

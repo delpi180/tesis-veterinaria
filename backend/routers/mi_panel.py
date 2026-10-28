@@ -17,10 +17,10 @@ from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from models import Usuario, Cita, HistoriaClinica, Asistencia, Paciente
 from core.deps import usuario_actual
+from core.tiempo import PERU_TZ
 
 router = APIRouter(prefix="/api/mi-panel", tags=["Mi Panel"])
 
-PERU_TZ = timezone(timedelta(hours=-5))
 
 
 # Ojo al tocar las consultas de abajo: todas pasan por _paciente_info(), que lee
