@@ -18,6 +18,7 @@ import './App.css'
 // aunque nunca los abriera, y no veía nada hasta que terminaba de bajar todo.
 // Login queda fuera de esta lista a propósito: es la primera pantalla y
 // dividirla solo agregaría una espera extra antes de poder escribir el usuario.
+const CarnetPublico     = lazy(() => import('./pages/Carnet'))
 const Inicio            = lazy(() => import('./pages/Inicio'))
 const MiPanel           = lazy(() => import('./pages/MiPanel'))
 const Clientes          = lazy(() => import('./pages/Clientes'))
@@ -124,6 +125,8 @@ export default function App() {
           <ConfirmarProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+              {/* Lo abre el dueño desde un enlace, sin sesión: va fuera de la app protegida */}
+              <Route path="/carnet/:token" element={<Suspense fallback={<CargandoPantalla />}><CarnetPublico /></Suspense>} />
               <Route path="/*"     element={<AppProtegida />} />
             </Routes>
           </ConfirmarProvider>

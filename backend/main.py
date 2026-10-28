@@ -17,7 +17,7 @@ from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
     busqueda, inventario, asistencia, mi_panel, actividad, configuracion, errores,
-    respaldo, catalogos, tratamientos, etiquetas,
+    respaldo, catalogos, tratamientos, etiquetas, carnet,
 )
 from core import ratelimit
 from core.config import settings
@@ -42,6 +42,11 @@ RUTAS_PUBLICAS_ESCRITURA = {"/api/errores/"}
 # La pantalla de acceso muestra el nombre de la clínica antes de que nadie haya
 # entrado; modificar esos datos sigue siendo exclusivo de la administradora.
 RUTAS_PUBLICAS_LECTURA = {"/api/configuracion/"}
+
+# Lectura pública por prefijo: el carnet que se le manda al dueño. El permiso es
+# el código secreto del enlace (ver routers/carnet.py); crear o revocar el enlace
+# queda fuera de este prefijo y sigue exigiendo sesión.
+PREFIJOS_PUBLICOS_LECTURA = ("/api/carnet/publico/",)
 
 # Identificador de la versión desplegada. Railway expone el SHA del commit;
 # antes esto era una cadena fija escrita a mano ("redeploy-2026-06-27"), que
@@ -185,7 +190,9 @@ def _registrar_actividad(usuario, rol, metodo, ruta, estado, detalle=None):
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    es_lectura_publica = request.method == "GET" and path in RUTAS_PUBLICAS_LECTURA
+    es_lectura_publica = request.method == "GET" and (
+        path in RUTAS_PUBLICAS_LECTURA or path.startswith(PREFIJOS_PUBLICOS_LECTURA)
+    )
     es_reporte_publico = request.method == "POST" and path in RUTAS_PUBLICAS_ESCRITURA
     if (
         path.startswith("/api/")
@@ -324,6 +331,7 @@ app.include_router(errores.router)
 app.include_router(respaldo.router)
 app.include_router(catalogos.router)
 app.include_router(tratamientos.router)
+app.include_router(carnet.router)
 
 
 _SECRETO_POR_DEFECTO = "vet-los-pinos-secreto-dev"

@@ -91,6 +91,10 @@ class Paciente(Base):
     creado_en      = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     registrado_por = Column(String(100))
 
+    # Código secreto del enlace al carnet que se le manda al dueño. Nulo = sin
+    # enlace (o revocado). Ver routers/carnet.py.
+    carnet_token = Column(String(40), unique=True, index=True)
+
     cliente  = relationship("Cliente", back_populates="pacientes")
     historias = relationship(
         "HistoriaClinica",

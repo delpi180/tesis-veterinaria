@@ -19,6 +19,7 @@ import { useToast } from '../components/Toast'
 import RegistrosPaciente from '../components/RegistrosPaciente'
 import RecetasPaciente from '../components/RecetasPaciente'
 import ResumenPrevio from '../components/ResumenPrevio'
+import CompartirCarnet from '../components/CompartirCarnet'
 import { clinicaActual } from '../services/clinica'
 import Disposicion from '../components/consulta/Disposicion'
 import ColumnaPaciente from '../components/consulta/ColumnaPaciente'
@@ -566,10 +567,13 @@ export default function HistorialPaciente() {
   // Como en Volki, la fila de pestañas lleva la acción principal a la derecha; el nombre y el PDF
   // están en la columna derecha y las migas arriba, así que no hay una fila de título aparte.
   const atender = (
-    <Button type="primary" icon={<MedicineBoxOutlined />}
-      onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente, citaId } })}>
-      Atender / Nueva consulta
-    </Button>
+    <Flex gap={8} wrap>
+      <CompartirCarnet pacienteId={pacienteId} mascota={paciente?.nombre} propietario={cliente?.nombre} telefono={cliente?.telefono} />
+      <Button type="primary" icon={<MedicineBoxOutlined />}
+        onClick={() => navigate(`/consultas/${pacienteId}`, { state: { paciente, cliente, citaId } })}>
+        Atender / Nueva consulta
+      </Button>
+    </Flex>
   )
 
   return (
