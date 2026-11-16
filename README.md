@@ -196,7 +196,7 @@ Por eso conviven.
 
 ### Checklist de salida a producción (go-live)
 Antes de abrir el sistema a la clínica:
-- [x] **Backups automáticos de la BD activados** en Railway: PITR con pgBackRest (confirmado 28/07/2026, restauración a un punto en el tiempo, no solo snapshot diario). Pendiente opcional: copia adicional fuera de Railway vía `.github/workflows/backup-db.yml` (requiere el secreto `PROD_DATABASE_URL`), útil solo como respaldo ante la pérdida de la cuenta de Railway.
+- [x] **Backups automáticos de la BD activados** en Railway: PITR con pgBackRest (confirmado 28/07/2026, restauración a un punto en el tiempo, no solo snapshot diario). Se quitó el respaldo diario por GitHub Actions (nadie lo usaba); para un respaldo puntual está `backend/scripts/backup_db.py`.
 - [ ] **Cambiar la contraseña del admin** por defecto (la inicial es pública).
 - [ ] **CI en verde**: backend (tests) y frontend (build) pasan en GitHub Actions.
 - [ ] **Smoke test de los flujos críticos** con un usuario real: login, crear cliente+mascota, registrar una consulta, una venta, abrir/cerrar caja.
