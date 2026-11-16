@@ -14,9 +14,7 @@ Para RESTAURAR ese respaldo en una base (¡reemplaza su contenido!):
     pg_restore --clean --no-owner -d "<DATABASE_URL>" backend/backups/backup_XXXX.dump
 
 Nota: este script es para respaldos manuales puntuales (por ejemplo, justo antes
-de una migración riesgosa). El respaldo diario automático corre solo desde
-.github/workflows/backup-db.yml y deja el volcado como artefacto del
-repositorio (Actions → Respaldo diario de la base de datos → Artifacts).
+de una migración riesgosa). El respaldo automático diario lo hace Railway.
 """
 import subprocess
 import sys
