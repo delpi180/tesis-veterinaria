@@ -16,6 +16,19 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     llm_model: str = "gpt-4o-mini"
 
+    # Precios de la IA en dólares, para estimar el gasto. Son ESTIMADOS y cambian:
+    # revisarlos en las páginas de precios de OpenAI y Deepgram antes de citarlos en
+    # la tesis. Por defecto: gpt-4o-mini (por millón de tokens) y Deepgram nova-3
+    # multilingüe en audio grabado (por minuto). Si se cambia de modelo, cambiarlos.
+    precio_openai_entrada_millon: float = 0.15
+    precio_openai_salida_millon: float = 0.60
+    precio_deepgram_minuto: float = 0.0052
+    # Tope de gasto de IA por día (hora de Lima), en dólares. 0 = sin tope.
+    # Al pasarse, la IA se bloquea hasta mañana y el llenado manual sigue igual.
+    tope_gasto_ia_diario_usd: float = 0.0
+    # Aviso en pantalla cuando el gasto del mes pase de esto. 0 = sin aviso.
+    alerta_gasto_ia_mensual_usd: float = 0.0
+
     # Procesamiento de audio
     max_audio_duration_seconds: int = 900
     allowed_audio_formats: str = "webm,mp3,wav,m4a,ogg"

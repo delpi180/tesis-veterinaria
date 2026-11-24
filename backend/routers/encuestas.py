@@ -8,7 +8,7 @@ from database import get_db
 from models import HistoriaClinica, Paciente, RespuestaSUS, RespuestaTAM
 from schemas import ResumenEncuestas
 from services.estadistica import (
-    descriptivos, cronbach_alpha, interpretar_alpha, t_test_welch,
+    descriptivos, cronbach_alpha, interpretar_alpha, t_test_welch, percentil,
 )
 
 router = APIRouter(prefix="/api/encuestas", tags=["Resumen Encuestas"])
@@ -175,6 +175,17 @@ def metricas_tiempo(db: Session = Depends(get_db)):
         for h in filas[:30]
     ]
 
+    # Latencia por etapa (solo registros con IA que la guardaron): mediana y p95.
+    etapas_ia = [h.etapas_registro for h in filas
+                 if h.metodo_registro == "ia" and isinstance(h.etapas_registro, dict)]
+
+    def _etapa(clave):
+        vals = [e[clave] for e in etapas_ia if isinstance(e.get(clave), (int, float))]
+        return {"n": len(vals), "mediana_seg": descriptivos(vals)["mediana"],
+                "p95_seg": percentil(vals, 95)}
+
+    etapas = {c: _etapa(c) for c in ("grabacion_s", "transcripcion_s", "extraccion_s", "revision_s")}
+
     return {
         "total": len(filas),
         "manual": manual,
@@ -182,4 +193,7 @@ def metricas_tiempo(db: Session = Depends(get_db)):
         "ahorro_pct": ahorro_pct,
         "prueba_t": prueba_t,
         "recientes": recientes,
+        "p95_manual_seg": percentil(vals_manual, 95),
+        "p95_ia_seg": percentil(vals_ia, 95),
+        "etapas_ia": etapas,
     }

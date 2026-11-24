@@ -93,6 +93,7 @@ class HistoriaClinicaCreate(BaseModel):
     # Métricas de registro (tesis)
     segundos_registro: Optional[int] = Field(None, ge=0)
     metodo_registro:   Optional[Literal['manual', 'ia']] = None
+    etapas_registro:   Optional[dict] = None
 
     # Veterinario que ATENDIÓ la consulta. Lo manda la recepcionista cuando
     # llena la historia por el doctor; si escribe el propio veterinario se
@@ -173,6 +174,7 @@ class HistoriaClinicaOut(BaseModel):
 
     # Métricas de registro (tesis)
     segundos_registro: Optional[int] = None
+    etapas_registro:   Optional[dict] = None
     metodo_registro:   Optional[str] = None
 
     # Autoría: doctor que la llenó (la hora de llenado es creado_en)

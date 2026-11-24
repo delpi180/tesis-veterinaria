@@ -6,7 +6,7 @@ import {
   HomeOutlined, CustomerServiceOutlined, ProfileOutlined, TeamOutlined, CalendarOutlined,
   MedicineBoxOutlined, InboxOutlined, ToolOutlined, ShoppingCartOutlined, WalletOutlined,
   ExperimentOutlined, PieChartOutlined, ClockCircleOutlined, HistoryOutlined,
-  UserSwitchOutlined, BugOutlined, BellOutlined, LogoutOutlined, MenuOutlined, DownOutlined,
+  UserSwitchOutlined, BugOutlined, BellOutlined, DollarOutlined, BarChartOutlined, LogoutOutlined, MenuOutlined, DownOutlined,
 } from '@ant-design/icons'
 import { MEDIDAS } from '@src/core/medidas'
 import { api, getNombre, getRol, cerrarSesion, esVeterinario, esAdmin } from '../services/api'
@@ -55,7 +55,12 @@ const SECCION_ADMIN: Item[] = [
   { label: 'Asistencia', to: '/asistencia', icon: <ClockCircleOutlined />,  admin: true },
   { label: 'Actividad',  to: '/actividad',  icon: <HistoryOutlined />,      admin: true },
   { label: 'Usuarios',   to: '/usuarios',   icon: <UserSwitchOutlined />,   admin: true },
+  { label: 'Gasto de IA', to: '/gasto-ia',  icon: <DollarOutlined />,       admin: true },
   { label: 'Errores',    to: '/errores',    icon: <BugOutlined />,          admin: true },
+  // Medición de la tesis: solo aparece al encender VITE_MODULOS_TESIS (y MODULOS_TESIS en el servidor)
+  ...(import.meta.env.VITE_MODULOS_TESIS === 'true'
+    ? [{ label: 'Mediciones', to: '/mediciones', icon: <BarChartOutlined />, admin: true } as Item]
+    : []),
 ]
 
 const visibles = (items: Item[]) =>

@@ -4,7 +4,7 @@ import {
 } from './HistoriasClinicas'
 import {
   armarPayloadConsulta, buscarMedicamento, CAMPOS_FUERA_DE_VOLKI, contarCamposLlenos, describirCuando,
-  DESTINO_VOLKI,
+  DESTINO_VOLKI, etapasDeLatencia,
   diasDeDuracion, fechaBaseISO, fechaISOCorta, fechaNumericaPeru, mezclarDatosIA,
   sumarDiasISO,
 } from '@src/utils/historiaClinica'
@@ -129,6 +129,20 @@ describe('armarPayloadConsulta', () => {
     expect(p.segundos_registro).toBe(125)
     const rapido = armarPayloadConsulta(lleno(), { editando: false, modo: 'ia', inicioMs: inicio, ahoraMs: inicio + 100 })
     expect(rapido.segundos_registro).toBe(1)
+  })
+
+  it('con IA guarda lo que tardó cada etapa y deja lo demás como revisión', () => {
+    const etapasIA = { grabacion_s: 40, transcripcion_s: 6.2, extraccion_s: 3.1 }
+    const p = armarPayloadConsulta(lleno(), { editando: false, modo: 'ia', inicioMs: inicio, ahoraMs: inicio + 100_000, etapasIA })
+    expect(p.etapas_registro).toEqual({ grabacion_s: 40, transcripcion_s: 6.2, extraccion_s: 3.1, revision_s: 50.7 })
+  })
+
+  it('manual no guarda etapas, y dictar sin usar la IA tampoco', () => {
+    const etapasIA = { grabacion_s: 40, transcripcion_s: 6, extraccion_s: 3 }
+    const manual = armarPayloadConsulta(lleno(), { editando: false, modo: 'manual', inicioMs: inicio, ahoraMs: inicio + 1000, etapasIA })
+    const sinIA = armarPayloadConsulta(lleno(), { editando: false, modo: 'ia', inicioMs: inicio, ahoraMs: inicio + 1000 })
+    expect(manual).not.toHaveProperty('etapas_registro')
+    expect(sinIA).not.toHaveProperty('etapas_registro')
   })
 
   it('sin modo elegido no inventa una medición', () => {
@@ -420,5 +434,18 @@ describe('describirCuando', () => {
     const txt = describirCuando('2020-03-05T01:30:00Z')
     expect(txt).toContain('4 de marzo')
     expect(txt).toContain('20:30')
+  })
+})
+
+describe('etapasDeLatencia', () => {
+  it('la revisión nunca sale negativa', () => {
+    expect(etapasDeLatencia({ grabacion_s: 50, transcripcion_s: 20, extraccion_s: 10 }, 60).revision_s).toBe(0)
+  })
+  it('en texto libre solo hay extracción', () => {
+    expect(etapasDeLatencia({ extraccion_s: 4 }, 30)).toEqual({ extraccion_s: 4, revision_s: 26 })
+  })
+  it('ignora valores que no son números y devuelve null si no queda nada', () => {
+    expect(etapasDeLatencia({ grabacion_s: null, transcripcion_s: NaN }, 30)).toBeNull()
+    expect(etapasDeLatencia(null, 30)).toBeNull()
   })
 })

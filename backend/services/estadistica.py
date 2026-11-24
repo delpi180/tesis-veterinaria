@@ -109,6 +109,24 @@ def descriptivos(valores: list) -> dict:
     }
 
 
+def percentil(valores: list, p: float) -> float | None:
+    """Percentil p (0-100) con interpolación lineal (igual que numpy por defecto).
+
+    Para latencias se reporta el p95 junto con la mediana: la media se distorsiona
+    con las pocas llamadas muy lentas, y el p95 dice «el 95 % de las veces tarda
+    esto o menos».
+    """
+    xs = sorted(float(v) for v in valores if v is not None)
+    if not xs:
+        return None
+    if len(xs) == 1:
+        return _r(xs[0])
+    k = (len(xs) - 1) * p / 100
+    i = math.floor(k)
+    j = min(i + 1, len(xs) - 1)
+    return _r(xs[i] + (xs[j] - xs[i]) * (k - i))
+
+
 # ── Cronbach's alpha ─────────────────────────────────────────────────────────
 
 def cronbach_alpha(respuestas: list[list[float]]) -> float | None:

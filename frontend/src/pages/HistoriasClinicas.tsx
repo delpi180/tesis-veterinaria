@@ -31,7 +31,7 @@ import {
   leerBorrador, mezclarDatosIA, ordenarHistorias,
 } from '@src/utils/historiaClinica'
 import type {
-  CampoTexto, DatosIA, FormConsulta, Historia, ItemProductoAplicado, ItemTratamiento, ModoRegistro,
+  CampoTexto, DatosIA, EtapasIA, FormConsulta, Historia, ItemProductoAplicado, ItemTratamiento, ModoRegistro,
 } from '@src/utils/historiaClinica'
 
 // Lo que decide qué se guarda vive en `utils/historiaClinica.ts`; se vuelve a
@@ -110,6 +110,8 @@ export default function HistoriasClinicas() {
 
   // ── IA / voz
   const [transcripcionIA, setTranscripcionIA] = useState('')
+  // Cuánto tardó cada etapa de la IA en la última pasada (para la medición de latencia)
+  const [etapasIA, setEtapasIA] = useState<EtapasIA | null>(null)
   const [datosIA, setDatosIA] = useState<DatosIA | null>(null)
   // Palabras del dictado que la IA no puso en ningún campo: se muestran para no perderlas en silencio
   const [sinUbicar, setSinUbicar] = useState<string[]>([])
@@ -250,6 +252,7 @@ export default function HistoriasClinicas() {
     setErrForm(null)
     setHighlights({})
     setTranscripcionIA('')
+    setEtapasIA(null)
     setDatosIA(null)
     setSinUbicar([])
     setInferenciasBrut({})
@@ -411,7 +414,7 @@ export default function HistoriasClinicas() {
     setGuardando(true); setErrForm(null)
     try {
       // Consulta nueva: campos de Volki + tiempo y método elegidos. Corregir: todo, sin medir.
-      const payload = armarPayloadConsulta(form, { editando: !reducido, modo, inicioMs })
+      const payload = armarPayloadConsulta(form, { editando: !reducido, modo, inicioMs, etapasIA })
       if (llenaRecepcion) payload.veterinario_id = Number(vetId)
       // Auditoría IA
       if (transcripcionIA) payload.transcripcion = transcripcionIA
@@ -541,13 +544,15 @@ export default function HistoriasClinicas() {
               {(modo === 'ia' || !reducido) && (
                 <VoiceTextProcessor
                   soloVolki={reducido}
-                  onResult={({ datos, inferencias, alertas_rango, transcripcion, sin_ubicar }: {
+                  onResult={({ datos, inferencias, alertas_rango, transcripcion, sin_ubicar, etapas }: {
                     datos: DatosIA
                     inferencias: Record<string, string>
                     alertas_rango: Record<string, unknown>
                     transcripcion: string
                     sin_ubicar?: string[]
+                    etapas?: EtapasIA
                   }) => {
+                    setEtapasIA(etapas ?? null)
                     setSinUbicar(Array.isArray(sin_ubicar) ? sin_ubicar : [])
                     // `applyIA` marca que este registro se asistió con IA
                     setTranscripcionIA(transcripcion)

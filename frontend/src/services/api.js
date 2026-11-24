@@ -75,3 +75,23 @@ const put  = (path, body) => request(path, {
 const del  = (path)       => request(path, { method: 'DELETE' })
 
 export const api = { get, post, put, del }
+
+/** Baja un archivo protegido (p. ej. un CSV) con la sesión puesta: un enlace directo no lleva el token. */
+export async function descargarArchivo(path, nombre) {
+  let res
+  try {
+    res = await fetch(BASE + path, { headers: authHeaders() })
+  } catch {
+    throw new Error('Sin conexión con el servidor. ¿Está el backend corriendo?')
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.detail || `Error del servidor: HTTP ${res.status}`)
+  }
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nombre
+  a.click()
+  URL.revokeObjectURL(url)
+}

@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { Col, Flex, Row, Tabs, Typography } from 'antd'
-import { BarChartOutlined, ClockCircleOutlined, FormOutlined, RobotOutlined } from '@ant-design/icons'
+import { BarChartOutlined, ClockCircleOutlined, DollarOutlined, FormOutlined, RobotOutlined } from '@ant-design/icons'
 import Encuestas from '../components/mediciones/Encuestas'
 import Resultados from '../components/mediciones/Resultados'
 import TiemposPanel from '../components/mediciones/TiemposPanel'
 import ComparativaIA from '../components/mediciones/ComparativaIA'
 import ExactitudPanel from '../components/mediciones/ExactitudPanel'
+import WerPanel from '../components/mediciones/WerPanel'
+import BancoCasosPanel from '../components/mediciones/BancoCasosPanel'
+import GastoPanel from '../components/mediciones/GastoPanel'
 import { MEDIDAS } from '@src/core/medidas'
 
 const { Title, Text } = Typography
 
-/** Mediciones de la tesis: encuestas SUS/TAM, tiempos de registro y exactitud de la IA. */
+/** Mediciones de la tesis: encuestas SUS/TAM, tiempos por etapa, calidad de la voz (WER), exactitud de la IA y gasto. */
 export default function Mediciones() {
   const [tab, setTab] = useState('encuestas')
   const hoyTexto = new Date().toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -39,11 +42,14 @@ export default function Mediciones() {
                 </Text>
               </div>
               <TiemposPanel />
+              <WerPanel />
+              <BancoCasosPanel />
               <ComparativaIA />
               <ExactitudPanel />
             </Flex>
           ),
         },
+        { key: 'gasto', label: 'Gasto de IA', icon: <DollarOutlined />, children: <GastoPanel /> },
       ]} />
     </div>
   )

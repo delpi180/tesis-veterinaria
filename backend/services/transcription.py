@@ -1,10 +1,13 @@
 import os
+import time
 from deepgram import DeepgramClient
 from core.config import settings
 from services.vocabulario import keyterms
+from services import uso_ia
 
 
-def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav", db=None) -> str:
+def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav", db=None,
+                     medicion: dict | None = None, operacion: str = "transcripcion") -> str:
     """
     Transcribe audio_bytes a texto usando Deepgram (pre-recorded REST).
     Devuelve el transcript como string plano.
@@ -16,6 +19,9 @@ def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav", db=None) -
       razas que esta clínica realmente maneja, no solo una lista genérica
       (ver services/vocabulario.py). Si la combinación modelo/idioma no
       soporta keyterm, reintenta automáticamente sin él.
+    - Si llega `db`, deja el gasto y la latencia en `uso_ia`. Si llega `medicion`
+      (un dict), se llena con `latencia_ms` y `duracion_audio_s` para que el
+      endpoint se los devuelva al navegador.
     """
     if not settings.deepgram_api_key:
         raise RuntimeError(
@@ -56,6 +62,7 @@ def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav", db=None) -
     intentos = [vocabulario, vocabulario[: max(len(vocabulario) // 2, 1)], []]
     response = None
     ultimo_error: Exception | None = None
+    t0 = time.perf_counter()
     for i, lista in enumerate(intentos):
         if i > 0 and not lista and not vocabulario:
             break          # ya se intentó sin refuerzo
@@ -67,13 +74,27 @@ def transcribe_audio(audio_bytes: bytes, filename: str = "audio.wav", db=None) -
         except Exception as exc:
             ultimo_error = exc
             print(f"[DEEPGRAM] intento {i + 1} falló ({str(exc)[:120]}); se reduce el refuerzo")
+    latencia_ms = round((time.perf_counter() - t0) * 1000)
     if response is None:
+        uso_ia.registrar(db, servicio="deepgram", operacion=operacion,
+                         modelo=settings.deepgram_model, latencia_ms=latencia_ms, exito=False)
         raise RuntimeError(f"Error al conectar con Deepgram: {ultimo_error}") from ultimo_error
 
     try:
         transcript = response.results.channels[0].alternatives[0].transcript
     except (AttributeError, IndexError, KeyError) as exc:
         raise RuntimeError(f"Respuesta inesperada de Deepgram: {exc}") from exc
+
+    # Duración del audio según Deepgram: es lo que se cobra. Si no viene, queda en None.
+    try:
+        duracion = float(response.metadata.duration)
+    except (AttributeError, TypeError, ValueError):
+        duracion = None
+    if medicion is not None:
+        medicion.update(latencia_ms=latencia_ms, duracion_audio_s=duracion)
+    uso_ia.registrar(db, servicio="deepgram", operacion=operacion,
+                     modelo=settings.deepgram_model, segundos_audio=duracion,
+                     latencia_ms=latencia_ms)
 
     print(
         f"[DEEPGRAM] OK — '{transcript[:80]}{'…' if len(transcript) > 80 else ''}'"

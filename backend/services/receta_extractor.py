@@ -11,9 +11,11 @@ receta: no calcula fechas relativas ni valida rangos fisiológicos.
 
 import json
 import re
+import time
 import unicodedata
 from openai import OpenAI
 from core.config import settings
+from services import uso_ia
 from services.vocabulario import (
     bloque_catalogo, catalogo_medicamentos, coincide_con_catalogo,
 )
@@ -155,7 +157,7 @@ def _quitar_repetidos(items: list[dict]) -> list[dict]:
     return resultado
 
 
-def extraer_receta(texto: str, db=None) -> dict:
+def extraer_receta(texto: str, db=None, operacion: str = "receta") -> dict:
     """
     Llama al LLM para extraer diagnóstico, indicaciones y medicamentos de la
     receta dictada.
@@ -173,6 +175,7 @@ def extraer_receta(texto: str, db=None) -> dict:
 
     print(f"[GPT] Extrayendo receta — modelo={settings.llm_model} ({len(texto)} chars)")
 
+    t0 = time.perf_counter()
     try:
         completion = client.chat.completions.create(
             model=settings.llm_model,
@@ -187,7 +190,10 @@ def extraer_receta(texto: str, db=None) -> dict:
             ],
         )
     except Exception as exc:
+        uso_ia.registrar(db, servicio="openai", operacion=operacion, modelo=settings.llm_model,
+                         latencia_ms=round((time.perf_counter() - t0) * 1000), exito=False)
         raise RuntimeError(f"Error al conectar con OpenAI: {exc}") from exc
+    latencia_ms = round((time.perf_counter() - t0) * 1000)
 
     msg = completion.choices[0].message
     if getattr(msg, "refusal", None):
@@ -201,7 +207,12 @@ def extraer_receta(texto: str, db=None) -> dict:
         ) from exc
 
     tokens = completion.usage
-    print(f"[GPT] OK — tokens: {tokens.prompt_tokens} prompt / {tokens.completion_tokens} completion")
+    print(f"[GPT] OK — tokens: {tokens.prompt_tokens} prompt / {tokens.completion_tokens} completion — {latencia_ms} ms")
+    uso_ia.registrar(
+        db, servicio="openai", operacion=operacion, modelo=settings.llm_model,
+        tokens_entrada=tokens.prompt_tokens, tokens_salida=tokens.completion_tokens,
+        latencia_ms=latencia_ms,
+    )
 
     # Se marca en Python, no se le pregunta al modelo: si el modelo se
     # equivocó al reconocer la marca, también se equivocaría al decir que la
@@ -217,4 +228,5 @@ def extraer_receta(texto: str, db=None) -> dict:
         "indicaciones": parsed.get("indicaciones"),
         "items": items,
         "transcripcion": texto,
+        "latencia_ms": latencia_ms,
     }

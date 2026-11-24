@@ -14,12 +14,14 @@ Devuelve:
 
 import json
 import re
+import time
 import unicodedata
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from openai import OpenAI
 from core.config import settings
+from services import uso_ia
 from services.vocabulario import (
     bloque_catalogo, catalogo_medicamentos, coincide_con_catalogo,
 )
@@ -473,7 +475,8 @@ def terminos_sin_ubicar(texto: str, datos: dict, maximo: int = 12, solo_volki: b
 
 
 
-def extraer_historia(texto: str, db=None, solo_volki: bool = False) -> dict:
+def extraer_historia(texto: str, db=None, solo_volki: bool = False,
+                     operacion: str = "historia") -> dict:
     """
     Llama al LLM para extraer los campos de la historia clínica usando
     salida estructurada (JSON Schema estricto).
@@ -508,6 +511,7 @@ def extraer_historia(texto: str, db=None, solo_volki: bool = False) -> dict:
         f"({len(texto)} chars) — hoy={fecha_hoy} — structured outputs"
     )
 
+    t0 = time.perf_counter()
     try:
         completion = client.chat.completions.create(
             model=settings.llm_model,
@@ -526,7 +530,10 @@ def extraer_historia(texto: str, db=None, solo_volki: bool = False) -> dict:
             ],
         )
     except Exception as exc:
+        uso_ia.registrar(db, servicio="openai", operacion=operacion, modelo=settings.llm_model,
+                         latencia_ms=round((time.perf_counter() - t0) * 1000), exito=False)
         raise RuntimeError(f"Error al conectar con OpenAI: {exc}") from exc
+    latencia_ms = round((time.perf_counter() - t0) * 1000)
 
     msg = completion.choices[0].message
     if getattr(msg, "refusal", None):
@@ -543,7 +550,12 @@ def extraer_historia(texto: str, db=None, solo_volki: bool = False) -> dict:
     tokens = completion.usage
     print(
         f"[GPT] OK — tokens: {tokens.prompt_tokens} prompt / "
-        f"{tokens.completion_tokens} completion"
+        f"{tokens.completion_tokens} completion — {latencia_ms} ms"
+    )
+    uso_ia.registrar(
+        db, servicio="openai", operacion=operacion, modelo=settings.llm_model,
+        tokens_entrada=tokens.prompt_tokens, tokens_salida=tokens.completion_tokens,
+        latencia_ms=latencia_ms,
     )
 
     # _inferencias: conservar solo las de campos realmente completados
@@ -577,4 +589,5 @@ def extraer_historia(texto: str, db=None, solo_volki: bool = False) -> dict:
         "alertas_rango": alertas_rango,
         "sin_ubicar":    terminos_sin_ubicar(texto, parsed, solo_volki=solo_volki),
         "transcripcion": texto,
+        "latencia_ms":   latencia_ms,
     }

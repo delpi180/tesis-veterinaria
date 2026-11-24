@@ -40,6 +40,8 @@ const PanelRecepcion    = lazy(() => import('./pages/PanelRecepcion'))
 const Vacunacion        = lazy(() => import('./pages/Vacunacion'))
 const Recordatorios     = lazy(() => import('./pages/Recordatorios'))
 const Errores           = lazy(() => import('./pages/Errores'))
+const GastoIA           = lazy(() => import('./pages/GastoIA'))
+const Mediciones        = lazy(() => import('./pages/Mediciones'))
 
 // Ruta solo para veterinarios; recepcionista es redirigida al inicio
 function SoloVet({ children }) {
@@ -108,6 +110,9 @@ function AppProtegida() {
           <Route path="/vacunacion"            element={<SoloAdmin><Vacunacion /></SoloAdmin>} />
           <Route path="/usuarios"               element={<SoloAdmin><Usuarios /></SoloAdmin>} />
           <Route path="/errores"                element={<SoloAdmin><Errores /></SoloAdmin>} />
+          <Route path="/gasto-ia"               element={<SoloAdmin><GastoIA /></SoloAdmin>} />
+          {/* Medición de la tesis: sus datos solo existen con MODULOS_TESIS=true en el servidor */}
+          <Route path="/mediciones"              element={<SoloAdmin><Mediciones /></SoloAdmin>} />
           <Route path="/usuarios/:usuarioId/perfil" element={<PerfilDoctor />} />
           <Route path="*"                       element={<Navigate to="/" replace />} />
         </Routes>

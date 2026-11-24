@@ -34,6 +34,8 @@ interface Props {
   soloVolki?: boolean
 }
 
+/** Segundos con un decimal (6.2 s): suficiente para medir latencia sin falsa precisión. */
+const redondear = (s: number) => Math.round(s * 10) / 10
 const fmtSec = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 const fmtMB = (b: number) => b >= 1024 * 1024
   ? `${(b / 1024 / 1024).toFixed(1)} MB`
@@ -162,7 +164,9 @@ export default function VoiceTextProcessor({
     updateAiState('transcribing')
     setAiError(null)
     try {
-      // 1. Transcribir con Deepgram
+      // 1. Transcribir con Deepgram. Se cronometra cada etapa: es lo que el doctor
+      // espera de verdad (incluye la red), y alimenta la medición de latencia de la tesis.
+      const t0 = performance.now()
       const fd = new FormData()
       fd.append('audio', blob, 'consulta.webm')
       const r1 = await fetch(`${BASE_URL}/api/transcribe`, {
@@ -175,13 +179,22 @@ export default function VoiceTextProcessor({
         throw new Error(b?.detail ?? `Error al transcribir (HTTP ${r1.status})`)
       }
       const { transcripcion } = await r1.json()
+      const t1 = performance.now()
       setTranscripcionIA(transcripcion)
 
       // 2. Extraer con GPT
       updateAiState('processing')
       const resultado = await api.post(endpoint, { texto: transcripcion, solo_volki: soloVolki })
+      const t2 = performance.now()
 
-      onResult?.({ ...resultado, transcripcion })
+      onResult?.({
+        ...resultado, transcripcion,
+        etapas: {
+          grabacion_s: duracionSeg ?? audioInfo?.segundos ?? null,
+          transcripcion_s: redondear((t1 - t0) / 1000),
+          extraccion_s: redondear((t2 - t1) / 1000),
+        },
+      })
       setResumen(resumirResultado?.({ ...resultado, transcripcion }) ?? null)
       updateAiState('done')
     } catch (e) {
@@ -229,9 +242,11 @@ export default function VoiceTextProcessor({
     updateAiState('processing')
     setAiError(null)
     try {
+      const t0 = performance.now()
       const resultado = await api.post(endpoint, { texto: textoManual, solo_volki: soloVolki })
       setTranscripcionIA(resultado.transcripcion)
-      onResult?.(resultado)
+      // Texto libre: no hay audio ni transcripción, solo la extracción
+      onResult?.({ ...resultado, etapas: { extraccion_s: redondear((performance.now() - t0) / 1000) } })
       setResumen(resumirResultado?.(resultado) ?? null)
       updateAiState('done')
     } catch (e) {

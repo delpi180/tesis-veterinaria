@@ -3,14 +3,17 @@ import { Alert, Button, Card, Col, Empty, Flex, Row, Skeleton, Table, Tag, Typog
 import type { TableColumnsType } from 'antd'
 import { DownloadOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { api } from '../../services/api'
+import { api, descargarArchivo } from '../../services/api'
 import { exportarCSV } from '../../utils/exportUtils'
 import { BRAND, ESTADO } from '@src/core/color'
 import { fmtSeg, metodoDe, Seccion } from './comun'
 
 const { Text } = Typography
+/** Las etapas duran segundos: se muestra un decimal (6.2 s) en vez de redondear a 6 s. */
+const seg1 = (s?: number | null) => (s == null ? '—' : s >= 60 ? fmtSeg(s) : `${s.toFixed(1)} s`)
 
-interface Grupo { n: number; promedio_seg?: number | null; sd_seg?: number | null }
+interface Grupo { n: number; promedio_seg?: number | null; sd_seg?: number | null; mediana_seg?: number | null }
+interface Etapa { n: number; mediana_seg?: number | null; p95_seg?: number | null }
 interface Registro { id: number; fecha?: string | null; paciente: string; metodo: string; segundos: number }
 interface Tiempos {
   total: number
@@ -19,7 +22,17 @@ interface Tiempos {
   ahorro_pct?: number | null
   prueba_t?: { significativo: boolean; t: number; df: number; p: number; cohen_d: number; efecto: string } | null
   recientes: Registro[]
+  p95_manual_seg?: number | null
+  p95_ia_seg?: number | null
+  etapas_ia?: Record<string, Etapa>
 }
+
+const ETAPAS: { k: string; l: string; nota: string }[] = [
+  { k: 'grabacion_s', l: 'Grabación', nota: 'El doctor dicta' },
+  { k: 'transcripcion_s', l: 'Voz a texto', nota: 'Deepgram' },
+  { k: 'extraccion_s', l: 'Texto a historia', nota: 'OpenAI' },
+  { k: 'revision_s', l: 'Revisión y llenado', nota: 'El doctor revisa y corrige' },
+]
 
 /** Tiempo de registro: manual vs IA en el mismo formulario. */
 export default function TiemposPanel() {
@@ -49,8 +62,8 @@ export default function TiemposPanel() {
     { metodo: 'Con IA', seg: d.ia.promedio_seg || 0, fill: BRAND.primary },
   ]
   const kpis = [
-    { t: 'Promedio manual', v: fmtSeg(d.manual.promedio_seg), n: `${d.manual.n} reg.${d.manual.sd_seg != null ? ` · DE ${fmtSeg(d.manual.sd_seg)}` : ''}` },
-    { t: 'Promedio con IA', v: fmtSeg(d.ia.promedio_seg), n: `${d.ia.n} reg.${d.ia.sd_seg != null ? ` · DE ${fmtSeg(d.ia.sd_seg)}` : ''}` },
+    { t: 'Promedio manual', v: fmtSeg(d.manual.promedio_seg), n: `${d.manual.n} reg. · mediana ${fmtSeg(d.manual.mediana_seg)} · p95 ${fmtSeg(d.p95_manual_seg)}` },
+    { t: 'Promedio con IA', v: fmtSeg(d.ia.promedio_seg), n: `${d.ia.n} reg. · mediana ${fmtSeg(d.ia.mediana_seg)} · p95 ${fmtSeg(d.p95_ia_seg)}` },
     { t: 'Ahorro de tiempo', v: d.ahorro_pct != null ? `${d.ahorro_pct}%` : '—', n: 'IA vs. manual', color: ESTADO.ok },
     { t: 'Total medido', v: String(d.total), n: 'historias' },
   ]
@@ -103,6 +116,23 @@ export default function TiemposPanel() {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      </Seccion>
+
+      <Seccion titulo="Latencia por etapa (registro con IA)"
+        nota="Dónde se va el tiempo cuando el doctor dicta. Mediana = lo normal; percentil 95 = el 95 % de las veces tarda eso o menos. Se mide en el navegador, así que incluye la red."
+        extra={<Button size="small" icon={<DownloadOutlined />}
+          onClick={() => descargarArchivo('/api/evaluacion/exportar?tabla=tiempos', 'tiempos_por_etapa.csv').catch(() => {})}>Excel</Button>}>
+        {d.ia.n === 0 || !d.etapas_ia || ETAPAS.every(e => !d.etapas_ia?.[e.k]?.n) ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Aún no hay historias dictadas con las etapas medidas." />
+        ) : (
+          <Table<(typeof ETAPAS)[number]> rowKey="k" size="small" pagination={false} scroll={{ x: 'max-content' }} dataSource={ETAPAS}
+            columns={[
+              { title: 'Etapa', dataIndex: 'l', render: (l: string, e) => <><Text strong>{l}</Text><br /><Text type="secondary" style={{ fontSize: 12 }}>{e.nota}</Text></> },
+              { title: 'Historias', align: 'right', render: (_, e) => d.etapas_ia?.[e.k]?.n ?? 0 },
+              { title: 'Mediana', align: 'right', render: (_, e) => seg1(d.etapas_ia?.[e.k]?.mediana_seg) },
+              { title: 'Percentil 95', align: 'right', render: (_, e) => seg1(d.etapas_ia?.[e.k]?.p95_seg) },
+            ]} />
+        )}
       </Seccion>
 
       <Seccion titulo="Historial de registros" extra={

@@ -551,19 +551,48 @@ export type ModoRegistro = 'manual' | 'ia'
  *  se toca la medición original. */
 export function armarPayloadConsulta(
   form: FormConsulta,
-  { editando, modo, inicioMs, ahoraMs = Date.now() }: {
+  { editando, modo, inicioMs, ahoraMs = Date.now(), etapasIA = null }: {
     editando: boolean
     modo: ModoRegistro | null
     inicioMs: number | null
     ahoraMs?: number
+    etapasIA?: EtapasIA | null
   },
 ): Record<string, unknown> {
   const payload = buildPayload(form, !editando)
   if (!editando && modo && inicioMs !== null) {
-    payload.segundos_registro = Math.max(1, Math.round((ahoraMs - inicioMs) / 1000))
+    const total = Math.max(1, Math.round((ahoraMs - inicioMs) / 1000))
+    payload.segundos_registro = total
     payload.metodo_registro = modo
+    if (modo === 'ia') {
+      const etapas = etapasDeLatencia(etapasIA, total)
+      if (etapas) payload.etapas_registro = etapas
+    }
   }
   return payload
+}
+
+/** Lo que tardó cada etapa de la IA (segundos), medido en el navegador. */
+export interface EtapasIA {
+  grabacion_s?: number | null
+  transcripcion_s?: number | null
+  extraccion_s?: number | null
+}
+
+/** Etapas guardadas con la historia. `revision_s` es lo que sobra del tiempo total una vez
+ *  quitadas las etapas de la IA: la revisión y el llenado a mano del doctor. Sin etapas
+ *  (no se usó la IA aunque se eligiera «Dictar») no se guarda nada. */
+export function etapasDeLatencia(etapas: EtapasIA | null | undefined, totalSeg: number): Record<string, number> | null {
+  if (!etapas) return null
+  const out: Record<string, number> = {}
+  for (const k of ['grabacion_s', 'transcripcion_s', 'extraccion_s'] as const) {
+    const v = etapas[k]
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) out[k] = v
+  }
+  if (Object.keys(out).length === 0) return null
+  const usado = Object.values(out).reduce((a, b) => a + b, 0)
+  out.revision_s = Math.max(0, Math.round((totalSeg - usado) * 10) / 10)
+  return out
 }
 
 export function formFromHistoria(h: Historia): FormConsulta {

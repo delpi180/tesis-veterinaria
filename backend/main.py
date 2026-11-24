@@ -17,12 +17,13 @@ from routers import (
     auth, usuarios, clientes, pacientes, citas, dashboard,
     evaluadores, sus, tam, encuestas, productos, servicios, ventas,
     busqueda, inventario, asistencia, mi_panel, actividad, configuracion, errores,
-    respaldo, catalogos, tratamientos, etiquetas, carnet,
+    respaldo, catalogos, tratamientos, etiquetas, carnet, gasto_ia, evaluacion_ia,
 )
 from core import ratelimit
 from core.config import settings
 from core.security import verificar_token, hash_password
 from services.transcription import transcribe_audio
+from services import uso_ia
 from services.historia_extractor import extraer_historia
 from services.receta_extractor import extraer_receta
 from services.soap_processor import process_soap  # léxico, para comparativa de tesis
@@ -318,6 +319,7 @@ if settings.modulos_tesis:
     app.include_router(sus.router)
     app.include_router(tam.router)
     app.include_router(encuestas.router)
+    app.include_router(evaluacion_ia.router)
 app.include_router(productos.router)
 app.include_router(servicios.router)
 app.include_router(ventas.router)
@@ -332,6 +334,7 @@ app.include_router(respaldo.router)
 app.include_router(catalogos.router)
 app.include_router(tratamientos.router)
 app.include_router(carnet.router)
+app.include_router(gasto_ia.router)
 
 
 _SECRETO_POR_DEFECTO = "vet-los-pinos-secreto-dev"
@@ -413,6 +416,10 @@ def _seed_admin():
 
 class TranscribeResponse(BaseModel):
     transcripcion: str
+    # Medición (tesis): lo que tardó Deepgram y cuánto dura el audio. Opcionales
+    # para que un cliente antiguo los ignore sin romperse.
+    latencia_ms: int | None = None
+    duracion_audio_s: float | None = None
 
 
 class ProcessHistoriaRequest(BaseModel):
@@ -430,6 +437,7 @@ class ProcessHistoriaResponse(BaseModel):
     # determinista, sin IA). Opcional: un cliente antiguo la ignora sin romperse.
     sin_ubicar:    list[str] = []
     transcripcion: str
+    latencia_ms:   int | None = None
 
 
 class ProcesarRecetaRequest(BaseModel):
@@ -441,6 +449,7 @@ class ProcesarRecetaResponse(BaseModel):
     indicaciones:  str | None = None
     items:         list[dict] = []
     transcripcion: str
+    latencia_ms:   int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -475,6 +484,17 @@ def health_check():
         "message": "Veterinaria Los Pinos API funcionando",
         "build": _BUILD,
     }
+
+
+def _cupo_ia(db) -> None:
+    """Corta la IA (voz y extracción) si hoy ya se llegó al tope de gasto diario.
+
+    Con 429 y un mensaje claro: el doctor puede seguir llenando a mano, que no gasta nada.
+    """
+    try:
+        uso_ia.exigir_cupo(db)
+    except uso_ia.TopeGastoExcedido as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
 
 
 @app.post("/api/transcribe", response_model=TranscribeResponse)
@@ -522,18 +542,26 @@ async def transcribe_endpoint(request: Request, audio: UploadFile = File(...)):
     # transcripción corre en otro hilo y puede tardar minutos: sostener una
     # conexión del pool todo ese rato sería desperdiciarla.
     db_vocab = SessionLocal()
+    medicion: dict = {}
     try:
         import asyncio
+        _cupo_ia(db_vocab)
         texto = await asyncio.to_thread(
             transcribe_audio, audio_bytes,
-            filename=audio.filename or "audio.wav", db=db_vocab,
+            filename=audio.filename or "audio.wav", db=db_vocab, medicion=medicion,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en transcripción: {str(e)}")
     finally:
         db_vocab.close()
 
-    return TranscribeResponse(transcripcion=texto)
+    return TranscribeResponse(
+        transcripcion=texto,
+        latencia_ms=medicion.get("latencia_ms"),
+        duracion_audio_s=medicion.get("duracion_audio_s"),
+    )
 
 
 
@@ -560,7 +588,10 @@ def procesar_historia_endpoint(body: ProcessHistoriaRequest, request: Request):
     # reconocer una marca mal transcrita en vez de copiarla rota.
     db_cat = SessionLocal()
     try:
+        _cupo_ia(db_cat)
         resultado = extraer_historia(body.texto, db=db_cat, solo_volki=body.solo_volki)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en extracción IA: {str(e)}")
     finally:
@@ -590,7 +621,10 @@ def procesar_receta_endpoint(body: ProcesarRecetaRequest, request: Request):
 
     db_cat = SessionLocal()
     try:
+        _cupo_ia(db_cat)
         resultado = extraer_receta(body.texto, db=db_cat)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en extracción IA: {str(e)}")
     finally:

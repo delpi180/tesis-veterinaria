@@ -352,6 +352,10 @@ class HistoriaClinica(Base):
     # Métricas de registro (tesis): cuánto tardó y con qué método
     segundos_registro = Column(Integer)            # tiempo total de llenado
     metodo_registro   = Column(String(10))         # 'manual' | 'ia'
+    # Latencia por etapa, en segundos, medida en el navegador (lo que el doctor
+    # espera de verdad): {grabacion_s, transcripcion_s, extraccion_s, revision_s}.
+    # En modo manual no hay etapas de IA y queda vacío.
+    etapas_registro   = Column(JSONB)
 
     # Autoría: qué doctor veterinario llenó la historia (la hora es creado_en)
     veterinario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
@@ -801,3 +805,63 @@ class VacunaAvisada(Base):
         UniqueConstraint("paciente_id", "vacuna", "proxima_dosis", "tipo", name="uq_vacuna_avisada"),
     )
 
+
+
+# ── Medición de IA (tesis): gasto, latencia y calidad ────────────────────────
+
+class UsoIA(Base):
+    """Una llamada a un servicio de IA (Deepgram u OpenAI): cuánto costó y cuánto tardó.
+
+    Sirve para saber cuánto se gasta, predecir el gasto de las pruebas y poner un
+    tope diario. El costo se calcula al guardar con los precios de `core/config.py`.
+    """
+    __tablename__ = "uso_ia"
+
+    id             = Column(Integer, primary_key=True)
+    creado_en      = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    servicio       = Column(String(20), nullable=False)    # 'deepgram' | 'openai'
+    operacion      = Column(String(30), nullable=False)    # 'transcripcion' | 'historia' | 'receta' | 'evaluacion'
+    modelo         = Column(String(60))
+    tokens_entrada = Column(Integer)
+    tokens_salida  = Column(Integer)
+    segundos_audio = Column(Float)
+    latencia_ms    = Column(Integer)                       # lo que tardó el servicio en responder
+    costo_usd      = Column(Float, default=0)
+    exito          = Column(Boolean, default=True)
+
+
+class EvaluacionVoz(Base):
+    """Una comparación de transcripción contra la referencia escrita a mano (WER)."""
+    __tablename__ = "evaluaciones_voz"
+
+    id                = Column(Integer, primary_key=True)
+    creado_en         = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    etiqueta          = Column(String(120))                # nota libre: «consulta del lunes, Dr. X»
+    texto_referencia  = Column(Text, nullable=False)       # lo que de verdad se dijo
+    texto_deepgram    = Column(Text, nullable=False)       # lo que escribió el sistema
+    palabras_ref      = Column(Integer)
+    sustituidas       = Column(Integer)
+    borradas          = Column(Integer)
+    insertadas        = Column(Integer)
+    wer               = Column(Float)                      # (S + D + I) / palabras de la referencia
+    wer_clinico       = Column(Float)                      # solo sobre términos clínicos (puede ser None)
+    terminos_clinicos = Column(Integer)
+    duracion_audio_s  = Column(Float)
+
+
+class CorridaEvaluacion(Base):
+    """Una corrida del banco de casos con respuesta conocida (gold standard)."""
+    __tablename__ = "corridas_evaluacion"
+
+    id           = Column(Integer, primary_key=True)
+    creado_en    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    modelo       = Column(String(60))
+    casos        = Column(Integer)
+    correctos    = Column(Integer)
+    saltados     = Column(Integer, default=0)
+    exactitud    = Column(Float)                           # correctos / casos evaluados (0 a 1)
+    ic95_inf     = Column(Float)
+    ic95_sup     = Column(Float)
+    latencia_media_ms = Column(Integer)
+    costo_usd    = Column(Float)
+    detalle      = Column(JSONB)                           # por caso: nombre, ok, fallos, ms
